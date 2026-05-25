@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { processCapture } from "@/lib/ai";
 
 const PATH = "/insights-pedro";
 
@@ -19,14 +20,52 @@ export async function getCaptures() {
 
 export async function createCapture(formData: FormData) {
   const supabase = await createClient();
-  const { error } = await supabase.from("captures").insert({
-    title: formData.get("title") as string,
-    context: (formData.get("context") as string) || null,
-    source_type: formData.get("source_type") as string,
-    source_url: (formData.get("source_url") as string) || null,
-    raw_content: (formData.get("raw_content") as string) || null,
-  });
+  const rawContent = (formData.get("raw_content") as string) || null;
+  const sourceType = formData.get("source_type") as string;
+
+  const { data: inserted, error } = await supabase
+    .from("captures")
+    .insert({
+      title: formData.get("title") as string,
+      context: (formData.get("context") as string) || null,
+      source_type: sourceType,
+      source_url: (formData.get("source_url") as string) || null,
+      raw_content: rawContent,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+
+  // AI processing (non-blocking — capture is already saved)
+  try {
+    if (rawContent) {
+      const result = await processCapture(rawContent, sourceType);
+
+      if ("error" in result) throw new Error(result.error);
+
+      // Save proposals
+      if (result.proposals && result.proposals.length > 0) {
+        const proposalRows = result.proposals.map((p) => ({
+          ...p,
+          capture_id: inserted.id,
+        }));
+        await supabase.from("proposals").insert(proposalRows);
+      }
+
+      // Update capture status
+      await supabase
+        .from("captures")
+        .update({
+          status: "processed",
+          speaker_verified: result.speaker_verified,
+        })
+        .eq("id", inserted.id);
+    }
+  } catch (aiError) {
+    // AI failure is non-fatal — the capture remains saved without proposals
+    console.error("[AI] processCapture failed:", aiError);
+  }
+
   revalidatePath(PATH);
 }
 

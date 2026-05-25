@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { generateContent } from "@/lib/ai";
 
 const PATH = "/gerar-conteudo";
 
@@ -56,18 +57,80 @@ export async function getGeneratedContents() {
 export async function createGeneratedContent(formData: FormData) {
   const supabase = await createClient();
   const sourceType = formData.get("source_type") as string;
-  const { error } = await supabase.from("generated_contents").insert({
-    source_type: sourceType,
-    playbook_id: (formData.get("playbook_id") as string) || null,
-    story_id: (formData.get("story_id") as string) || null,
-    free_text_input: (formData.get("free_text_input") as string) || null,
-    content_type: formData.get("content_type") as string,
-    format_id: (formData.get("format_id") as string) || null,
-    content_text:
-      "Geração de conteúdo pendente — integração com IA em breve",
-    status: "draft",
-  });
+  const playbookId = (formData.get("playbook_id") as string) || null;
+  const storyId = (formData.get("story_id") as string) || null;
+  const freeTextInput = (formData.get("free_text_input") as string) || null;
+  const contentType = formData.get("content_type") as string;
+  const formatId = (formData.get("format_id") as string) || null;
+
+  const { data: inserted, error } = await supabase
+    .from("generated_contents")
+    .insert({
+      source_type: sourceType,
+      playbook_id: playbookId,
+      story_id: storyId,
+      free_text_input: freeTextInput,
+      content_type: contentType,
+      format_id: formatId,
+      content_text:
+        "Geração de conteúdo pendente — integração com IA em breve",
+      status: "draft",
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+
+  // AI generation (non-blocking — record is already saved)
+  try {
+    // Fetch supporting data for AI
+    const [identityRes, playbookRes, storyRes, formatRes, feedbackRes] =
+      await Promise.all([
+        supabase.from("identity").select("*").limit(1).single(),
+        playbookId
+          ? supabase.from("playbooks").select("*").eq("id", playbookId).single()
+          : Promise.resolve({ data: null }),
+        storyId
+          ? supabase.from("stories").select("*").eq("id", storyId).single()
+          : Promise.resolve({ data: null }),
+        formatId
+          ? supabase
+              .from("content_formats")
+              .select("*")
+              .eq("id", formatId)
+              .single()
+          : Promise.resolve({ data: null }),
+        supabase
+          .from("generated_contents")
+          .select("feedback_text, feedback_rating")
+          .not("feedback_text", "is", null)
+          .lte("feedback_rating", 2)
+          .order("created_at", { ascending: false })
+          .limit(5),
+      ]);
+
+    const result = await generateContent({
+      identity: identityRes.data,
+      playbook: playbookRes.data,
+      story: storyRes.data,
+      format: formatRes.data,
+      freeText: freeTextInput ?? undefined,
+      contentType,
+      recentFeedbacks: feedbackRes.data ?? [],
+    });
+
+    if (!("error" in result)) {
+      await supabase
+        .from("generated_contents")
+        .update({
+          content_text: result.content_text,
+          source_map: result.source_map,
+        })
+        .eq("id", inserted.id);
+    }
+  } catch (aiError) {
+    console.error("[AI] generateContent failed:", aiError);
+  }
+
   revalidatePath(PATH);
 }
 

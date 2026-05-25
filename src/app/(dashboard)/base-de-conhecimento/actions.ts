@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { analyzeCompleteness } from "@/lib/ai";
 
 // --- Themes ---
 
@@ -158,5 +159,41 @@ export async function deleteStory(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("stories").delete().eq("id", id);
   if (error) throw error;
+  revalidatePath("/base-de-conhecimento");
+}
+
+// --- Playbook Completeness Analysis ---
+
+export async function analyzePlaybookCompleteness(id: string) {
+  const supabase = await createClient();
+  const { data: playbook, error } = await supabase
+    .from("playbooks")
+    .select("*, theme:themes(*)")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+
+  try {
+    const result = await analyzeCompleteness(playbook);
+
+    if ("error" in result) {
+      throw new Error(result.error);
+    }
+
+    await supabase
+      .from("playbooks")
+      .update({
+        completeness_score: result.completeness_score,
+        has_example: result.has_example,
+        has_story: result.has_story,
+        has_origin: result.has_origin,
+        has_counterexample: result.has_counterexample,
+      })
+      .eq("id", id);
+  } catch (aiError) {
+    console.error("[AI] analyzeCompleteness failed:", aiError);
+    throw new Error("Falha ao analisar completude do playbook");
+  }
+
   revalidatePath("/base-de-conhecimento");
 }
