@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { usePathname } from "next/navigation";
 
 const tabs = [
   { href: "/base-de-conhecimento", label: "Base de Conhecimento" },
@@ -14,18 +13,10 @@ const tabs = [
 
 export default function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const supabase = createClient();
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
 
   return (
     <header className="border-b border-rule bg-paper">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+      <div className="mx-auto flex max-w-7xl items-center px-4 py-3">
         <Link href="/base-de-conhecimento" className="flex items-baseline gap-2">
           <span className="font-display text-lg font-bold text-ink">
             Segundo Cérebro
@@ -34,13 +25,6 @@ export default function Navbar() {
             do Pedro
           </span>
         </Link>
-
-        <button
-          onClick={handleLogout}
-          className="font-mono text-xs uppercase tracking-wider text-ink-muted hover:text-accent transition"
-        >
-          Sair
-        </button>
       </div>
 
       <nav className="mx-auto max-w-7xl overflow-x-auto px-4">
