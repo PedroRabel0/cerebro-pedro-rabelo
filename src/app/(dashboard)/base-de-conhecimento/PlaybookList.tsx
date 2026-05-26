@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Playbook, Theme } from "@/lib/supabase/types";
 import { createPlaybook, updatePlaybook, deletePlaybook } from "./actions";
+import BookQuestionsPanel from "./BookQuestionsPanel";
 
 function CompletenessBar({ score }: { score: number }) {
   const color =
@@ -86,7 +87,7 @@ function PlaybookForm({
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-accent px-4 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-1.5 font-mono text-xs font-bold text-white transition hover:bg-accent-hover disabled:opacity-50"
           >
             {saving ? "Salvando..." : "Salvar"}
           </button>
@@ -113,6 +114,7 @@ export default function PlaybookList({
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Playbook | null>(null);
   const [filterTheme, setFilterTheme] = useState<string>("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filtered = filterTheme
     ? playbooks.filter((p) => p.theme_id === filterTheme)
@@ -161,7 +163,7 @@ export default function PlaybookList({
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="rounded-lg bg-accent px-3 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover"
+          className="rounded-lg bg-accent px-3 py-1.5 font-mono text-xs font-bold text-white transition hover:bg-accent-hover"
         >
           + Novo Playbook
         </button>
@@ -173,48 +175,85 @@ export default function PlaybookList({
         </p>
       ) : (
         <div className="space-y-2">
-          {filtered.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 transition hover:border-border-light"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="truncate font-sans text-sm font-medium text-text">
-                    {p.title}
-                  </h3>
-                  {p.theme && (
-                    <span
-                      className="inline-block rounded-full px-2 py-0.5 font-mono text-[10px] text-bg"
-                      style={{ backgroundColor: p.theme.color ?? "#3a5a7a" }}
+          {filtered.map((p) => {
+            const isBookReady =
+              p.has_example &&
+              p.has_story &&
+              p.has_origin &&
+              p.has_counterexample &&
+              p.completeness_score >= 80;
+            const isExpanded = expandedId === p.id;
+
+            return (
+              <div
+                key={p.id}
+                className="rounded-xl border border-border bg-card transition hover:border-border-light"
+              >
+                <div className="flex items-center justify-between px-4 py-3">
+                  <button
+                    onClick={() =>
+                      setExpandedId(isExpanded ? null : p.id)
+                    }
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate font-sans text-sm font-medium text-text">
+                        {p.title}
+                      </h3>
+                      {p.theme && (
+                        <span
+                          className="inline-block rounded-full px-2 py-0.5 font-mono text-[10px] text-white"
+                          style={{
+                            backgroundColor: p.theme.color ?? "#3a5a7a",
+                          }}
+                        >
+                          {p.theme.name}
+                        </span>
+                      )}
+                      {isBookReady && (
+                        <span className="inline-block rounded-full bg-green/20 px-2 py-0.5 font-mono text-[10px] font-bold text-green">
+                          Pronto pro Livro
+                        </span>
+                      )}
+                    </div>
+                    {p.subtitle && (
+                      <p className="mt-0.5 truncate text-xs text-text-muted">
+                        {p.subtitle}
+                      </p>
+                    )}
+                    <CompletenessBar score={p.completeness_score} />
+                  </button>
+                  <div className="ml-3 flex shrink-0 gap-1">
+                    <button
+                      onClick={() => setEditing(p)}
+                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-blue transition hover:bg-card"
                     >
-                      {p.theme.name}
-                    </span>
-                  )}
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
+                    >
+                      Apagar
+                    </button>
+                  </div>
                 </div>
-                {p.subtitle && (
-                  <p className="mt-0.5 truncate text-xs text-text-muted">
-                    {p.subtitle}
-                  </p>
+
+                {isExpanded && (
+                  <div className="border-t border-border px-4 pb-4">
+                    {p.body_markdown && (
+                      <div className="mt-3 rounded-lg bg-surface p-3">
+                        <pre className="whitespace-pre-wrap text-xs text-text-secondary font-sans leading-relaxed">
+                          {p.body_markdown}
+                        </pre>
+                      </div>
+                    )}
+                    <BookQuestionsPanel playbook={p} />
+                  </div>
                 )}
-                <CompletenessBar score={p.completeness_score} />
               </div>
-              <div className="ml-3 flex shrink-0 gap-1">
-                <button
-                  onClick={() => setEditing(p)}
-                  className="rounded-lg px-2 py-1 font-mono text-[10px] text-blue transition hover:bg-card"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => handleDelete(p.id)}
-                  className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
-                >
-                  Apagar
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -90,7 +90,7 @@ function StoryForm({
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-accent px-4 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-1.5 font-mono text-xs font-bold text-white transition hover:bg-accent-hover disabled:opacity-50"
           >
             {saving ? "Salvando..." : "Salvar"}
           </button>
@@ -132,7 +132,7 @@ export default function StoryList({ stories }: { stories: Story[] }) {
         </span>
         <button
           onClick={() => setShowForm(true)}
-          className="rounded-lg bg-accent px-3 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover"
+          className="rounded-lg bg-accent px-3 py-1.5 font-mono text-xs font-bold text-white transition hover:bg-accent-hover"
         >
           + Nova História
         </button>

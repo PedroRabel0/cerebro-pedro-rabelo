@@ -92,7 +92,7 @@ function CaptureForm({ onClose }: { onClose: () => void }) {
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 font-mono text-xs font-bold text-white transition hover:bg-accent-hover disabled:opacity-50"
           >
             <Save className="h-3 w-3" />
             {saving ? "Salvando..." : "Salvar"}
@@ -132,7 +132,7 @@ export default function CaptureList({ captures }: { captures: Capture[] }) {
         </span>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover"
+          className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 font-mono text-xs font-bold text-white transition hover:bg-accent-hover"
         >
           <Plus className="h-3.5 w-3.5" />
           Nova Captura

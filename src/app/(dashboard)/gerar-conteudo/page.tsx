@@ -4,14 +4,18 @@ export const maxDuration = 60;
 import {
   getFormats,
   getGeneratedContents,
+  getPlaybooks,
+  getStories,
 } from "./actions";
 import Tabs from "./Tabs";
 import { Sparkles } from "lucide-react";
 
 export default async function GerarConteudoPage() {
-  const [formats, contents] = await Promise.all([
+  const [formats, contents, playbooks, stories] = await Promise.all([
     getFormats(),
     getGeneratedContents(),
+    getPlaybooks(),
+    getStories(),
   ]);
 
   return (
@@ -35,6 +39,8 @@ export default async function GerarConteudoPage() {
       <Tabs
         formats={formats}
         contents={contents}
+        playbooks={playbooks}
+        stories={stories}
       />
     </div>
   );

@@ -59,7 +59,7 @@ export default function ThemeManager({ themes }: { themes: Theme[] }) {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-accent px-3 py-1 font-mono text-[10px] font-bold text-bg disabled:opacity-50"
+              className="rounded-lg bg-accent px-3 py-1 font-mono text-[10px] font-bold text-white disabled:opacity-50"
             >
               {saving ? "..." : "Criar"}
             </button>

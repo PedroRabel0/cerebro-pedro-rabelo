@@ -3,14 +3,12 @@ import { getClient, logCost, parseJSON } from './client';
 
 // --- Types ---
 
-export interface GeneratedPost {
-  platform: 'instagram_carousel' | 'linkedin_post' | 'x_thread';
+export interface ProposalResult {
+  type: 'playbook' | 'story' | 'question';
   title: string;
-  caption: string;
-  hashtags: string[];
-  hook: string;
-  cta: string;
-  slides?: string[];
+  summary?: string;
+  content_markdown: string;
+  suggested_tags: string[];
 }
 
 export interface UniversalInputResult {
@@ -26,7 +24,7 @@ export interface UniversalInputResult {
   summary: string;
   source_url: string | null;
   raw_content: string;
-  proposals: GeneratedPost[];
+  proposals: ProposalResult[];
   extracted_themes: string[];
   speaker_verified: boolean;
 }
@@ -65,9 +63,15 @@ export async function processUniversalInput(
       }
     }
 
-    const systemPrompt = `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR). SE O CONTEÚDO ORIGINAL ESTIVER EM INGLÊS OU QUALQUER OUTRO IDIOMA, TRADUZA E ADAPTE TUDO PARA PT-BR. TÍTULOS, RESUMOS, PROPOSTAS, TAGS, POSTS — TUDO EM PORTUGUÊS. NUNCA RESPONDA EM INGLÊS OU OUTRO IDIOMA.
+    const systemPrompt = `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR). SE O CONTEÚDO ORIGINAL ESTIVER EM INGLÊS OU QUALQUER OUTRO IDIOMA, TRADUZA E ADAPTE TUDO PARA PT-BR. TÍTULOS, RESUMOS, PROPOSTAS, TAGS — TUDO EM PORTUGUÊS. NUNCA RESPONDA EM INGLÊS OU OUTRO IDIOMA.
 
-Voce e o ghostwriter do Pedro Rabelo. Seu trabalho e transformar qualquer input — link, texto, transcricao, ideia solta — em POSTS PRONTOS para publicar.
+Voce e o analista de conteudo do Pedro Rabelo. Seu trabalho e transformar qualquer input — link, texto, transcricao, ideia solta — em PROPOSTAS de conhecimento estruturado para a Base de Conhecimento do Pedro.
+
+## Contexto:
+A Base de Conhecimento do Pedro tem 3 tipos de itens:
+- **Playbooks**: Conviccoes, frameworks, metodologias que o Pedro ensina. Estruturados como ensino/guia pratico.
+- **Historias (Stories)**: Historias pessoais, estudos de caso, exemplos reais. Estruturados como narrativa.
+- **Perguntas (Questions)**: Pontos que merecem ser explorados mais a fundo — exemplos, origens, contra-exemplos, historias relacionadas.
 
 ## Tom e Estilo do Pedro:
 - Tom: direto, pratico, contrario ao senso comum
@@ -75,29 +79,24 @@ Voce e o ghostwriter do Pedro Rabelo. Seu trabalho e transformar qualquer input 
 - Usa frases curtas e impactantes
 - Traz exemplos reais e numeros quando possivel
 - NUNCA use: "Ola pessoal", "Nesse video", emojis excessivos, linguagem de guru
-- NUNCA use frases genericas tipo "vou te contar um segredo", "a maioria das pessoas nao sabe"
 - SEMPRE em portugues brasileiro
-- Baseie-se no conteudo fornecido para criar posts que o Pedro publicaria
 
 ## O que voce deve fazer:
 1. DETECTAR o tipo do input (youtube, instagram, article, book, podcast, free_text)
 2. EXTRAIR o conteudo relevante e resumir
-3. GERAR exatamente 3 posts PRONTOS para publicar:
-   - 1 post de Instagram Carousel (com slides)
-   - 1 post de LinkedIn
-   - 1 thread de X/Twitter
+3. GERAR propostas de conhecimento estruturado:
+   - **Playbook proposals**: Identifique conviccoes, frameworks ou metodologias. O content_markdown deve ser estruturado como ensino (com secoes, passos, principios).
+   - **Story proposals**: Identifique historias pessoais, estudos de caso, exemplos reais. O content_markdown deve ser estruturado como narrativa (contexto, acontecimento, licao).
+   - **Question proposals**: Identifique pontos que merecem exploracao futura. O content_markdown deve explicar por que essa pergunta importa.
 4. IDENTIFICAR temas recorrentes
 5. VERIFICAR se e o Pedro falando (speaker_verified)
 
-## Regras para os posts:
-- Cada post deve ter um HOOK forte na primeira linha (algo que faca a pessoa parar de rolar)
-- O conteudo deve ser ACIONAVEL — o leitor deve sair sabendo fazer algo
-- CTA (call-to-action) no final de cada post
-- Hashtags relevantes em portugues
-- O carousel do Instagram deve ter entre 5-8 slides
-- O thread do X deve ter entre 4-7 tweets
-- O post do LinkedIn deve ter entre 800-1500 caracteres
-- TODOS os posts devem extrair as ideias-chave do conteudo fornecido
+## Regras para as propostas:
+- Gere entre 2 e 6 propostas, dependendo da riqueza do conteudo
+- Cada playbook deve ter content_markdown bem estruturado com ## secoes, listas, passos praticos
+- Cada story deve ter content_markdown com narrativa: contexto, o que aconteceu, licao aprendida
+- Cada question deve ter content_markdown explicando o contexto e por que vale explorar
+- suggested_tags devem ser em portugues, relevantes ao tema
 - Se for URL e nao tiver conteudo, faca o melhor com a URL disponivel
 
 ## Formato de Resposta (JSON):
@@ -108,29 +107,23 @@ Voce e o ghostwriter do Pedro Rabelo. Seu trabalho e transformar qualquer input 
   "summary": "Resumo em 2-3 frases",
   "proposals": [
     {
-      "platform": "instagram_carousel",
-      "title": "Titulo interno do post",
-      "caption": "Legenda completa do carousel com quebras de linha",
-      "hashtags": ["hashtag1", "hashtag2"],
-      "hook": "Primeira linha impactante",
-      "cta": "Call-to-action final",
-      "slides": ["Texto do slide 1 (capa)", "Texto do slide 2", "Texto do slide 3", "..."]
+      "type": "playbook",
+      "title": "Titulo do framework/metodologia",
+      "content_markdown": "## Principio\\n\\nConteudo estruturado como ensino...",
+      "suggested_tags": ["tag1", "tag2"]
     },
     {
-      "platform": "linkedin_post",
-      "title": "Titulo interno do post",
-      "caption": "Texto completo do post no LinkedIn",
-      "hashtags": ["hashtag1", "hashtag2"],
-      "hook": "Primeira linha impactante",
-      "cta": "Call-to-action final"
+      "type": "story",
+      "title": "Titulo da historia",
+      "summary": "Resumo breve da historia",
+      "content_markdown": "## Contexto\\n\\nNarrativa estruturada...",
+      "suggested_tags": ["tag1"]
     },
     {
-      "platform": "x_thread",
-      "title": "Titulo interno da thread",
-      "caption": "Tweet 1\\n\\nTweet 2\\n\\nTweet 3 (cada tweet separado por linha em branco)",
-      "hashtags": ["hashtag1", "hashtag2"],
-      "hook": "Primeiro tweet impactante",
-      "cta": "Call-to-action no ultimo tweet"
+      "type": "question",
+      "title": "Pergunta a explorar",
+      "content_markdown": "Contexto sobre por que essa pergunta importa...",
+      "suggested_tags": []
     }
   ],
   "extracted_themes": ["tema1", "tema2"],
@@ -144,11 +137,11 @@ Voce e o ghostwriter do Pedro Rabelo. Seu trabalho e transformar qualquer input 
       // We have real YouTube transcript or Gemini analysis
       const isGeminiAnalysis = youtubeContent.transcript.startsWith('[Análise do vídeo via Gemini');
       userPrompt = isGeminiAnalysis
-        ? `Processe esta analise de video do YouTube:\n\nTitulo: ${youtubeContent.title}\nCanal: ${youtubeContent.author}\n\n${youtubeContent.transcript}\n\nCom base nesta analise detalhada, gere os 3 posts prontos para publicar extraindo os melhores insights e topicos abordados.`
+        ? `Processe esta analise de video do YouTube:\n\nTitulo: ${youtubeContent.title}\nCanal: ${youtubeContent.author}\n\n${youtubeContent.transcript}\n\nCom base nesta analise detalhada, gere propostas de playbooks, historias e perguntas para a Base de Conhecimento.`
         : `Processe este video do YouTube:\n\nTitulo: ${youtubeContent.title}\nCanal: ${youtubeContent.author}\n\nTranscricao:\n${youtubeContent.transcript}`;
     } else if (youtubeContent && !youtubeContent.transcript) {
       // YouTube URL but no transcript - use metadata
-      userPrompt = `Processe este video do YouTube baseado no titulo e canal:\n\nTitulo: ${youtubeContent.title}\nCanal: ${youtubeContent.author}\nURL: ${input.trim()}\n\nNao foi possivel obter a transcricao completa, mas crie os 3 posts baseados no titulo, canal e tema do video. Faca sua melhor inferencia sobre o conteudo.`;
+      userPrompt = `Processe este video do YouTube baseado no titulo e canal:\n\nTitulo: ${youtubeContent.title}\nCanal: ${youtubeContent.author}\nURL: ${input.trim()}\n\nNao foi possivel obter a transcricao completa, mas gere propostas de conhecimento baseadas no titulo, canal e tema do video. Faca sua melhor inferencia sobre o conteudo.`;
     } else if (isUrl) {
       userPrompt = `Processe este link e extraia todo o conhecimento possivel:\n\n${input.trim()}\n\nNota: Voce nao pode acessar a URL, mas analise o dominio, path, e qualquer contexto para inferir o conteudo.`;
     } else {

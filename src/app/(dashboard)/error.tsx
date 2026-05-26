@@ -22,7 +22,7 @@ export default function DashboardError({
 
         <button
           onClick={reset}
-          className="mt-2 inline-flex items-center rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-bg transition-colors hover:bg-accent/90"
+          className="mt-2 inline-flex items-center rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent/90"
         >
           Tentar novamente
         </button>

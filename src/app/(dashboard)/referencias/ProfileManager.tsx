@@ -148,7 +148,7 @@ export default function ProfileManager({
             <button
               type="submit"
               disabled={saving}
-              className="ml-auto rounded-lg bg-blue px-3 py-1 font-mono text-[10px] font-bold text-bg disabled:opacity-50"
+              className="ml-auto rounded-lg bg-blue px-3 py-1 font-mono text-[10px] font-bold text-white disabled:opacity-50"
             >
               {saving ? (scrapingMessage ? "Scraping..." : "...") : "Criar"}
             </button>

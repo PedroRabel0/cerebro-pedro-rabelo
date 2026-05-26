@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { analyzeCompleteness } from "@/lib/ai";
+import { analyzeCompleteness, generateBookQuestions } from "@/lib/ai";
 
 // --- Themes ---
 
@@ -190,10 +190,80 @@ export async function analyzePlaybookCompleteness(id: string) {
         has_counterexample: result.has_counterexample,
       })
       .eq("id", id);
+
+    revalidatePath("/base-de-conhecimento");
+    return result;
   } catch (aiError) {
     console.error("[AI] analyzeCompleteness failed:", aiError);
     throw new Error("Falha ao analisar completude do playbook");
   }
+}
+
+// --- Book Questions ---
+
+export async function getBookQuestions(playbookId: string) {
+  const supabase = await createClient();
+  const { data: playbook, error } = await supabase
+    .from("playbooks")
+    .select("*, theme:themes(*)")
+    .eq("id", playbookId)
+    .single();
+  if (error) throw error;
+
+  const result = await generateBookQuestions(playbook);
+
+  if ("error" in result) {
+    throw new Error(result.error);
+  }
+
+  return result;
+}
+
+export async function saveQuestionAnswer(
+  playbookId: string,
+  questionText: string,
+  answer: string
+) {
+  const supabase = await createClient();
+  const { data: playbook, error } = await supabase
+    .from("playbooks")
+    .select("*")
+    .eq("id", playbookId)
+    .single();
+  if (error) throw error;
+
+  // Append answer to body_markdown
+  const existingBody = playbook.body_markdown || "";
+  const section = `\n\n---\n\n**P:** ${questionText}\n\n**R:** ${answer}`;
+  const updatedBody = existingBody + section;
+
+  await supabase
+    .from("playbooks")
+    .update({ body_markdown: updatedBody })
+    .eq("id", playbookId);
+
+  // Re-analyze completeness
+  const completenessResult = await analyzeCompleteness({ ...playbook, body_markdown: updatedBody });
+  if (!("error" in completenessResult)) {
+    await supabase
+      .from("playbooks")
+      .update({
+        completeness_score: completenessResult.completeness_score,
+        has_example: completenessResult.has_example,
+        has_story: completenessResult.has_story,
+        has_origin: completenessResult.has_origin,
+        has_counterexample: completenessResult.has_counterexample,
+      })
+      .eq("id", playbookId);
+  }
 
   revalidatePath("/base-de-conhecimento");
+
+  // Return updated playbook
+  const { data: updated } = await supabase
+    .from("playbooks")
+    .select("*, theme:themes(*)")
+    .eq("id", playbookId)
+    .single();
+  return updated;
 }

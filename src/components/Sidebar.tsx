@@ -64,7 +64,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 border-b border-border px-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-hover shadow-lg shadow-accent/20">
-          <Brain className="h-5 w-5 text-bg" />
+          <Brain className="h-5 w-5 text-white" />
         </div>
         <div>
           <h1 className="font-display text-sm font-bold text-text">

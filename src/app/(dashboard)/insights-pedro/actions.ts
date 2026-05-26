@@ -102,6 +102,93 @@ export async function updateProposalStatus(
   revalidatePath(PATH);
 }
 
+export async function approveProposal(proposalId: string) {
+  const supabase = await createClient();
+
+  // 1. Read the proposal
+  const { data: proposal, error: fetchError } = await supabase
+    .from("proposals")
+    .select("*")
+    .eq("id", proposalId)
+    .single();
+
+  if (fetchError || !proposal) throw fetchError || new Error("Proposal not found");
+
+  // 2. Create the corresponding item in the knowledge base
+  if (proposal.type === "playbook") {
+    const { error: insertError } = await supabase.from("playbooks").insert({
+      title: proposal.title,
+      body_markdown: proposal.content_markdown,
+      completeness_score: 0,
+      has_example: false,
+      has_story: false,
+      has_origin: false,
+      has_counterexample: false,
+    });
+    if (insertError) throw insertError;
+  } else if (proposal.type === "story") {
+    const { error: insertError } = await supabase.from("stories").insert({
+      title: proposal.title,
+      body_markdown: proposal.content_markdown,
+      tags: proposal.suggested_tags || [],
+    });
+    if (insertError) throw insertError;
+  }
+  // For "question" type, we just mark as approved (no separate table)
+
+  // 3. Update proposal status
+  const { error: updateError } = await supabase
+    .from("proposals")
+    .update({ status: "approved", reviewed_at: new Date().toISOString() })
+    .eq("id", proposalId);
+  if (updateError) throw updateError;
+
+  // 4. Log activity
+  await supabase.from("activity_log").insert({
+    actor: "henrique",
+    action: `Aprovou proposta de ${proposal.type}: "${proposal.title}"`,
+    entity_type: "proposal",
+    entity_id: proposalId,
+    entity_title: proposal.title,
+  });
+
+  // 5. Revalidate paths
+  revalidatePath(PATH);
+  revalidatePath("/base-de-conhecimento");
+  revalidatePath("/");
+}
+
+export async function rejectProposal(proposalId: string) {
+  const supabase = await createClient();
+
+  // 1. Read the proposal for logging
+  const { data: proposal } = await supabase
+    .from("proposals")
+    .select("title, type")
+    .eq("id", proposalId)
+    .single();
+
+  // 2. Update proposal status
+  const { error: updateError } = await supabase
+    .from("proposals")
+    .update({ status: "rejected", reviewed_at: new Date().toISOString() })
+    .eq("id", proposalId);
+  if (updateError) throw updateError;
+
+  // 3. Log activity
+  if (proposal) {
+    await supabase.from("activity_log").insert({
+      actor: "henrique",
+      action: `Rejeitou proposta de ${proposal.type}: "${proposal.title}"`,
+      entity_type: "proposal",
+      entity_id: proposalId,
+      entity_title: proposal.title,
+    });
+  }
+
+  revalidatePath(PATH);
+}
+
 // --- Activity Log ---
 
 export async function getActivityLog() {

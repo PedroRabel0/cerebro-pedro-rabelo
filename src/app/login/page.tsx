@@ -52,7 +52,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent">
-            <Brain className="h-6 w-6 text-bg" />
+            <Brain className="h-6 w-6 text-white" />
           </div>
           <h1 className="font-display text-3xl font-bold text-text">
             Segundo Cerebro
@@ -113,7 +113,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-accent px-4 py-2 font-mono text-sm font-semibold text-bg transition hover:bg-accent-hover disabled:opacity-50"
+            className="w-full rounded-xl bg-accent px-4 py-2 font-mono text-sm font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50"
           >
             {loading
               ? "Carregando..."

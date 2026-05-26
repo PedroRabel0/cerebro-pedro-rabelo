@@ -15,18 +15,11 @@ import {
   MessageSquare,
   Paperclip,
   Hash,
-  ArrowRight,
   Sparkles,
   Brain,
-  Search as SearchIcon,
-  Image as ImageIcon,
-  Heart,
-  MessageCircle,
-  TrendingUp,
-  Copy,
-  Check,
+  BookMarked,
+  HelpCircle,
 } from "lucide-react";
-import SlideDesigner from "@/components/SlideDesigner";
 
 type ProcessingState = "idle" | "processing" | "done" | "error";
 
@@ -35,14 +28,12 @@ type ProcessingStep = {
   status: "pending" | "active" | "done";
 };
 
-interface GeneratedPost {
-  platform: string;
+interface ProposalResult {
+  type: "playbook" | "story" | "question";
   title: string;
-  caption: string;
-  hashtags: string[];
-  hook: string;
-  cta: string;
-  slides?: string[];
+  summary?: string;
+  content_markdown: string;
+  suggested_tags: string[];
 }
 
 interface ProcessResult {
@@ -52,17 +43,9 @@ interface ProcessResult {
     detected_type: string;
     title: string;
     summary: string;
-    proposals: GeneratedPost[];
+    proposals: ProposalResult[];
     extracted_themes: string[];
   };
-  instagramData?: {
-    caption: string | null;
-    likes: number;
-    comments: number;
-    thumbnail_url: string | null;
-    owner_username: string | null;
-    engagement_rate: number | null;
-  } | null;
 }
 
 const typeIcons: Record<string, typeof Video> = {
@@ -73,6 +56,27 @@ const typeIcons: Record<string, typeof Video> = {
   podcast: Mic,
   free_text: MessageSquare,
   unknown: Paperclip,
+};
+
+const proposalTypeConfig: Record<
+  string,
+  { label: string; className: string; Icon: typeof BookOpen }
+> = {
+  playbook: {
+    label: "Playbook",
+    className: "bg-red-500/10 text-red-400 border-red-500/20",
+    Icon: BookOpen,
+  },
+  story: {
+    label: "História",
+    className: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    Icon: BookMarked,
+  },
+  question: {
+    label: "Pergunta",
+    className: "bg-green-500/10 text-green-400 border-green-500/20",
+    Icon: HelpCircle,
+  },
 };
 
 function detectInputType(input: string): string | null {
@@ -104,36 +108,25 @@ function getProcessingSteps(input: string): ProcessingStep[] {
   }
 
   steps.push(
-    { label: "Processando com Claude AI", status: "pending" },
-    { label: "Gerando propostas", status: "pending" }
+    { label: "Analisando conteúdo com Claude AI", status: "pending" },
+    { label: "Gerando propostas para a Base", status: "pending" }
   );
 
   return steps;
 }
 
-const platformLabels: Record<string, string> = {
-  instagram_carousel: "Instagram Carousel",
-  linkedin_post: "LinkedIn Post",
-  x_thread: "X / Twitter Thread",
-};
-
-const platformColors: Record<string, string> = {
-  instagram_carousel: "bg-pink-500/10 text-pink-400 border-pink-500/20",
-  linkedin_post: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  x_thread: "bg-sky-500/10 text-sky-400 border-sky-500/20",
-};
-
-function PostPreviewCard({ post, index }: { post: GeneratedPost; index: number }) {
-  const [copied, setCopied] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-
-  const fullText = [post.caption, "", post.hashtags.map(h => h.startsWith("#") ? h : `#${h}`).join(" ")].join("\n");
-
-  function handleCopy() {
-    navigator.clipboard.writeText(fullText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
+function ProposalPreviewCard({
+  proposal,
+  index,
+}: {
+  proposal: ProposalResult;
+  index: number;
+}) {
+  const config = proposalTypeConfig[proposal.type] || proposalTypeConfig.playbook;
+  const preview =
+    proposal.content_markdown.length > 200
+      ? proposal.content_markdown.slice(0, 200) + "..."
+      : proposal.content_markdown;
 
   return (
     <div
@@ -142,56 +135,35 @@ function PostPreviewCard({ post, index }: { post: GeneratedPost; index: number }
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border bg-surface/50 px-4 py-2">
-        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase ${platformColors[post.platform] || "bg-surface text-text-muted border-border"}`}>
-          {platformLabels[post.platform] || post.platform}
-        </span>
-        <button
-          onClick={handleCopy}
-          className="inline-flex items-center gap-1 rounded-lg bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-semibold text-accent transition hover:bg-accent/20"
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase ${config.className}`}
         >
-          {copied ? <><Check className="h-3 w-3" /> Copiado!</> : <><Copy className="h-3 w-3" /> Copiar post</>}
-        </button>
+          <config.Icon className="h-3 w-3" />
+          {config.label}
+        </span>
+        <span className="font-mono text-[9px] text-text-muted uppercase">
+          Será adicionado à Base
+        </span>
       </div>
 
-      <div className="px-4 py-3 space-y-3">
-        {/* Hook */}
-        {post.hook && (
-          <div className="rounded-lg bg-accent/5 border border-accent/10 px-3 py-2">
-            <span className="font-mono text-[9px] uppercase tracking-wider text-accent/60 block mb-0.5">Hook</span>
-            <p className="text-sm font-semibold text-text leading-snug">{post.hook}</p>
-          </div>
-        )}
+      <div className="px-4 py-3 space-y-2">
+        {/* Title */}
+        <h4 className="text-sm font-semibold text-text">{proposal.title}</h4>
 
-        {/* Slide Designer for carousel */}
-        {post.platform === "instagram_carousel" && post.slides && post.slides.length > 0 && (
-          <SlideDesigner
-            slides={post.slides}
-            hook={post.hook}
-            cta={post.cta}
-            title={post.title}
-            hashtags={post.hashtags}
-          />
-        )}
+        {/* Content preview */}
+        <p className="text-xs leading-relaxed text-text-muted whitespace-pre-wrap">
+          {preview}
+        </p>
 
-        {/* Caption */}
-        <div>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-text-muted mb-1 hover:text-text transition"
-          >
-            Legenda {expanded ? "(ocultar)" : "(expandir)"}
-          </button>
-          <p className={`text-xs leading-relaxed text-text-muted whitespace-pre-wrap ${expanded ? "" : "line-clamp-4"}`}>
-            {post.caption}
-          </p>
-        </div>
-
-        {/* Hashtags */}
-        {post.hashtags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {post.hashtags.map((tag) => (
-              <span key={tag} className="rounded-md bg-surface px-1.5 py-0.5 font-mono text-[10px] text-accent/80">
-                {tag.startsWith("#") ? tag : `#${tag}`}
+        {/* Tags */}
+        {proposal.suggested_tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-1">
+            {proposal.suggested_tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-md bg-surface px-1.5 py-0.5 font-mono text-[10px] text-accent/80"
+              >
+                {tag}
               </span>
             ))}
           </div>
@@ -302,7 +274,7 @@ export default function UniversalInput() {
           <button
             onClick={handleSubmit}
             disabled={!input.trim() || state === "processing"}
-            className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 font-mono text-xs font-bold text-bg transition-all hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/20 disabled:opacity-40 disabled:hover:shadow-none"
+            className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 font-mono text-xs font-bold text-white transition-all hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/20 disabled:opacity-40 disabled:hover:shadow-none"
           >
             {state === "processing" ? (
               <>
@@ -391,11 +363,11 @@ export default function UniversalInput() {
               <div className="flex items-center gap-2">
                 <Sparkles className="h-3 w-3 text-accent" />
                 <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
-                  {result.result.proposals.length} post(s) pronto(s) para publicar
+                  {result.result.proposals.length} proposta(s) para a Base de Conhecimento
                 </span>
               </div>
               {result.result.proposals.map((p, i) => (
-                <PostPreviewCard key={i} post={p} index={i} />
+                <ProposalPreviewCard key={i} proposal={p} index={i} />
               ))}
             </div>
           )}
@@ -411,48 +383,6 @@ export default function UniversalInput() {
                   {theme}
                 </span>
               ))}
-            </div>
-          )}
-
-          {/* Instagram scraped data */}
-          {result.instagramData && (
-            <div className="mt-4 animate-slide-in rounded-xl border border-purple/20 bg-purple/5 px-4 py-3">
-              <div className="mb-2 flex items-center gap-2">
-                <Camera className="h-4 w-4 text-purple" />
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-purple">
-                  Instagram Scrapado via Apify
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-4 font-mono text-xs text-text-secondary">
-                {result.instagramData.owner_username && (
-                  <span className="flex items-center gap-1">
-                    @{result.instagramData.owner_username}
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <Heart className="h-3 w-3 text-red" />
-                  {result.instagramData.likes.toLocaleString()}
-                </span>
-                <span className="flex items-center gap-1">
-                  <MessageCircle className="h-3 w-3 text-blue" />
-                  {result.instagramData.comments.toLocaleString()}
-                </span>
-                {result.instagramData.engagement_rate && (
-                  <span className="flex items-center gap-1">
-                    <TrendingUp className="h-3 w-3 text-green" />
-                    {result.instagramData.engagement_rate.toFixed(2)}%
-                  </span>
-                )}
-              </div>
-              {result.instagramData.thumbnail_url && (
-                <div className="mt-3">
-                  <img
-                    src={result.instagramData.thumbnail_url}
-                    alt="Instagram thumbnail"
-                    className="h-24 w-24 rounded-xl object-cover ring-1 ring-border"
-                  />
-                </div>
-              )}
             </div>
           )}
         </div>

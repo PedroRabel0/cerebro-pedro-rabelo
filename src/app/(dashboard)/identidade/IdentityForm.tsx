@@ -295,7 +295,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
         <button
           type="submit"
           disabled={isPending || isResetting}
-          className="flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-bg shadow-sm hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/20 transition-all disabled:opacity-50"
+          className="flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/20 transition-all disabled:opacity-50"
         >
           {isPending ? (
             <>

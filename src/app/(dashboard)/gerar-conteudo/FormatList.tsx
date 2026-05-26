@@ -20,17 +20,17 @@ export function contentTypeBadgeColor(ct: string): string {
     case "instagram_reel":
     case "instagram_carousel":
     case "instagram_static":
-      return "bg-[#c13584] text-bg";
+      return "bg-[#c13584] text-white";
     case "youtube_long":
     case "youtube_short":
-      return "bg-accent text-bg";
+      return "bg-accent text-white";
     case "linkedin_post":
-      return "bg-blue text-bg";
+      return "bg-blue text-white";
     case "x_thread":
     case "x_tweet":
-      return "bg-text text-bg";
+      return "bg-text text-white";
     default:
-      return "bg-text-muted text-bg";
+      return "bg-text-muted text-white";
   }
 }
 
@@ -89,7 +89,7 @@ function FormatForm({ onClose }: { onClose: () => void }) {
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-accent px-4 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-1.5 font-mono text-xs font-bold text-white transition hover:bg-accent-hover disabled:opacity-50"
           >
             {saving ? "Salvando..." : "Salvar"}
           </button>
@@ -130,7 +130,7 @@ export default function FormatList({
         </span>
         <button
           onClick={() => setShowForm(true)}
-          className="rounded-lg bg-accent px-3 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover"
+          className="rounded-lg bg-accent px-3 py-1.5 font-mono text-xs font-bold text-white transition hover:bg-accent-hover"
         >
           + Novo Formato
         </button>

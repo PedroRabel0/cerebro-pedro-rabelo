@@ -125,7 +125,7 @@ function PostForm({
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-blue px-4 py-1.5 font-mono text-xs font-bold text-bg transition hover:opacity-90 disabled:opacity-50"
+            className="rounded-lg bg-blue px-4 py-1.5 font-mono text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {saving ? "Salvando..." : "Salvar Post"}
           </button>
@@ -209,7 +209,7 @@ export default function PostList({
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="rounded-lg bg-blue px-3 py-1.5 font-mono text-xs font-bold text-bg transition hover:opacity-90"
+          className="rounded-lg bg-blue px-3 py-1.5 font-mono text-xs font-bold text-white transition hover:opacity-90"
         >
           + Novo Post
         </button>

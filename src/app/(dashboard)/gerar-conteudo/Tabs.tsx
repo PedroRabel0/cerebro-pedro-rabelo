@@ -6,7 +6,7 @@ import type {
   GeneratedContent,
 } from "@/lib/supabase/types";
 import FormatList from "./FormatList";
-import QuickGenerate from "./GenerationWizard";
+import GenerationWizard from "./GenerationWizard";
 import ContentList from "./ContentList";
 import { PlusCircle, LayoutGrid, Archive } from "lucide-react";
 
@@ -18,12 +18,26 @@ const TABS: { key: Tab; label: string; Icon: typeof PlusCircle }[] = [
   { key: "salvos", label: "Salvos", Icon: Archive },
 ];
 
+interface PlaybookOption {
+  id: string;
+  title: string;
+}
+
+interface StoryOption {
+  id: string;
+  title: string;
+}
+
 export default function Tabs({
   formats,
   contents,
+  playbooks,
+  stories,
 }: {
   formats: ContentFormat[];
   contents: GeneratedContent[];
+  playbooks: PlaybookOption[];
+  stories: StoryOption[];
 }) {
   const [tab, setTab] = useState<Tab>("novo");
 
@@ -47,7 +61,7 @@ export default function Tabs({
       </div>
 
       {tab === "novo" && (
-        <QuickGenerate formats={formats} />
+        <GenerationWizard playbooks={playbooks} stories={stories} />
       )}
       {tab === "formatos" && <FormatList formats={formats} />}
       {tab === "salvos" && <ContentList contents={contents} />}

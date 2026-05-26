@@ -5,8 +5,6 @@ import { revalidatePath } from "next/cache";
 import { processUniversalInput } from "@/lib/ai/universal";
 import { scrapeInstagramPost } from "@/lib/ai/apify";
 import { analyzeDNA } from "@/lib/ai";
-import { generateCarouselSlides } from "@/lib/ai/slide-generator";
-import { uploadImageToStorage } from "@/lib/supabase/storage";
 import type { CaptureSourceType } from "@/lib/supabase/types";
 
 // --- Universal Input ---
@@ -198,49 +196,22 @@ export async function submitUniversalInput(input: string) {
       })
       .eq("id", capture.id);
 
-    // Save proposals (now ready-to-post content pieces)
+    // Save proposals (playbook/story/question for the knowledge base)
     if (result.proposals.length > 0) {
-      const proposalRows = result.proposals.map((p) => {
-        // Build structured markdown from the post data
-        const slidesSection = p.slides && p.slides.length > 0
-          ? `\n\n**Slides:**\n${p.slides.map((s, i) => `${i + 1}. ${s}`).join("\n")}`
-          : "";
-
-        const contentMarkdown = `**Hook:** ${p.hook}\n\n**Legenda:**\n${p.caption}\n\n**Hashtags:** ${p.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}\n\n**CTA:** ${p.cta}${slidesSection}`;
-
-        return {
-          capture_id: capture.id,
-          type: p.platform as "instagram_carousel" | "linkedin_post" | "x_thread",
-          title: p.title,
-          content_markdown: contentMarkdown,
-          suggested_tags: p.hashtags,
-          status: "pending",
-        };
-      });
+      const proposalRows = result.proposals.map((p) => ({
+        capture_id: capture.id,
+        type: p.type as "playbook" | "story" | "question",
+        title: p.title,
+        content_markdown: p.content_markdown,
+        suggested_tags: p.suggested_tags || [],
+        status: "pending",
+      }));
 
       if (proposalRows.length > 0) {
-        const { data: insertedProposals } = await supabase
+        await supabase
           .from("proposals")
           .insert(proposalRows)
           .select("id, type");
-
-        // Generate carousel slide images in background (fire-and-forget)
-        const carouselProposal = result.proposals.find(
-          (p) => p.platform === "instagram_carousel" && p.slides && p.slides.length > 0
-        );
-        const insertedCarousel = insertedProposals?.find(
-          (p) => p.type === "instagram_carousel"
-        );
-
-        if (carouselProposal && insertedCarousel) {
-          generateAndSaveSlideImages(
-            carouselProposal,
-            insertedCarousel.id,
-            supabase
-          ).catch((err) =>
-            console.error("[SlideGen] Background generation failed:", err)
-          );
-        }
       }
     }
 
@@ -271,75 +242,6 @@ export async function submitUniversalInput(input: string) {
   }
 }
 
-// --- Slide Image Generation (background) ---
-
-async function generateAndSaveSlideImages(
-  carouselPost: { slides?: string[]; hook: string; cta: string; title: string; hashtags: string[] },
-  proposalId: string,
-  supabase: Awaited<ReturnType<typeof createClient>>
-) {
-  try {
-    console.log(`[SlideGen] Starting image generation for proposal ${proposalId}`);
-
-    const slideImages = await generateCarouselSlides({
-      slides: carouselPost.slides || [],
-      hook: carouselPost.hook,
-      cta: carouselPost.cta,
-      title: carouselPost.title,
-      hashtags: carouselPost.hashtags,
-    });
-
-    if (slideImages.length === 0) {
-      console.log("[SlideGen] No images generated");
-      return;
-    }
-
-    // Upload each slide to Supabase Storage
-    const uploadedUrls: string[] = [];
-    for (const slide of slideImages) {
-      const publicUrl = await uploadImageToStorage(
-        slide.imageUrl,
-        `proposal-${proposalId}-slide-${slide.slideIndex}`
-      );
-      if (publicUrl) {
-        uploadedUrls.push(publicUrl);
-      }
-    }
-
-    if (uploadedUrls.length > 0) {
-      // Get current proposal content and append image URLs
-      const { data: proposal } = await supabase
-        .from("proposals")
-        .select("content_markdown")
-        .eq("id", proposalId)
-        .single();
-
-      const existingContent = proposal?.content_markdown || "";
-      const imageSection = `\n\n**Imagens dos Slides:**\n${uploadedUrls.map((url, i) => `${i + 1}. ${url}`).join("\n")}`;
-
-      await supabase
-        .from("proposals")
-        .update({
-          content_markdown: existingContent + imageSection,
-        })
-        .eq("id", proposalId);
-
-      console.log(`[SlideGen] Saved ${uploadedUrls.length} slide images for proposal ${proposalId}`);
-
-      // Log activity
-      await supabase.from("activity_log").insert({
-        actor: "ia",
-        action: `Gerou ${uploadedUrls.length} imagens de slides para carousel`,
-        entity_type: "proposal",
-        entity_id: proposalId,
-      });
-
-      revalidatePath("/insights-pedro");
-    }
-  } catch (error) {
-    console.error("[SlideGen] Error:", error);
-  }
-}
 
 // --- Dashboard Queries ---
 

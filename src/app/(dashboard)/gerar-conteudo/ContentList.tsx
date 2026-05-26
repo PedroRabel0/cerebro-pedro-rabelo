@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { GeneratedContent, ContentStatus } from "@/lib/supabase/types";
-import { updateContentStatus, deleteContent } from "./actions";
+import { updateContentStatus, updateContentText, deleteContent } from "./actions";
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import {
   MessageSquare,
@@ -36,6 +36,74 @@ function statusLabel(status: ContentStatus) {
     case "published":
       return "Publicado";
   }
+}
+
+function SourceMapDisplay({ sourceMap }: { sourceMap: Record<string, unknown> | null }) {
+  if (!sourceMap || Object.keys(sourceMap).length === 0) return null;
+  const entries = Object.entries(sourceMap);
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1 font-mono text-[10px] text-text-muted">
+      <span className="text-accent">Fontes:</span>
+      {entries.map(([key, val], i) => (
+        <span key={key}>
+          {i > 0 && <span className="mx-0.5">&middot;</span>}
+          {String(val)} {key}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function InlineEditor({
+  contentId,
+  initialText,
+  onClose,
+}: {
+  contentId: string;
+  initialText: string;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState(initialText);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await updateContentText(contentId, text);
+    } catch {
+      // silent
+    }
+    setSaving(false);
+    onClose();
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={6}
+        className="w-full rounded-xl border border-accent/30 bg-card px-3 py-2 text-sm text-text leading-relaxed focus:border-accent focus:outline-none resize-none"
+      />
+      <div className="flex gap-2">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover disabled:opacity-50"
+        >
+          <Save className="h-3 w-3" />
+          {saving ? "Salvando..." : "Salvar"}
+        </button>
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 font-mono text-xs text-text-muted transition hover:border-border-light hover:text-text"
+        >
+          <X className="h-3 w-3" />
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function FeedbackForm({
@@ -91,10 +159,10 @@ function FeedbackForm({
         </div>
         <div>
           <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-text-muted">
-            Avaliação
+            Avaliacao
           </label>
           <div className="flex gap-1">
-            {ratingOptions.map(({ value, label, Icon, color }) => (
+            {ratingOptions.map(({ value, label, Icon }) => (
               <button
                 key={value}
                 type="button"
@@ -118,7 +186,7 @@ function FeedbackForm({
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Comentários sobre o conteúdo..."
+            placeholder="Comentarios sobre o conteudo..."
             rows={3}
             className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
@@ -152,9 +220,10 @@ export default function ContentList({
   contents: GeneratedContent[];
 }) {
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   async function handleDelete(id: string) {
-    if (!confirm("Apagar este conteúdo?")) return;
+    if (!confirm("Apagar este conteudo?")) return;
     await deleteContent(id);
   }
 
@@ -164,9 +233,9 @@ export default function ContentList({
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10">
           <ImageIcon className="h-6 w-6 text-accent" />
         </div>
-        <p className="text-sm font-medium text-text">Nenhum conteúdo gerado</p>
+        <p className="text-sm font-medium text-text">Nenhum conteudo gerado</p>
         <p className="mt-1 text-xs text-text-muted">
-          Use a aba &quot;Novo Conteúdo&quot; para criar!
+          Use a aba &quot;Novo Conteudo&quot; para criar!
         </p>
       </div>
     );
@@ -175,7 +244,7 @@ export default function ContentList({
   return (
     <div>
       <span className="mb-4 block font-mono text-[10px] text-text-muted">
-        {contents.length} conteúdo{contents.length !== 1 ? "s" : ""}
+        {contents.length} conteudo{contents.length !== 1 ? "s" : ""}
       </span>
       <div className="space-y-3">
         {contents.map((c) => (
@@ -228,14 +297,23 @@ export default function ContentList({
                     />
                   )}
                   <div className="min-w-0">
-                    <p className="text-sm leading-relaxed text-text line-clamp-2">
-                      {c.content_text}
-                    </p>
+                    {editingId === c.id ? (
+                      <InlineEditor
+                        contentId={c.id}
+                        initialText={c.content_text || ""}
+                        onClose={() => setEditingId(null)}
+                      />
+                    ) : (
+                      <p className="text-sm leading-relaxed text-text line-clamp-2">
+                        {c.content_text}
+                      </p>
+                    )}
+                    <SourceMapDisplay sourceMap={c.source_map} />
                     <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-text-muted">
                       {c.playbook && (
                         <span>Playbook: {c.playbook.title}</span>
                       )}
-                      {c.story && <span>História: {c.story.title}</span>}
+                      {c.story && <span>Historia: {c.story.title}</span>}
                       {c.format && <span>Formato: {c.format.name}</span>}
                       <span>
                         {new Date(c.created_at).toLocaleDateString("pt-BR")}
@@ -245,6 +323,15 @@ export default function ContentList({
                 </div>
               </div>
               <div className="flex shrink-0 gap-1">
+                {editingId !== c.id && (
+                  <button
+                    onClick={() => setEditingId(c.id)}
+                    className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-accent transition hover:bg-accent/10"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    <span className="hidden sm:inline">Editar</span>
+                  </button>
+                )}
                 <button
                   onClick={() =>
                     setFeedbackId(feedbackId === c.id ? null : c.id)
