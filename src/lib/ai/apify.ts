@@ -68,23 +68,26 @@ export async function scrapeInstagramPost(
     const token = process.env.APIFY_TOKEN;
     if (!token) return { error: 'APIFY_TOKEN not configured' };
 
-    const actorId = 'apify~instagram-post-scraper';
+    const actorId = 'apify~instagram-scraper';
     const apiUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${token}`;
+
+    console.log(`[Apify] Scraping single post: ${url}`);
 
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         directUrls: [url],
+        resultsType: 'posts',
         resultsLimit: 1,
       }),
       signal: AbortSignal.timeout(60_000), // 60 s timeout
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Apify] HTTP error:', response.status, errorText);
-      return { error: `Apify retornou status ${response.status}` };
+      const errorBody = await response.text().catch(() => '');
+      console.error(`[Apify] HTTP ${response.status}: ${errorBody.substring(0, 500)}`);
+      return { error: `Apify retornou status ${response.status}: ${errorBody.substring(0, 200)}` };
     }
 
     const data: unknown = await response.json();
@@ -121,6 +124,8 @@ export async function scrapeInstagramProfile(
     const actorId = 'apify~instagram-scraper';
     const apiUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${token}`;
 
+    console.log(`[Apify] Scraping profile: ${username} (limit: ${maxPosts})`);
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -133,7 +138,9 @@ export async function scrapeInstagramProfile(
     });
 
     if (!response.ok) {
-      return { error: `Apify retornou status ${response.status}` };
+      const errorBody = await response.text().catch(() => '');
+      console.error(`[Apify] HTTP ${response.status}: ${errorBody.substring(0, 500)}`);
+      return { error: `Apify retornou status ${response.status}: ${errorBody.substring(0, 200)}` };
     }
 
     const data: unknown = await response.json();

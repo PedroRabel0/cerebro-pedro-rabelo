@@ -28,9 +28,9 @@ export function contentTypeBadgeColor(ct: string): string {
       return "bg-blue text-white";
     case "x_thread":
     case "x_tweet":
-      return "bg-text text-white";
+      return "bg-border-light text-text";
     default:
-      return "bg-text-muted text-white";
+      return "bg-text-muted text-text";
   }
 }
 

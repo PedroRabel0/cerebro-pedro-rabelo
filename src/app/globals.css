@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f4f0e8;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f8f5ef;
-  --bg-surface: #ebe5d8;
-  --border: #c9bfae;
-  --border-light: #b5a99a;
-  --text: #1a1612;
-  --text-secondary: #4a4138;
-  --text-muted: #8a7d6e;
+  --bg: #0a0a0b;
+  --bg-card: #141416;
+  --bg-card-hover: #1a1a1e;
+  --bg-surface: #1e1e22;
+  --border: #2a2a2e;
+  --border-light: #3a3a3e;
+  --text: #f0ece4;
+  --text-secondary: #b8b0a4;
+  --text-muted: #706a60;
   --accent: #c9412b;
-  --accent-hover: #a83520;
-  --blue: #3a5a7a;
-  --green: #4a6b3f;
+  --accent-hover: #e04a32;
+  --blue: #5b8cb8;
+  --green: #6b9b5f;
   --red: #c9412b;
-  --purple: #7c5295;
+  --purple: #9b72b8;
 }
 
 @theme inline {
@@ -143,7 +143,7 @@ h2 { letter-spacing: -0.01em; }
 .card-hover:hover {
   border-color: var(--border-light);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* Step indicator animation */
@@ -160,7 +160,7 @@ h2 { letter-spacing: -0.01em; }
   .sidebar-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 40;
     backdrop-filter: blur(4px);
   }
