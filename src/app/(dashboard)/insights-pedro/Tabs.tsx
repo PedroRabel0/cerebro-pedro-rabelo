@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Capture, ActivityLogEntry } from "@/lib/supabase/types";
 import CaptureList from "./CaptureList";
 import ActivityTimeline from "./ActivityTimeline";
+import { Inbox, Activity } from "lucide-react";
 
 type Tab = "capturas" | "timeline";
 
@@ -18,25 +19,27 @@ export default function Tabs({
 
   return (
     <div>
-      <div className="mb-4 flex gap-0 border-b border-rule">
+      <div className="mb-4 flex gap-1 rounded-2xl bg-surface p-1">
         <button
           onClick={() => setTab("capturas")}
-          className={`border-b-2 px-4 py-2 font-mono text-xs uppercase tracking-wider transition ${
+          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 font-mono text-xs transition-all ${
             tab === "capturas"
-              ? "border-accent text-accent"
-              : "border-transparent text-ink-muted hover:text-ink-soft"
+              ? "bg-card text-accent shadow-sm"
+              : "text-text-muted hover:text-text"
           }`}
         >
+          <Inbox className="h-3.5 w-3.5" />
           Capturas
         </button>
         <button
           onClick={() => setTab("timeline")}
-          className={`border-b-2 px-4 py-2 font-mono text-xs uppercase tracking-wider transition ${
+          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 font-mono text-xs transition-all ${
             tab === "timeline"
-              ? "border-accent text-accent"
-              : "border-transparent text-ink-muted hover:text-ink-soft"
+              ? "bg-card text-accent shadow-sm"
+              : "text-text-muted hover:text-text"
           }`}
         >
+          <Activity className="h-3.5 w-3.5" />
           Timeline
         </button>
       </div>

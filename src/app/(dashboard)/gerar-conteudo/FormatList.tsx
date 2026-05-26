@@ -20,17 +20,17 @@ export function contentTypeBadgeColor(ct: string): string {
     case "instagram_reel":
     case "instagram_carousel":
     case "instagram_static":
-      return "bg-[#c13584] text-paper";
+      return "bg-[#c13584] text-bg";
     case "youtube_long":
     case "youtube_short":
-      return "bg-accent text-paper";
+      return "bg-accent text-bg";
     case "linkedin_post":
-      return "bg-blue text-paper";
+      return "bg-blue text-bg";
     case "x_thread":
     case "x_tweet":
-      return "bg-ink text-paper";
+      return "bg-text text-bg";
     default:
-      return "bg-ink-muted text-paper";
+      return "bg-text-muted text-bg";
   }
 }
 
@@ -51,8 +51,8 @@ function FormatForm({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="rounded border border-rule bg-paper-dark p-4">
-      <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-ink-soft">
+    <div className="rounded-xl border border-border bg-card p-4">
+      <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-text-secondary">
         Novo Formato
       </h3>
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -60,12 +60,12 @@ function FormatForm({ onClose }: { onClose: () => void }) {
           name="name"
           required
           placeholder="Nome do formato"
-          className="w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <select
           name="content_type"
           required
-          className="w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
         >
           <option value="">Tipo de conteúdo</option>
           {CONTENT_TYPES.map((t) => (
@@ -77,26 +77,26 @@ function FormatForm({ onClose }: { onClose: () => void }) {
         <input
           name="description"
           placeholder="Descrição (opcional)"
-          className="w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <textarea
           name="structure_markdown"
           placeholder="Estrutura em markdown (opcional)"
           rows={6}
-          className="w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <div className="flex gap-2">
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-accent px-4 py-1.5 font-mono text-xs font-semibold text-paper transition hover:opacity-90 disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover disabled:opacity-50"
           >
             {saving ? "Salvando..." : "Salvar"}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded border border-rule px-4 py-1.5 font-mono text-xs text-ink-muted transition hover:text-ink-soft"
+            className="rounded-lg border border-border px-4 py-1.5 font-mono text-xs text-text-muted transition hover:text-text hover:border-border-light"
           >
             Cancelar
           </button>
@@ -125,19 +125,19 @@ export default function FormatList({
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <span className="font-mono text-[10px] text-ink-muted">
+        <span className="font-mono text-[10px] text-text-muted">
           {formats.length} formato{formats.length !== 1 ? "s" : ""}
         </span>
         <button
           onClick={() => setShowForm(true)}
-          className="rounded bg-accent px-3 py-1.5 font-mono text-xs font-semibold text-paper transition hover:opacity-90"
+          className="rounded-lg bg-accent px-3 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover"
         >
           + Novo Formato
         </button>
       </div>
 
       {formats.length === 0 ? (
-        <p className="py-8 text-center text-sm text-ink-muted">
+        <p className="py-8 text-center text-sm text-text-muted">
           Nenhum formato ainda. Crie o primeiro!
         </p>
       ) : (
@@ -145,11 +145,11 @@ export default function FormatList({
           {formats.map((f) => (
             <div
               key={f.id}
-              className="flex items-center justify-between rounded border border-rule bg-paper-dark px-4 py-3 transition hover:border-ink-muted"
+              className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 transition hover:border-border-light"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="truncate font-sans text-sm font-medium text-ink">
+                  <h3 className="truncate font-sans text-sm font-medium text-text">
                     {f.name}
                   </h3>
                   <span
@@ -159,18 +159,18 @@ export default function FormatList({
                   </span>
                 </div>
                 {f.description && (
-                  <p className="mt-0.5 truncate text-xs text-ink-muted">
+                  <p className="mt-0.5 truncate text-xs text-text-muted">
                     {f.description}
                   </p>
                 )}
-                <span className="font-mono text-[10px] text-ink-muted">
+                <span className="font-mono text-[10px] text-text-muted">
                   {f.usage_count} uso{f.usage_count !== 1 ? "s" : ""}
                 </span>
               </div>
               <div className="ml-3 flex shrink-0 gap-1">
                 <button
                   onClick={() => handleDelete(f.id)}
-                  className="rounded px-2 py-1 font-mono text-[10px] text-accent transition hover:bg-paper"
+                  className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
                 >
                   Apagar
                 </button>

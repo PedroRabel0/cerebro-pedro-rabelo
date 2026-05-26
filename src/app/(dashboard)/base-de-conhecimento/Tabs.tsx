@@ -5,6 +5,7 @@ import type { Playbook, Story, Theme } from "@/lib/supabase/types";
 import PlaybookList from "./PlaybookList";
 import StoryList from "./StoryList";
 import ThemeManager from "./ThemeManager";
+import { BookOpen, BookMarked } from "lucide-react";
 
 type Tab = "playbooks" | "historias";
 
@@ -26,25 +27,27 @@ export default function Tabs({
       </aside>
 
       <div className="min-w-0 flex-1">
-        <div className="mb-4 flex gap-0 border-b border-rule">
+        <div className="mb-4 flex gap-1 rounded-2xl bg-surface p-1">
           <button
             onClick={() => setTab("playbooks")}
-            className={`border-b-2 px-4 py-2 font-mono text-xs uppercase tracking-wider transition ${
+            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 font-mono text-xs transition-all ${
               tab === "playbooks"
-                ? "border-accent text-accent"
-                : "border-transparent text-ink-muted hover:text-ink-soft"
+                ? "bg-card text-accent shadow-sm"
+                : "text-text-muted hover:text-text"
             }`}
           >
+            <BookOpen className="h-3.5 w-3.5" />
             Playbooks
           </button>
           <button
             onClick={() => setTab("historias")}
-            className={`border-b-2 px-4 py-2 font-mono text-xs uppercase tracking-wider transition ${
+            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 font-mono text-xs transition-all ${
               tab === "historias"
-                ? "border-accent text-accent"
-                : "border-transparent text-ink-muted hover:text-ink-soft"
+                ? "bg-card text-accent shadow-sm"
+                : "text-text-muted hover:text-text"
             }`}
           >
+            <BookMarked className="h-3.5 w-3.5" />
             Histórias
           </button>
         </div>

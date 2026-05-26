@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { Brain } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -38,7 +39,7 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
-        router.push("/base-de-conhecimento");
+        router.push("/");
         router.refresh();
       }
     }
@@ -47,22 +48,28 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-4">
+    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="font-display text-3xl font-bold text-ink">
-            Segundo Cérebro
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent">
+            <Brain className="h-6 w-6 text-bg" />
+          </div>
+          <h1 className="font-display text-3xl font-bold text-text">
+            Segundo Cerebro
           </h1>
-          <p className="mt-2 font-mono text-xs uppercase tracking-widest text-ink-muted">
+          <p className="mt-2 font-mono text-xs uppercase tracking-widest text-text-muted">
             do Pedro
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4 rounded-2xl border border-border bg-card p-6"
+        >
           <div>
             <label
               htmlFor="email"
-              className="block font-mono text-xs uppercase tracking-wider text-ink-soft"
+              className="block font-mono text-xs uppercase tracking-wider text-text-secondary"
             >
               Email
             </label>
@@ -72,7 +79,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="mt-1 block w-full rounded border border-rule bg-paper-dark px-3 py-2 text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="mt-1 block w-full rounded-xl border border-border bg-surface px-3 py-2 text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               placeholder="seu@email.com"
             />
           </div>
@@ -80,7 +87,7 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="password"
-              className="block font-mono text-xs uppercase tracking-wider text-ink-soft"
+              className="block font-mono text-xs uppercase tracking-wider text-text-secondary"
             >
               Senha
             </label>
@@ -91,13 +98,13 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="mt-1 block w-full rounded border border-rule bg-paper-dark px-3 py-2 text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="mt-1 block w-full rounded-xl border border-border bg-surface px-3 py-2 text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-accent">{error}</p>
+            <p className="text-sm text-red">{error}</p>
           )}
           {message && (
             <p className="text-sm text-green">{message}</p>
@@ -106,7 +113,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded bg-accent px-4 py-2 font-mono text-sm font-semibold text-paper transition hover:opacity-90 disabled:opacity-50"
+            className="w-full rounded-xl bg-accent px-4 py-2 font-mono text-sm font-semibold text-bg transition hover:bg-accent-hover disabled:opacity-50"
           >
             {loading
               ? "Carregando..."
@@ -122,11 +129,11 @@ export default function LoginPage() {
             setError("");
             setMessage("");
           }}
-          className="mt-4 w-full text-center text-sm text-ink-muted hover:text-ink-soft"
+          className="mt-4 w-full text-center text-sm text-text-muted hover:text-text-secondary"
         >
           {isSignUp
-            ? "Já tem conta? Faça login"
-            : "Não tem conta? Crie uma"}
+            ? "Ja tem conta? Faca login"
+            : "Nao tem conta? Crie uma"}
         </button>
       </div>
     </div>

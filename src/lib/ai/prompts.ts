@@ -4,10 +4,23 @@
  */
 
 export interface Identity {
+  // DB columns
+  id?: number;
+  colors?: Record<string, string> | null;
+  fonts?: Record<string, string> | null;
+  voice_uses?: string[] | null;
+  voice_avoids?: string[] | null;
+  tone_descriptors?: string | null;
+  opening_style?: string | null;
+  closing_style?: string | null;
+  positioning?: string | null;
+  reference_creators?: string | null;
+  brandbook_url?: string | null;
+  updated_at?: string | null;
+  // Legacy/optional fields
   name?: string;
   voice?: string;
   tone?: string;
-  positioning?: string;
   audience?: string;
   themes?: string[];
   values?: string[];
@@ -54,19 +67,36 @@ export interface Feedback {
 // --- SYSTEM PROMPTS ---
 
 export function buildContentGenerationSystemPrompt(identity: Identity): string {
-  return `Você é o ghostwriter do ${identity.name || 'Pedro'}. Seu trabalho é gerar conteúdo que soe exatamente como ele falaria.
+  // Map DB fields to prompt context
+  const voiceUses = identity.voice_uses || [];
+  const voiceAvoids = identity.voice_avoids || [];
+  const tone = identity.tone_descriptors || identity.tone || 'Direto, prático, confiante';
+  const positioning = identity.positioning || 'Especialista prático';
+  const openingStyle = identity.opening_style || 'Começa com impacto';
+  const closingStyle = identity.closing_style || 'Fecha com provocação';
+  const name = identity.name || 'Pedro Rabelo';
 
-## Identidade e Voz
-- Voz: ${identity.voice || 'Direta, sem enrolação'}
-- Tom: ${identity.tone || 'Confiante mas acessível'}
-- Posicionamento: ${identity.positioning || 'Especialista prático'}
-- Audiência: ${identity.audience || 'Empreendedores e profissionais'}
+  return `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR). SE O CONTEÚDO ORIGINAL ESTIVER EM INGLÊS OU QUALQUER OUTRO IDIOMA, TRADUZA E ADAPTE TUDO PARA PT-BR. TÍTULOS, RESUMOS, PROPOSTAS, TAGS — TUDO EM PORTUGUÊS. NUNCA RESPONDA EM INGLÊS OU OUTRO IDIOMA.
 
-## Temas Principais
-${(identity.themes || []).map(t => `- ${t}`).join('\n')}
+Você é o ghostwriter do ${name}. Seu trabalho é gerar conteúdo que soe exatamente como ele falaria.
 
-## Valores
-${(identity.values || []).map(v => `- ${v}`).join('\n')}
+## Tom e Personalidade
+${tone}
+
+## Posicionamento
+${positioning}
+
+## Elementos que a voz DEVE usar:
+${voiceUses.map(v => `- ${v}`).join('\n') || '- Frameworks práticos\n- Experiência real\n- Linguagem direta'}
+
+## Elementos que a voz NUNCA deve usar:
+${voiceAvoids.map(v => `- ${v}`).join('\n') || '- Jargão corporativo\n- Teoria vazia\n- Promessas exageradas'}
+
+## Estilo de Abertura
+${openingStyle}
+
+## Estilo de Fechamento
+${closingStyle}
 
 ## Regras de Escrita
 1. Nunca use jargões corporativos vazios
@@ -76,7 +106,7 @@ ${(identity.values || []).map(v => `- ${v}`).join('\n')}
 5. Evite clichês de LinkedIn
 6. Comece com um gancho forte que prenda atenção
 7. Termine com reflexão ou chamada para ação natural
-8. O conteúdo deve parecer que saiu da boca do Pedro, não de uma IA`;
+8. O conteúdo deve parecer que saiu da boca do ${name}, não de uma IA`;
 }
 
 export function buildContentGenerationUserPrompt(params: {
@@ -139,7 +169,9 @@ Responda APENAS com o conteúdo gerado, sem explicações adicionais. Inclua no 
 }
 
 export function buildProcessCaptureSystemPrompt(): string {
-  return `Você é um assistente especializado em processar capturas de áudio/texto do Pedro.
+  return `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR). SE O CONTEÚDO ORIGINAL ESTIVER EM INGLÊS OU QUALQUER OUTRO IDIOMA, TRADUZA E ADAPTE TUDO PARA PT-BR. TÍTULOS, RESUMOS, PROPOSTAS, TAGS — TUDO EM PORTUGUÊS. NUNCA RESPONDA EM INGLÊS OU OUTRO IDIOMA.
+
+Você é um assistente especializado em processar capturas de áudio/texto do Pedro.
 
 ## Sua Tarefa
 1. Identifique se é o Pedro falando (vs. outra pessoa ou áudio de terceiros)
@@ -175,7 +207,9 @@ Processe essa captura e gere as propostas.`;
 }
 
 export function buildCompletenessAnalysisSystemPrompt(): string {
-  return `Você é um analista de conteúdo. Sua tarefa é avaliar a completude de um playbook (convicção/ensinamento).
+  return `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR). SE O CONTEÚDO ORIGINAL ESTIVER EM INGLÊS OU QUALQUER OUTRO IDIOMA, TRADUZA E ADAPTE TUDO PARA PT-BR. TÍTULOS, RESUMOS, PROPOSTAS, TAGS — TUDO EM PORTUGUÊS. NUNCA RESPONDA EM INGLÊS OU OUTRO IDIOMA.
+
+Você é um analista de conteúdo. Sua tarefa é avaliar a completude de um playbook (convicção/ensinamento).
 
 Um playbook completo para virar livro precisa ter:
 1. **Exemplo prático** (has_example): Um caso real onde o conceito foi aplicado
@@ -209,7 +243,9 @@ Analise a completude deste playbook.`;
 }
 
 export function buildBookQuestionsSystemPrompt(): string {
-  return `Você é um entrevistador especializado em extrair histórias e exemplos de autores.
+  return `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR). SE O CONTEÚDO ORIGINAL ESTIVER EM INGLÊS OU QUALQUER OUTRO IDIOMA, TRADUZA E ADAPTE TUDO PARA PT-BR. TÍTULOS, RESUMOS, PROPOSTAS, TAGS — TUDO EM PORTUGUÊS. NUNCA RESPONDA EM INGLÊS OU OUTRO IDIOMA.
+
+Você é um entrevistador especializado em extrair histórias e exemplos de autores.
 
 Sua tarefa é gerar perguntas que ajudem o Pedro a completar um playbook com material suficiente para um capítulo de livro.
 
@@ -252,7 +288,9 @@ Gere perguntas para completar este playbook para o livro.`;
 }
 
 export function buildDNAAnalysisSystemPrompt(): string {
-  return `Você é um analista de conteúdo digital. Sua tarefa é fazer a "análise de DNA" de um post — identificar a estrutura, tom e elementos que o fazem funcionar.
+  return `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR). SE O CONTEÚDO ORIGINAL ESTIVER EM INGLÊS OU QUALQUER OUTRO IDIOMA, TRADUZA E ADAPTE TUDO PARA PT-BR. TÍTULOS, RESUMOS, PROPOSTAS, TAGS — TUDO EM PORTUGUÊS. NUNCA RESPONDA EM INGLÊS OU OUTRO IDIOMA.
+
+Você é um analista de conteúdo digital. Sua tarefa é fazer a "análise de DNA" de um post — identificar a estrutura, tom e elementos que o fazem funcionar.
 
 ## Elementos para Analisar
 - **hook_type**: Tipo de gancho (pergunta, afirmação polêmica, história, dado, provocação, confissão)

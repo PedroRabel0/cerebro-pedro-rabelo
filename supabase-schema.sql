@@ -163,7 +163,7 @@ create policy "Authenticated users can manage captures" on public.captures
 create table if not exists public.proposals (
   id uuid primary key default gen_random_uuid(),
   capture_id uuid references public.captures on delete cascade,
-  type text not null check (type in ('playbook', 'story', 'question')),
+  type text not null check (type in ('playbook', 'story', 'question', 'instagram_carousel', 'linkedin_post', 'x_thread')),
   title text not null,
   content_markdown text,
   suggested_theme_id uuid references public.themes on delete set null,

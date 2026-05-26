@@ -8,6 +8,7 @@ import type {
 import ProfileManager from "./ProfileManager";
 import PostList from "./PostList";
 import KnowledgeList from "./KnowledgeList";
+import { Users, Library } from "lucide-react";
 
 type Tab = "perfis" | "conhecimento";
 
@@ -28,25 +29,27 @@ export default function Tabs({
 
   return (
     <div>
-      <div className="mb-4 flex gap-0 border-b border-rule">
+      <div className="mb-4 flex gap-1 rounded-2xl bg-surface p-1">
         <button
           onClick={() => setTab("perfis")}
-          className={`border-b-2 px-4 py-2 font-mono text-xs uppercase tracking-wider transition ${
+          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 font-mono text-xs transition-all ${
             tab === "perfis"
-              ? "border-blue text-blue"
-              : "border-transparent text-ink-muted hover:text-ink-soft"
+              ? "bg-card text-accent shadow-sm"
+              : "text-text-muted hover:text-text"
           }`}
         >
+          <Users className="h-3.5 w-3.5" />
           Perfis &amp; Posts
         </button>
         <button
           onClick={() => setTab("conhecimento")}
-          className={`border-b-2 px-4 py-2 font-mono text-xs uppercase tracking-wider transition ${
+          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 font-mono text-xs transition-all ${
             tab === "conhecimento"
-              ? "border-blue text-blue"
-              : "border-transparent text-ink-muted hover:text-ink-soft"
+              ? "bg-card text-accent shadow-sm"
+              : "text-text-muted hover:text-text"
           }`}
         >
+          <Library className="h-3.5 w-3.5" />
           Conhecimento Externo
         </button>
       </div>

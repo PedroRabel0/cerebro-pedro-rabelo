@@ -16,11 +16,11 @@ function KnowledgeForm({ onClose }: { onClose: () => void }) {
   }
 
   const inputCls =
-    "w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-blue focus:outline-none";
+    "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-blue focus:outline-none";
 
   return (
-    <div className="rounded border border-blue/30 bg-paper-dark p-4">
-      <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-ink-soft">
+    <div className="rounded-xl border border-blue/30 bg-card p-4">
+      <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-text-secondary">
         Novo Conhecimento Externo
       </h3>
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -60,29 +60,32 @@ function KnowledgeForm({ onClose }: { onClose: () => void }) {
           placeholder="Tags (separadas por vírgula)"
           className={inputCls}
         />
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-ink-soft">
-            <input
-              name="citation_allowed"
-              type="checkbox"
-              defaultChecked
-              className="accent-blue"
-            />
-            Citação permitida
+        <div>
+          <label className="mb-1 block font-mono text-[10px] uppercase text-text-muted">
+            Citação
           </label>
+          <select
+            name="citation_allowed"
+            defaultValue="attributed"
+            className={inputCls}
+          >
+            <option value="yes">Sim</option>
+            <option value="attributed">Com atribuição</option>
+            <option value="no">Não</option>
+          </select>
         </div>
         <div className="flex gap-2">
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-blue px-4 py-1.5 font-mono text-xs font-semibold text-paper transition hover:opacity-90 disabled:opacity-50"
+            className="rounded-lg bg-blue px-4 py-1.5 font-mono text-xs font-bold text-bg transition hover:opacity-90 disabled:opacity-50"
           >
             {saving ? "Salvando..." : "Salvar"}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded border border-rule px-4 py-1.5 font-mono text-xs text-ink-muted transition hover:text-ink-soft"
+            className="rounded-lg border border-border px-4 py-1.5 font-mono text-xs text-text-muted transition hover:text-text hover:border-border-light"
           >
             Cancelar
           </button>
@@ -111,19 +114,19 @@ export default function KnowledgeList({
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-[10px] text-ink-muted">
+        <span className="font-mono text-[10px] text-text-muted">
           {knowledge.length} item{knowledge.length !== 1 ? "s" : ""}
         </span>
         <button
           onClick={() => setShowForm(true)}
-          className="rounded bg-blue px-3 py-1.5 font-mono text-xs font-semibold text-paper transition hover:opacity-90"
+          className="rounded-lg bg-blue px-3 py-1.5 font-mono text-xs font-bold text-bg transition hover:opacity-90"
         >
           + Novo Conhecimento
         </button>
       </div>
 
       {knowledge.length === 0 ? (
-        <p className="py-8 text-center text-sm text-ink-muted">
+        <p className="py-8 text-center text-sm text-text-muted">
           Nenhum conhecimento externo registrado. Adicione livros, artigos,
           podcasts e outras fontes de inspiração.
         </p>
@@ -132,11 +135,11 @@ export default function KnowledgeList({
           {knowledge.map((k) => (
             <div
               key={k.id}
-              className="flex items-start justify-between rounded border border-blue/20 bg-paper-dark px-4 py-3 transition hover:border-blue/40"
+              className="flex items-start justify-between rounded-xl border border-blue/20 bg-card px-4 py-3 transition hover:border-blue/40"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="truncate font-sans text-sm font-medium text-ink">
+                  <h3 className="truncate font-sans text-sm font-medium text-text">
                     {k.title}
                   </h3>
                   {k.source_type && (
@@ -144,14 +147,14 @@ export default function KnowledgeList({
                       {k.source_type}
                     </span>
                   )}
-                  {k.citation_allowed && (
+                  {k.citation_allowed && k.citation_allowed !== "no" && (
                     <span className="inline-block shrink-0 rounded-full border border-green/30 bg-green/10 px-2 py-0.5 font-mono text-[10px] text-green">
-                      citável
+                      {k.citation_allowed === "yes" ? "citável" : "com atribuição"}
                     </span>
                   )}
                 </div>
                 {k.author && (
-                  <p className="mt-0.5 text-xs text-ink-muted">
+                  <p className="mt-0.5 text-xs text-text-muted">
                     por {k.author}
                   </p>
                 )}
@@ -170,7 +173,7 @@ export default function KnowledgeList({
                     {k.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="rounded bg-paper px-1.5 py-0.5 font-mono text-[10px] text-ink-muted"
+                        className="rounded bg-card px-1.5 py-0.5 font-mono text-[10px] text-text-muted"
                       >
                         {tag}
                       </span>
@@ -180,7 +183,7 @@ export default function KnowledgeList({
               </div>
               <button
                 onClick={() => handleDelete(k.id)}
-                className="ml-3 shrink-0 rounded px-2 py-1 font-mono text-[10px] text-accent transition hover:bg-paper"
+                className="ml-3 shrink-0 rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
               >
                 Apagar
               </button>

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useTransition, useRef, type KeyboardEvent } from "react";
-import { upsertIdentity } from "./actions";
+import { upsertIdentity, resetToPedroDefaults } from "./actions";
 import type { Identity } from "./actions";
+import { X, Plus, Save, CheckCircle2, AlertCircle, Loader2, RotateCcw } from "lucide-react";
 
 interface Props {
   initial: Identity | null;
+  wasAutoFilled?: boolean;
 }
 
 function TagInput({
@@ -44,16 +46,16 @@ function TagInput({
         {tags.map((tag, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-3 py-1 text-sm text-ink-soft"
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 text-sm text-text-secondary"
           >
             {tag}
             <button
               type="button"
               onClick={() => remove(i)}
-              className="ml-1 text-ink-muted hover:text-accent transition-colors"
+              className="ml-1 text-text-muted hover:text-red transition-colors"
               aria-label={`Remover ${tag}`}
             >
-              &times;
+              <X className="h-3 w-3" />
             </button>
           </span>
         ))}
@@ -66,13 +68,14 @@ function TagInput({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKey}
           placeholder="Digite e pressione Enter"
-          className="flex-1 rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
+          className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
         <button
           type="button"
           onClick={add}
-          className="rounded-lg border border-rule bg-paper px-3 py-2 text-sm font-medium text-ink-soft hover:bg-paper-dark transition-colors"
+          className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-text-secondary hover:bg-surface transition-colors"
         >
+          <Plus className="h-3.5 w-3.5" />
           Adicionar
         </button>
       </div>
@@ -80,8 +83,9 @@ function TagInput({
   );
 }
 
-export default function IdentityForm({ initial }: Props) {
+export default function IdentityForm({ initial, wasAutoFilled }: Props) {
   const [isPending, startTransition] = useTransition();
+  const [isResetting, startResetTransition] = useTransition();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -142,11 +146,25 @@ export default function IdentityForm({ initial }: Props) {
     });
   }
 
+  function handleReset() {
+    setError(null);
+    setSuccess(false);
+    startResetTransition(async () => {
+      try {
+        await resetToPedroDefaults();
+        // Reload to pick up the new defaults
+        window.location.reload();
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Erro ao resetar");
+      }
+    });
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Cores */}
-      <section className="rounded-xl border border-rule bg-paper-dark p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-muted mb-3">
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
           Cores
         </h2>
         <textarea
@@ -154,13 +172,13 @@ export default function IdentityForm({ initial }: Props) {
           onChange={(e) => setColors(e.target.value)}
           rows={6}
           placeholder='{"primary": "#c9412b", "secondary": "#3a5a7a"}'
-          className="w-full rounded-lg border border-rule bg-paper px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
 
       {/* Fontes */}
-      <section className="rounded-xl border border-rule bg-paper-dark p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-muted mb-3">
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
           Fontes
         </h2>
         <textarea
@@ -168,29 +186,29 @@ export default function IdentityForm({ initial }: Props) {
           onChange={(e) => setFonts(e.target.value)}
           rows={6}
           placeholder='{"display": "Fraunces", "body": "Inter"}'
-          className="w-full rounded-lg border border-rule bg-paper px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
 
       {/* Voz - Usa */}
-      <section className="rounded-xl border border-rule bg-paper-dark p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-muted mb-3">
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
           Voz &mdash; Usa
         </h2>
         <TagInput tags={voiceUses} onChange={setVoiceUses} />
       </section>
 
       {/* Voz - Evita */}
-      <section className="rounded-xl border border-rule bg-paper-dark p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-muted mb-3">
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
           Voz &mdash; Evita
         </h2>
         <TagInput tags={voiceAvoids} onChange={setVoiceAvoids} />
       </section>
 
       {/* Tom */}
-      <section className="rounded-xl border border-rule bg-paper-dark p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-muted mb-3">
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
           Tom
         </h2>
         <textarea
@@ -198,13 +216,13 @@ export default function IdentityForm({ initial }: Props) {
           onChange={(e) => setToneDescriptors(e.target.value)}
           rows={3}
           placeholder="Descreva o tom geral da comunicação..."
-          className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
 
       {/* Estilo de Abertura */}
-      <section className="rounded-xl border border-rule bg-paper-dark p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-muted mb-3">
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
           Estilo de Abertura
         </h2>
         <textarea
@@ -212,13 +230,13 @@ export default function IdentityForm({ initial }: Props) {
           onChange={(e) => setOpeningStyle(e.target.value)}
           rows={3}
           placeholder="Como o Pedro costuma abrir seus textos..."
-          className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
 
       {/* Estilo de Fechamento */}
-      <section className="rounded-xl border border-rule bg-paper-dark p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-muted mb-3">
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
           Estilo de Fechamento
         </h2>
         <textarea
@@ -226,13 +244,13 @@ export default function IdentityForm({ initial }: Props) {
           onChange={(e) => setClosingStyle(e.target.value)}
           rows={3}
           placeholder="Como o Pedro costuma fechar seus textos..."
-          className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
 
       {/* Posicionamento */}
-      <section className="rounded-xl border border-rule bg-paper-dark p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-muted mb-3">
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
           Posicionamento
         </h2>
         <textarea
@@ -240,13 +258,13 @@ export default function IdentityForm({ initial }: Props) {
           onChange={(e) => setPositioning(e.target.value)}
           rows={3}
           placeholder="Posicionamento de marca..."
-          className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
 
       {/* Criadores Referência */}
-      <section className="rounded-xl border border-rule bg-paper-dark p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-muted mb-3">
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
           Criadores Refer&ecirc;ncia
         </h2>
         <textarea
@@ -254,13 +272,13 @@ export default function IdentityForm({ initial }: Props) {
           onChange={(e) => setReferenceCreators(e.target.value)}
           rows={3}
           placeholder="Criadores que servem como referência..."
-          className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
 
       {/* Brandbook URL */}
-      <section className="rounded-xl border border-rule bg-paper-dark p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-muted mb-3">
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
           Brandbook URL
         </h2>
         <input
@@ -268,27 +286,60 @@ export default function IdentityForm({ initial }: Props) {
           value={brandbookUrl}
           onChange={(e) => setBrandbookUrl(e.target.value)}
           placeholder="https://..."
-          className="w-full rounded-lg border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
       </section>
 
-      {/* Status messages + Save */}
-      <div className="flex items-center gap-4">
+      {/* Status messages + Save + Reset */}
+      <div className="flex items-center gap-4 flex-wrap">
         <button
           type="submit"
-          disabled={isPending}
-          className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+          disabled={isPending || isResetting}
+          className="flex items-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-bg shadow-sm hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/20 transition-all disabled:opacity-50"
         >
-          {isPending ? "Salvando..." : "Salvar Identidade"}
+          {isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              Salvar Identidade
+            </>
+          )}
+        </button>
+
+        <button
+          type="button"
+          disabled={isPending || isResetting}
+          onClick={handleReset}
+          className="flex items-center gap-2 rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface transition-colors disabled:opacity-50"
+        >
+          {isResetting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Resetando...
+            </>
+          ) : (
+            <>
+              <RotateCcw className="h-4 w-4" />
+              Resetar para dados do Pedro
+            </>
+          )}
         </button>
 
         {success && (
-          <span className="text-sm font-medium text-green">
+          <span className="flex items-center gap-1.5 text-sm font-medium text-green animate-fade-in">
+            <CheckCircle2 className="h-4 w-4" />
             Salvo com sucesso!
           </span>
         )}
         {error && (
-          <span className="text-sm font-medium text-accent">{error}</span>
+          <span className="flex items-center gap-1.5 text-sm font-medium text-red animate-fade-in">
+            <AlertCircle className="h-4 w-4" />
+            {error}
+          </span>
         )}
       </div>
     </form>

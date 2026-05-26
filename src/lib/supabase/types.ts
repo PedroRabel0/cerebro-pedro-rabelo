@@ -72,23 +72,22 @@ export interface ReferencePost {
   caption_text: string | null;
   likes: number | null;
   comments: number | null;
-  shares: number | null;
-  saves: number | null;
-  hook_type: string | null;
-  structure: string | null;
-  length: string | null;
-  tone: string | null;
-  cta_type: string | null;
-  main_theme: string | null;
-  sub_theme: string | null;
-  thesis: string | null;
+  engagement_rate: number | null;
+  dna_hook_type: string | null;
+  dna_structure: string | null;
+  dna_length: string | null;
+  dna_tone: string | null;
+  dna_cta_type: string | null;
+  dna_main_theme: string | null;
+  dna_sub_theme: string | null;
+  dna_thesis: string | null;
   saved_as_reference: boolean | null;
-  created_at: string;
-  updated_at: string;
+  posted_at: string | null;
+  scraped_at: string;
 }
 
-export type CaptureSourceType = "transcription" | "pdf" | "youtube" | "manual";
-export type CaptureStatus = "pending" | "processing" | "processed" | "error";
+export type CaptureSourceType = "transcript" | "pdf" | "youtube" | "manual";
+export type CaptureStatus = "pending" | "processed" | "archived";
 
 export interface Capture {
   id: string;
@@ -105,7 +104,7 @@ export interface Capture {
   updated_at: string;
 }
 
-export type ProposalType = "playbook" | "story" | "question";
+export type ProposalType = "playbook" | "story" | "question" | "instagram_carousel" | "linkedin_post" | "x_thread";
 export type ProposalStatus = "pending" | "approved" | "rejected";
 
 export interface Proposal {
@@ -120,9 +119,15 @@ export interface Proposal {
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string;
+  caption?: string;
+  hashtags?: string[];
+  hook?: string;
+  cta?: string;
+  slides?: string[];
+  platform?: string;
 }
 
-export type ActivityActor = "system" | "pedro" | "henrique";
+export type ActivityActor = "ia" | "pedro" | "henrique";
 
 export interface ActivityLogEntry {
   id: string;
@@ -142,7 +147,7 @@ export interface ReferenceKnowledge {
   title: string;
   extracted_playbooks: Record<string, unknown> | null;
   tags: string[];
-  citation_allowed: boolean | null;
+  citation_allowed: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -172,7 +177,7 @@ export interface ContentFormat {
 }
 
 export type SourceType = "base_only" | "references_only" | "both" | "free_text";
-export type ContentStatus = "draft" | "approved" | "rejected";
+export type ContentStatus = "draft" | "approved" | "published";
 
 export interface GeneratedContent {
   id: string;
@@ -190,7 +195,7 @@ export interface GeneratedContent {
   image_model: string | null;
   source_map: Record<string, unknown> | null;
   status: ContentStatus;
-  feedback_rating: number | null;
+  feedback_rating: string | null;
   feedback_text: string | null;
   created_at: string;
   updated_at: string;

@@ -9,13 +9,13 @@ function CompletenessBar({ score }: { score: number }) {
     score >= 80 ? "bg-green" : score >= 50 ? "bg-blue" : "bg-accent";
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 w-20 rounded-full bg-paper-dark">
+      <div className="h-1.5 w-20 rounded-full bg-surface">
         <div
           className={`h-1.5 rounded-full ${color}`}
           style={{ width: `${score}%` }}
         />
       </div>
-      <span className="font-mono text-[10px] text-ink-muted">{score}%</span>
+      <span className="font-mono text-[10px] text-text-muted">{score}%</span>
     </div>
   );
 }
@@ -45,8 +45,8 @@ function PlaybookForm({
   }
 
   return (
-    <div className="rounded border border-rule bg-paper-dark p-4">
-      <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-ink-soft">
+    <div className="rounded-xl border border-border bg-card p-4">
+      <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-text-secondary">
         {playbook ? "Editar Playbook" : "Novo Playbook"}
       </h3>
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -55,18 +55,18 @@ function PlaybookForm({
           required
           defaultValue={playbook?.title}
           placeholder="Título do playbook"
-          className="w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <input
           name="subtitle"
           defaultValue={playbook?.subtitle ?? ""}
           placeholder="Subtítulo (opcional)"
-          className="w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <select
           name="theme_id"
           defaultValue={playbook?.theme_id ?? ""}
-          className="w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
         >
           <option value="">Sem tema</option>
           {themes.map((t) => (
@@ -80,20 +80,20 @@ function PlaybookForm({
           defaultValue={playbook?.body_markdown ?? ""}
           placeholder="Conteúdo em markdown..."
           rows={8}
-          className="w-full rounded border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none"
+          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <div className="flex gap-2">
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-accent px-4 py-1.5 font-mono text-xs font-semibold text-paper transition hover:opacity-90 disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover disabled:opacity-50"
           >
             {saving ? "Salvando..." : "Salvar"}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded border border-rule px-4 py-1.5 font-mono text-xs text-ink-muted transition hover:text-ink-soft"
+            className="rounded-lg border border-border px-4 py-1.5 font-mono text-xs text-text-muted transition hover:text-text hover:border-border-light"
           >
             Cancelar
           </button>
@@ -146,7 +146,7 @@ export default function PlaybookList({
           <select
             value={filterTheme}
             onChange={(e) => setFilterTheme(e.target.value)}
-            className="rounded border border-rule bg-paper px-2 py-1 font-mono text-xs text-ink-soft focus:border-accent focus:outline-none"
+            className="rounded-lg border border-border bg-card px-2 py-1 font-mono text-xs text-text-secondary focus:border-accent focus:outline-none"
           >
             <option value="">Todos os temas</option>
             {themes.map((t) => (
@@ -155,20 +155,20 @@ export default function PlaybookList({
               </option>
             ))}
           </select>
-          <span className="font-mono text-[10px] text-ink-muted">
+          <span className="font-mono text-[10px] text-text-muted">
             {filtered.length} playbook{filtered.length !== 1 ? "s" : ""}
           </span>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="rounded bg-accent px-3 py-1.5 font-mono text-xs font-semibold text-paper transition hover:opacity-90"
+          className="rounded-lg bg-accent px-3 py-1.5 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover"
         >
           + Novo Playbook
         </button>
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-ink-muted">
+        <p className="py-8 text-center text-sm text-text-muted">
           Nenhum playbook ainda. Crie o primeiro!
         </p>
       ) : (
@@ -176,16 +176,16 @@ export default function PlaybookList({
           {filtered.map((p) => (
             <div
               key={p.id}
-              className="flex items-center justify-between rounded border border-rule bg-paper-dark px-4 py-3 transition hover:border-ink-muted"
+              className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 transition hover:border-border-light"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="truncate font-sans text-sm font-medium text-ink">
+                  <h3 className="truncate font-sans text-sm font-medium text-text">
                     {p.title}
                   </h3>
                   {p.theme && (
                     <span
-                      className="inline-block rounded-full px-2 py-0.5 font-mono text-[10px] text-paper"
+                      className="inline-block rounded-full px-2 py-0.5 font-mono text-[10px] text-bg"
                       style={{ backgroundColor: p.theme.color ?? "#3a5a7a" }}
                     >
                       {p.theme.name}
@@ -193,7 +193,7 @@ export default function PlaybookList({
                   )}
                 </div>
                 {p.subtitle && (
-                  <p className="mt-0.5 truncate text-xs text-ink-muted">
+                  <p className="mt-0.5 truncate text-xs text-text-muted">
                     {p.subtitle}
                   </p>
                 )}
@@ -202,13 +202,13 @@ export default function PlaybookList({
               <div className="ml-3 flex shrink-0 gap-1">
                 <button
                   onClick={() => setEditing(p)}
-                  className="rounded px-2 py-1 font-mono text-[10px] text-blue transition hover:bg-paper"
+                  className="rounded-lg px-2 py-1 font-mono text-[10px] text-blue transition hover:bg-card"
                 >
                   Editar
                 </button>
                 <button
                   onClick={() => handleDelete(p.id)}
-                  className="rounded px-2 py-1 font-mono text-[10px] text-accent transition hover:bg-paper"
+                  className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
                 >
                   Apagar
                 </button>

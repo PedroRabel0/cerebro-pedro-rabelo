@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import {
   Identity,
   Playbook,
@@ -16,6 +15,7 @@ import {
   buildDNAAnalysisSystemPrompt,
   buildDNAAnalysisUserPrompt,
 } from './prompts';
+import { getClient, logCost, parseJSON } from './client';
 
 // --- Types ---
 
@@ -69,46 +69,6 @@ export interface DNAResult {
   main_theme: string;
   sub_theme: string;
   thesis: string;
-}
-
-// --- Client ---
-
-function getClient(): Anthropic {
-  return new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  });
-}
-
-function logCost(model: string, inputTokens: number, outputTokens: number) {
-  const costs: Record<string, { input: number; output: number }> = {
-    'claude-sonnet-4-6': { input: 3.0, output: 15.0 },
-    'claude-haiku-4-5-20251001': { input: 0.8, output: 4.0 },
-  };
-  const rate = costs[model] || { input: 3.0, output: 15.0 };
-  const cost = (inputTokens / 1_000_000) * rate.input + (outputTokens / 1_000_000) * rate.output;
-  console.log(`[AI Cost] ${model} | in: ${inputTokens} | out: ${outputTokens} | $${cost.toFixed(4)}`);
-}
-
-function parseJSON<T>(text: string): T | null {
-  // Try to extract JSON from markdown code blocks or raw text
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim();
-  try {
-    return JSON.parse(jsonStr) as T;
-  } catch {
-    // Try to find JSON object/array in the text
-    const objectMatch = jsonStr.match(/\{[\s\S]*\}/);
-    const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
-    const match = objectMatch || arrayMatch;
-    if (match) {
-      try {
-        return JSON.parse(match[0]) as T;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
 }
 
 // --- Exported Functions ---

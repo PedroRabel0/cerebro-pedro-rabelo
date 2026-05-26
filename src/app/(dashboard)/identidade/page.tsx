@@ -1,30 +1,42 @@
 export const dynamic = "force-dynamic";
 
-import { getIdentity } from "./actions";
+import { getIdentity, autoFillIdentity } from "./actions";
 import IdentityForm from "./IdentityForm";
+import { Target, Info } from "lucide-react";
 
 export default async function IdentidadePage() {
-  const identity = await getIdentity();
+  const existingBefore = await getIdentity();
+  const identity = await autoFillIdentity();
+  const wasAutoFilled = !existingBefore && !!identity;
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-display text-2xl font-bold text-ink">
-          Identidade
-        </h1>
-        <p className="mt-1 text-sm text-ink-muted">
-          Branding, voz e tom do Pedro.
-        </p>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-green/20 to-accent/20">
+            <Target className="h-5 w-5 text-green" />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl font-bold text-text sm:text-3xl">
+              Identidade
+            </h1>
+            <p className="mt-0.5 text-sm text-text-secondary">
+              Branding, voz e tom do Pedro.
+            </p>
+          </div>
+        </div>
       </div>
 
-      {!identity && (
-        <div className="mb-6 rounded-xl border border-rule bg-paper-dark px-5 py-4 text-sm text-ink-muted">
-          Identidade ainda não configurada. Preencha os campos abaixo para
-          começar.
+      {wasAutoFilled && (
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-green/20 bg-green/5 px-5 py-4">
+          <Info className="h-5 w-5 shrink-0 text-green" />
+          <p className="text-sm text-text-secondary">
+            Identidade preenchida automaticamente com base no Personal Brand do Pedro.
+          </p>
         </div>
       )}
 
-      <IdentityForm initial={identity} />
+      <IdentityForm initial={identity} wasAutoFilled={wasAutoFilled} />
     </div>
   );
 }
