@@ -104,42 +104,54 @@ export async function GET(request: Request) {
 
       profileResult.posts_new = newPosts.length;
 
-      // 2d. For each new post: analyze DNA and save
-      for (const post of newPosts) {
-        let dna: Record<string, string> = {} as Record<string, string>;
+      // 2d. Process posts in parallel batches of 5 for speed
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < newPosts.length; i += BATCH_SIZE) {
+        const batch = newPosts.slice(i, i + BATCH_SIZE);
 
-        if (post.caption) {
-          const dnaResult = await analyzeDNA({ content: post.caption });
-          if (!("error" in dnaResult)) {
-            dna = dnaResult as unknown as Record<string, string>;
-            profileResult.posts_analyzed++;
-          }
+        const batchResults = await Promise.all(
+          batch.map(async (post) => {
+            let dna: Record<string, string> = {} as Record<string, string>;
+
+            if (post.caption) {
+              const dnaResult = await analyzeDNA({ content: post.caption });
+              if (!("error" in dnaResult)) {
+                dna = dnaResult as unknown as Record<string, string>;
+                profileResult.posts_analyzed++;
+              }
+            }
+
+            return { post, dna };
+          })
+        );
+
+        // Save all posts from this batch
+        for (const { post, dna } of batchResults) {
+          const postUrl = post.owner_username
+            ? `https://www.instagram.com/${post.owner_username}/`
+            : null;
+
+          await supabase.from("reference_posts").insert({
+            profile_id: profile.id,
+            platform: "instagram",
+            url: postUrl,
+            thumbnail_url: post.thumbnail_url,
+            caption_text: post.caption,
+            likes: post.likes,
+            comments: post.comments,
+            engagement_rate: post.engagement_rate,
+            posted_at: post.posted_at,
+            dna_hook_type: dna.hook_type || null,
+            dna_structure: dna.structure || null,
+            dna_length: dna.length || null,
+            dna_tone: dna.tone || null,
+            dna_cta_type: dna.cta_type || null,
+            dna_main_theme: dna.main_theme || null,
+            dna_sub_theme: dna.sub_theme || null,
+            dna_thesis: dna.thesis || null,
+            saved_as_reference: true,
+          });
         }
-
-        const postUrl = post.owner_username
-          ? `https://www.instagram.com/${post.owner_username}/`
-          : null;
-
-        await supabase.from("reference_posts").insert({
-          profile_id: profile.id,
-          platform: "instagram",
-          url: postUrl,
-          thumbnail_url: post.thumbnail_url,
-          caption_text: post.caption,
-          likes: post.likes,
-          comments: post.comments,
-          engagement_rate: post.engagement_rate,
-          posted_at: post.posted_at,
-          dna_hook_type: dna.hook_type || null,
-          dna_structure: dna.structure || null,
-          dna_length: dna.length || null,
-          dna_tone: dna.tone || null,
-          dna_cta_type: dna.cta_type || null,
-          dna_main_theme: dna.main_theme || null,
-          dna_sub_theme: dna.sub_theme || null,
-          dna_thesis: dna.thesis || null,
-          saved_as_reference: true,
-        });
       }
 
       // 2e. Update last_scraped_at

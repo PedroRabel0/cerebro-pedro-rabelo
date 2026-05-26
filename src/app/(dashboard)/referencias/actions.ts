@@ -379,6 +379,156 @@ export async function deletePost(id: string) {
   revalidatePath(PATH);
 }
 
+// --- Weekly Patterns (Sinais da Semana) ---
+
+export interface WeeklyPattern {
+  pattern_type: string;
+  description: string;
+  count: number;
+  example_posts: string[];
+  suggestion: string;
+}
+
+export async function detectWeeklyPatterns(): Promise<WeeklyPattern[]> {
+  const supabase = await createClient();
+
+  // Fetch posts from last 7 days
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const { data: posts, error } = await supabase
+    .from("reference_posts")
+    .select("*")
+    .gte("scraped_at", sevenDaysAgo.toISOString())
+    .order("scraped_at", { ascending: false });
+
+  if (error) throw error;
+  if (!posts || posts.length === 0) return [];
+
+  // Group by DNA fields to find patterns
+  const hookGroups: Record<string, typeof posts> = {};
+  const structureGroups: Record<string, typeof posts> = {};
+  const themeGroups: Record<string, typeof posts> = {};
+  const toneGroups: Record<string, typeof posts> = {};
+  const ctaGroups: Record<string, typeof posts> = {};
+
+  for (const post of posts) {
+    if (post.dna_hook_type) {
+      hookGroups[post.dna_hook_type] = hookGroups[post.dna_hook_type] || [];
+      hookGroups[post.dna_hook_type].push(post);
+    }
+    if (post.dna_structure) {
+      structureGroups[post.dna_structure] = structureGroups[post.dna_structure] || [];
+      structureGroups[post.dna_structure].push(post);
+    }
+    if (post.dna_main_theme) {
+      themeGroups[post.dna_main_theme] = themeGroups[post.dna_main_theme] || [];
+      themeGroups[post.dna_main_theme].push(post);
+    }
+    if (post.dna_tone) {
+      toneGroups[post.dna_tone] = toneGroups[post.dna_tone] || [];
+      toneGroups[post.dna_tone].push(post);
+    }
+    if (post.dna_cta_type) {
+      ctaGroups[post.dna_cta_type] = ctaGroups[post.dna_cta_type] || [];
+      ctaGroups[post.dna_cta_type].push(post);
+    }
+  }
+
+  // Build pattern summaries for AI (only groups with 2+ posts)
+  const rawPatterns: Array<{
+    field: string;
+    value: string;
+    count: number;
+    examples: string[];
+  }> = [];
+
+  const addPatterns = (groups: Record<string, typeof posts>, field: string) => {
+    for (const [value, groupPosts] of Object.entries(groups)) {
+      if (groupPosts.length >= 2) {
+        rawPatterns.push({
+          field,
+          value,
+          count: groupPosts.length,
+          examples: groupPosts
+            .slice(0, 3)
+            .map((p) => p.caption_text?.slice(0, 120) || "(sem legenda)"),
+        });
+      }
+    }
+  };
+
+  addPatterns(hookGroups, "hook_type");
+  addPatterns(structureGroups, "structure");
+  addPatterns(themeGroups, "main_theme");
+  addPatterns(toneGroups, "tone");
+  addPatterns(ctaGroups, "cta_type");
+
+  if (rawPatterns.length === 0) return [];
+
+  // Sort by count descending and take top 8
+  rawPatterns.sort((a, b) => b.count - a.count);
+  const topPatterns = rawPatterns.slice(0, 8);
+
+  // Use Claude Haiku to summarize into actionable insights
+  const client = getAIClient();
+
+  const patternsText = topPatterns
+    .map(
+      (p, i) =>
+        `${i + 1}. Campo: ${p.field} | Valor: "${p.value}" | Ocorrências: ${p.count}\n   Exemplos: ${p.examples.join(" | ")}`
+    )
+    .join("\n");
+
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 2048,
+    system: `Você é um analista de conteúdo. Receba padrões detectados em posts de referência da última semana e transforme-os em insights acionáveis em português brasileiro.
+
+Para cada padrão, retorne um JSON array com objetos contendo:
+- pattern_type: tipo curto (ex: "hook", "estrutura", "tema", "tom", "cta")
+- description: descrição clara do padrão em português (ex: "5 posts usam hook de pergunta")
+- count: número de ocorrências
+- example_posts: até 3 trechos de exemplo
+- suggestion: sugestão prática de como Pedro pode usar esse padrão no conteúdo dele
+
+Responda APENAS com o JSON array, sem markdown.`,
+    messages: [
+      {
+        role: "user",
+        content: `Total de posts analisados na última semana: ${posts.length}\n\nPadrões encontrados:\n${patternsText}`,
+      },
+    ],
+  });
+
+  const text = response.content[0].type === "text" ? response.content[0].text : "";
+  const parsed = parseJSON<WeeklyPattern[]>(text);
+
+  return parsed && Array.isArray(parsed) ? parsed : [];
+}
+
+export async function createFormatFromPattern(
+  patternType: string,
+  description: string,
+  suggestion: string,
+) {
+  const supabase = await createClient();
+
+  const name = `Formato: ${patternType} — ${description.slice(0, 50)}`;
+  const structureMarkdown = `## Padrão detectado\n${description}\n\n## Como usar\n${suggestion}\n\n## Estrutura sugerida\n- Hook baseado em "${patternType}"\n- Desenvolver com exemplos práticos\n- CTA alinhado ao padrão`;
+
+  const { error } = await supabase.from("content_formats").insert({
+    name,
+    content_type: "instagram_carousel",
+    description: `Formato criado a partir de padrão semanal: ${description}`,
+    structure_markdown: structureMarkdown,
+  });
+
+  if (error) throw error;
+  revalidatePath(PATH);
+  revalidatePath("/gerar-conteudo");
+}
+
 // --- Reference Knowledge ---
 
 export async function getKnowledge() {

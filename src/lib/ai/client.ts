@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@/lib/supabase/server';
 
 export function getClient(): Anthropic {
   return new Anthropic({
@@ -18,6 +19,21 @@ export function logCost(model: string, inputTokens: number, outputTokens: number
   console.log(
     `[AI Cost] ${model} | in: ${inputTokens} | out: ${outputTokens} | $${cost.toFixed(4)}`
   );
+
+  // Fire-and-forget: persist cost to Supabase
+  createClient()
+    .then((supabase) =>
+      supabase.from('api_cost_log').insert({
+        model,
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        cost_usd: parseFloat(cost.toFixed(6)),
+        created_at: new Date().toISOString(),
+      })
+    )
+    .catch(() => {
+      // Silently ignore — table may not exist yet
+    });
 }
 
 export function parseJSON<T>(text: string): T | null {

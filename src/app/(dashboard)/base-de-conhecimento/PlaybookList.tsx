@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Playbook, Theme } from "@/lib/supabase/types";
 import { createPlaybook, updatePlaybook, deletePlaybook } from "./actions";
 import BookQuestionsPanel from "./BookQuestionsPanel";
+import DiffView from "./DiffView";
 
 function CompletenessBar({ score }: { score: number }) {
   const color =
@@ -115,6 +116,7 @@ export default function PlaybookList({
   const [editing, setEditing] = useState<Playbook | null>(null);
   const [filterTheme, setFilterTheme] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [diffId, setDiffId] = useState<string | null>(null);
 
   const filtered = filterTheme
     ? playbooks.filter((p) => p.theme_id === filterTheme)
@@ -224,6 +226,16 @@ export default function PlaybookList({
                     <CompletenessBar score={p.completeness_score} />
                   </button>
                   <div className="ml-3 flex shrink-0 gap-1">
+                    {p.version_previous && (
+                      <button
+                        onClick={() =>
+                          setDiffId(diffId === p.id ? null : p.id)
+                        }
+                        className="rounded-lg px-2 py-1 font-mono text-[10px] text-accent transition hover:bg-accent/10"
+                      >
+                        Ver alteracoes
+                      </button>
+                    )}
                     <button
                       onClick={() => setEditing(p)}
                       className="rounded-lg px-2 py-1 font-mono text-[10px] text-blue transition hover:bg-card"
@@ -247,6 +259,13 @@ export default function PlaybookList({
                           {p.body_markdown}
                         </pre>
                       </div>
+                    )}
+                    {diffId === p.id && p.version_previous && (
+                      <DiffView
+                        versionCurrent={p.version_current}
+                        versionPrevious={p.version_previous}
+                        onClose={() => setDiffId(null)}
+                      />
                     )}
                     <BookQuestionsPanel playbook={p} />
                   </div>

@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Wifi,
+  Settings,
 } from "lucide-react";
 
 const navItems = [
@@ -115,6 +116,39 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Settings link */}
+      <div className="px-3 pb-2">
+        <Link
+          href="/configuracoes"
+          onClick={() => setMobileOpen(false)}
+          className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ${
+            pathname.startsWith("/configuracoes")
+              ? "bg-accent/10 text-accent shadow-sm shadow-accent/5"
+              : "text-text-secondary hover:bg-card-hover hover:text-text"
+          }`}
+        >
+          <Settings
+            className={`h-[18px] w-[18px] transition-colors ${
+              pathname.startsWith("/configuracoes")
+                ? "text-accent"
+                : "text-text-muted group-hover:text-text-secondary"
+            }`}
+          />
+          <div>
+            <span
+              className={`block text-sm font-medium ${
+                pathname.startsWith("/configuracoes") ? "text-accent" : ""
+              }`}
+            >
+              Configurações
+            </span>
+            <span className="block text-[11px] text-text-muted">
+              Custos e preferências
+            </span>
+          </div>
+        </Link>
+      </div>
 
       {/* Footer */}
       <div className="border-t border-border px-5 py-4">

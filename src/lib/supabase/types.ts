@@ -1,3 +1,12 @@
+export interface ApiCostLog {
+  id: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  created_at: string;
+}
+
 export type UserRole = "pedro" | "henrique";
 
 export interface UserProfile {
@@ -195,6 +204,7 @@ export interface GeneratedContent {
   image_model: string | null;
   source_map: Record<string, unknown> | null;
   status: ContentStatus;
+  published_url: string | null;
   feedback_rating: string | null;
   feedback_text: string | null;
   created_at: string;

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { GeneratedContent, ContentStatus } from "@/lib/supabase/types";
-import { updateContentStatus, updateContentText, deleteContent } from "./actions";
+import { updateContentStatus, updateContentText, deleteContent, savePublishedUrl } from "./actions";
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import {
   MessageSquare,
@@ -14,6 +14,8 @@ import {
   X,
   Save,
   ChevronDown,
+  Link,
+  ExternalLink,
 } from "lucide-react";
 
 function statusBadge(status: ContentStatus) {
@@ -214,6 +216,56 @@ function FeedbackForm({
   );
 }
 
+function PublishedUrlInput({
+  contentId,
+  currentUrl,
+  onClose,
+}: {
+  contentId: string;
+  currentUrl: string | null;
+  onClose: () => void;
+}) {
+  const [url, setUrl] = useState(currentUrl ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!url.trim()) return;
+    setSaving(true);
+    try {
+      await savePublishedUrl(contentId, url.trim());
+    } catch {
+      // silent
+    }
+    setSaving(false);
+    onClose();
+  }
+
+  return (
+    <div className="mt-3 flex items-center gap-2">
+      <input
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="Cole a URL de publicação..."
+        className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:ring-1 focus:ring-accent"
+      />
+      <button
+        onClick={handleSave}
+        disabled={saving || !url.trim()}
+        className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+      >
+        <Save className="h-3 w-3" />
+        {saving ? "..." : "Salvar"}
+      </button>
+      <button
+        onClick={onClose}
+        className="rounded-xl border border-border px-3 py-2 text-sm text-text-muted hover:text-text"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
 export default function ContentList({
   contents,
 }: {
@@ -221,6 +273,7 @@ export default function ContentList({
 }) {
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [publishUrlId, setPublishUrlId] = useState<string | null>(null);
 
   async function handleDelete(id: string) {
     if (!confirm("Apagar este conteudo?")) return;
@@ -270,6 +323,17 @@ export default function ContentList({
                       <ImageIcon className="h-2.5 w-2.5" />
                       {c.image_model}
                     </span>
+                  )}
+                  {c.published_url && (
+                    <a
+                      href={c.published_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full bg-green/10 px-2 py-0.5 font-mono text-[10px] font-medium text-green hover:bg-green/20 transition"
+                    >
+                      <Link className="h-2.5 w-2.5" />
+                      Publicado
+                    </a>
                   )}
                   {c.feedback_rating && (
                     <span className="inline-flex items-center gap-1 font-mono text-[10px] text-text-muted">
@@ -334,6 +398,15 @@ export default function ContentList({
                 )}
                 <button
                   onClick={() =>
+                    setPublishUrlId(publishUrlId === c.id ? null : c.id)
+                  }
+                  className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-green transition hover:bg-green/10"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  <span className="hidden sm:inline">{c.published_url ? "URL" : "Publicar"}</span>
+                </button>
+                <button
+                  onClick={() =>
                     setFeedbackId(feedbackId === c.id ? null : c.id)
                   }
                   className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-blue transition hover:bg-blue/10"
@@ -354,6 +427,13 @@ export default function ContentList({
               <FeedbackForm
                 content={c}
                 onClose={() => setFeedbackId(null)}
+              />
+            )}
+            {publishUrlId === c.id && (
+              <PublishedUrlInput
+                contentId={c.id}
+                currentUrl={c.published_url}
+                onClose={() => setPublishUrlId(null)}
               />
             )}
           </div>

@@ -229,6 +229,11 @@ export default function PostList({
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="rounded-full bg-purple/15 px-2 py-0.5 text-[11px] font-medium text-purple">
+                      Terceiros
+                    </span>
+                  </div>
                   {post.caption_text && (
                     <p className="mb-1 line-clamp-2 text-sm text-text">
                       {post.caption_text}

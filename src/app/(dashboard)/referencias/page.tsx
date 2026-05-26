@@ -1,13 +1,14 @@
 export const dynamic = "force-dynamic";
 
-import { getProfiles, getKnowledge } from "./actions";
+import { getProfiles, getKnowledge, detectWeeklyPatterns } from "./actions";
 import Tabs from "./Tabs";
 import { Search } from "lucide-react";
 
 export default async function ReferenciasPage() {
-  const [profiles, knowledge] = await Promise.all([
+  const [profiles, knowledge, patterns] = await Promise.all([
     getProfiles(),
     getKnowledge(),
+    detectWeeklyPatterns().catch(() => []),
   ]);
 
   return (
@@ -28,7 +29,7 @@ export default async function ReferenciasPage() {
         </div>
       </div>
 
-      <Tabs profiles={profiles} knowledge={knowledge} />
+      <Tabs profiles={profiles} knowledge={knowledge} patterns={patterns} />
     </div>
   );
 }

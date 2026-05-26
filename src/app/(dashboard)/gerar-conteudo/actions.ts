@@ -520,6 +520,46 @@ export async function createWizardContent(
           : Promise.resolve({ data: null }),
       ]);
 
+    // Fetch reference posts when source is "both" or "references_only"
+    let referenceContext = "";
+    if (payload.source !== "base_only") {
+      const { data: refPosts } = await supabase
+        .from("reference_posts")
+        .select("caption_text, profile_id, dna_hook_type, dna_structure, dna_main_theme")
+        .order("posted_at", { ascending: false })
+        .limit(10);
+
+      // Fetch profile info for attribution
+      let profileMap: Record<string, string> = {};
+      if (refPosts && refPosts.length > 0) {
+        const profileIds = [...new Set(refPosts.map((p) => p.profile_id).filter(Boolean))];
+        if (profileIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("reference_profiles")
+            .select("id, display_name, handle")
+            .in("id", profileIds);
+          if (profiles) {
+            profileMap = Object.fromEntries(
+              profiles.map((p) => [p.id, `@${p.handle || p.display_name}`])
+            );
+          }
+        }
+      }
+
+      if (refPosts && refPosts.length > 0) {
+        referenceContext = refPosts
+          .map((p) => {
+            const handle = profileMap[p.profile_id] || "desconhecido";
+            const dna = [p.dna_hook_type, p.dna_structure, p.dna_main_theme]
+              .filter(Boolean)
+              .join(" | ");
+            const caption = (p.caption_text || "").slice(0, 800);
+            return `### Ref: ${handle}${dna ? ` (${dna})` : ""}\n${caption}`;
+          })
+          .join("\n\n");
+      }
+    }
+
     // Build context from knowledge base
     const allPlaybooks = playbooksRes.data ?? [];
     const allStories = storiesRes.data ?? [];
@@ -657,23 +697,46 @@ Gere a legenda completa do post.`;
           break;
       }
 
+      // Build source-specific instructions
+      let sourceInstructions = "";
+      if (payload.source === "both") {
+        sourceInstructions = `
+## REGRAS DE FONTE (MODO AMBOS - Pedro + Terceiros):
+- Use o conteudo do Pedro (playbooks, historias) como BASE PRINCIPAL e espinha dorsal
+- Use referencias externas apenas como complemento, inspiracao ou contraponto
+- Sempre que usar insight de terceiros, cite a fonte: [Ref: @handle]
+- O conteudo final deve soar 100% como Pedro, nunca como copia de terceiros
+- A voz, tom e estilo sao SEMPRE do Pedro — referencias sao apenas tempero`;
+      } else if (payload.source === "references_only") {
+        sourceInstructions = `
+## REGRAS DE FONTE (MODO REFERENCIAS):
+- Use as referencias externas como inspiracao principal
+- Adapte completamente para a voz e tom do Pedro
+- Cite as fontes quando relevante: [Ref: @handle]
+- O conteudo final deve parecer 100% Pedro, mesmo baseado em referencias`;
+      }
+
       const freeTextPrompt = `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUES BRASILEIRO (PT-BR).
 
 TOPICO: ${topicText}
 ${payload.recorte ? `RECORTE ESPECIFICO: ${payload.recorte}` : ""}
 ${payload.audience ? `PUBLICO-ALVO: ${payload.audience}` : ""}
 ${payload.extraContext ? `CONTEXTO EXTRA: ${payload.extraContext}` : ""}
+${sourceInstructions}
 
 ${typeInstructions}
 
-CONTEXTO DA BASE DE CONHECIMENTO:
+CONTEXTO DA BASE DE CONHECIMENTO DO PEDRO:
 
 ## Playbooks Relevantes:
 ${playbookContext || "Nenhum playbook encontrado."}
 
 ## Historias Relevantes:
 ${storyContext || "Nenhuma historia encontrada."}
-
+${referenceContext ? `
+## Referencias Externas (terceiros):
+${referenceContext}
+` : ""}
 INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR. Use as informacoes dos playbooks e historias como base. O conteudo deve ser direto, pratico e refletir o tom e voz da identidade fornecida.`;
 
       const result = await generateContent({
@@ -834,6 +897,16 @@ async function generateImageForContent(
       .eq("id", contentId);
   }
 
+  revalidatePath(PATH);
+}
+
+export async function savePublishedUrl(contentId: string, url: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("generated_contents")
+    .update({ published_url: url, status: "published" })
+    .eq("id", contentId);
+  if (error) throw error;
   revalidatePath(PATH);
 }
 
