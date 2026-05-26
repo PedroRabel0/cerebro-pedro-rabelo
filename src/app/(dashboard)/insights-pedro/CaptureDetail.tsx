@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { Proposal } from "@/lib/supabase/types";
 import {
   getProposalsByCapture,
@@ -15,6 +16,7 @@ import {
   BookMarked,
   HelpCircle,
   MessageSquare,
+  ArrowRight,
 } from "lucide-react";
 
 const proposalTypeConfig: Record<
@@ -42,6 +44,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
   const [status, setStatus] = useState(proposal.status);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [feedback, setFeedback] = useState<"approved" | "rejected" | null>(null);
 
   const config = proposalTypeConfig[proposal.type] ?? {
     label: proposal.type,
@@ -58,6 +61,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
     try {
       await approveProposal(proposal.id);
       setStatus("approved");
+      setFeedback("approved");
     } catch (err) {
       console.error("Approve failed:", err);
     }
@@ -69,6 +73,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
     try {
       await rejectProposal(proposal.id);
       setStatus("rejected");
+      setFeedback("rejected");
     } catch (err) {
       console.error("Reject failed:", err);
     }
@@ -76,7 +81,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
+    <div className={`overflow-hidden rounded-xl border border-border bg-card${feedback === "rejected" ? " opacity-60" : ""}`}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border bg-surface/50 px-4 py-2.5">
         <div className="flex items-center gap-2">
@@ -168,6 +173,36 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
             <XCircle className="h-3 w-3" />
             Rejeitar
           </button>
+        </div>
+      )}
+
+      {/* Approve feedback banner */}
+      {feedback === "approved" && (
+        <div className="rounded-xl bg-green/10 border border-green/30 p-4 mx-4 mb-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green shrink-0" />
+              <span className="text-sm text-green font-medium">
+                {config.label} &ldquo;{proposal.title}&rdquo; criado na Base de Conhecimento
+              </span>
+            </div>
+            <Link
+              href="/base-de-conhecimento"
+              className="flex items-center gap-1 text-accent hover:underline font-mono text-xs whitespace-nowrap"
+            >
+              Ver na Base <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Reject feedback banner */}
+      {feedback === "rejected" && (
+        <div className="rounded-xl bg-surface border border-border p-4 mx-4 mb-4 opacity-60">
+          <div className="flex items-center gap-2">
+            <XCircle className="h-4 w-4 text-text-muted shrink-0" />
+            <span className="text-sm text-text-muted">Proposta rejeitada</span>
+          </div>
         </div>
       )}
     </div>

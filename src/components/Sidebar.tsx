@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  Zap,
   BookOpen,
   Search,
   Target,
@@ -20,9 +19,9 @@ import {
 const navItems = [
   {
     href: "/",
-    label: "Input",
-    Icon: Zap,
-    description: "Alimentar o cérebro",
+    label: "Cérebro",
+    Icon: Brain,
+    description: "Chat e alimentar",
   },
   {
     href: "/base-de-conhecimento",

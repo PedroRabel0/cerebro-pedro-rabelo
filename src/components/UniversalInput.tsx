@@ -329,9 +329,45 @@ export default function UniversalInput() {
 
       {/* Success with AI */}
       {state === "done" && result?.result && (
-        <div className="animate-slide-in rounded-2xl border border-green/20 bg-gradient-to-br from-green/5 to-transparent p-5">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
+        <div className="animate-slide-in space-y-4">
+          {/* Cerebro atualizado banner */}
+          <div className="rounded-2xl border border-green/30 bg-gradient-to-br from-green/10 via-accent/5 to-transparent p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Brain className="h-6 w-6 text-green" />
+                <div>
+                  <h3 className="text-base font-bold text-text">
+                    Cerebro atualizado!
+                  </h3>
+                  <p className="mt-1 font-mono text-xs text-text-secondary">
+                    {(() => {
+                      const proposals = result.result!.proposals;
+                      const themes = result.result!.extracted_themes;
+                      const playbookCount = proposals.filter((p) => p.type === "playbook").length;
+                      const storyCount = proposals.filter((p) => p.type === "story").length;
+                      const questionCount = proposals.filter((p) => p.type === "question").length;
+                      const parts: string[] = [];
+                      if (playbookCount > 0) parts.push(`+${playbookCount} playbook${playbookCount > 1 ? "s" : ""} proposto${playbookCount > 1 ? "s" : ""}`);
+                      if (storyCount > 0) parts.push(`+${storyCount} historia${storyCount > 1 ? "s" : ""} proposta${storyCount > 1 ? "s" : ""}`);
+                      if (questionCount > 0) parts.push(`+${questionCount} pergunta${questionCount > 1 ? "s" : ""} proposta${questionCount > 1 ? "s" : ""}`);
+                      if (themes.length > 0) parts.push(`${themes.length} tema${themes.length > 1 ? "s" : ""} detectado${themes.length > 1 ? "s" : ""}`);
+                      return parts.join(" · ") || "Processado com sucesso";
+                    })()}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleReset}
+                className="rounded-lg px-3 py-1 font-mono text-[10px] text-text-muted transition hover:bg-card hover:text-text"
+              >
+                Novo input
+              </button>
+            </div>
+          </div>
+
+          {/* Original result details */}
+          <div className="rounded-2xl border border-green/20 bg-gradient-to-br from-green/5 to-transparent p-5">
+            <div className="mb-4 flex items-center gap-3">
               {(() => {
                 const IconComp =
                   typeIcons[result.result.detected_type] || Paperclip;
@@ -346,45 +382,39 @@ export default function UniversalInput() {
                 </span>
               </div>
             </div>
-            <button
-              onClick={handleReset}
-              className="rounded-lg px-3 py-1 font-mono text-[10px] text-text-muted transition hover:bg-card hover:text-text"
-            >
-              Novo input
-            </button>
-          </div>
 
-          <p className="mb-4 text-sm leading-relaxed text-text-secondary">
-            {result.result.summary}
-          </p>
+            <p className="mb-4 text-sm leading-relaxed text-text-secondary">
+              {result.result.summary}
+            </p>
 
-          {result.result.proposals.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-3 w-3 text-accent" />
-                <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
-                  {result.result.proposals.length} proposta(s) para a Base de Conhecimento
-                </span>
+            {result.result.proposals.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-3 w-3 text-accent" />
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                    {result.result.proposals.length} proposta(s) para a Base de Conhecimento
+                  </span>
+                </div>
+                {result.result.proposals.map((p, i) => (
+                  <ProposalPreviewCard key={i} proposal={p} index={i} />
+                ))}
               </div>
-              {result.result.proposals.map((p, i) => (
-                <ProposalPreviewCard key={i} proposal={p} index={i} />
-              ))}
-            </div>
-          )}
+            )}
 
-          {result.result.extracted_themes.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {result.result.extracted_themes.map((theme, i) => (
-                <span
-                  key={i}
-                  className="flex items-center gap-1 rounded-full border border-border px-2.5 py-1 font-mono text-[10px] text-text-muted transition hover:border-accent/30 hover:text-accent"
-                >
-                  <Hash className="h-2.5 w-2.5" />
-                  {theme}
-                </span>
-              ))}
-            </div>
-          )}
+            {result.result.extracted_themes.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {result.result.extracted_themes.map((theme, i) => (
+                  <span
+                    key={i}
+                    className="flex items-center gap-1 rounded-full border border-border px-2.5 py-1 font-mono text-[10px] text-text-muted transition hover:border-accent/30 hover:text-accent"
+                  >
+                    <Hash className="h-2.5 w-2.5" />
+                    {theme}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

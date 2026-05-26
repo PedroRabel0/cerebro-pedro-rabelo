@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import type { ReferenceProfile } from "@/lib/supabase/types";
-import { createProfile, deleteProfile, rescrapeProfile } from "./actions";
+import { createProfile, deleteProfile, rescrapeProfile, scrapeProfileNow } from "./actions";
+import { Download, Loader2 } from "lucide-react";
 
 const PLATFORMS = ["instagram", "youtube", "linkedin", "x", "other"] as const;
 
@@ -41,6 +42,8 @@ export default function ProfileManager({
   const [saving, setSaving] = useState(false);
   const [scrapingMessage, setScrapingMessage] = useState<string | null>(null);
   const [rescrapingId, setRescrapingId] = useState<string | null>(null);
+  const [pullingId, setPullingId] = useState<string | null>(null);
+  const [pullResult, setPullResult] = useState<Record<string, { message: string; isError: boolean }>>({});
   const [isPending, startTransition] = useTransition();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -84,6 +87,41 @@ export default function ProfileManager({
         setTimeout(() => setRescrapingId(null), 5000);
       }
     });
+  }
+
+  async function handlePullNow(e: React.MouseEvent, profileId: string) {
+    e.stopPropagation();
+    setPullingId(profileId);
+    setPullResult((prev) => {
+      const next = { ...prev };
+      delete next[profileId];
+      return next;
+    });
+
+    try {
+      const result = await scrapeProfileNow(profileId);
+      if ("error" in result) {
+        setPullResult((prev) => ({
+          ...prev,
+          [profileId]: { message: result.error, isError: true },
+        }));
+      } else {
+        setPullResult((prev) => ({
+          ...prev,
+          [profileId]: {
+            message: `${result.posts_new} posts novos encontrados!`,
+            isError: false,
+          },
+        }));
+      }
+    } catch (err) {
+      setPullResult((prev) => ({
+        ...prev,
+        [profileId]: { message: "Erro ao puxar posts", isError: true },
+      }));
+    } finally {
+      setPullingId(null);
+    }
   }
 
   return (
@@ -165,64 +203,86 @@ export default function ProfileManager({
         <div className="space-y-1">
           {profiles.map((p) => {
             const isScraping = rescrapingId === p.id;
+            const result = pullResult[p.id];
             return (
-              <div
-                key={p.id}
-                onClick={() => onSelect(p.id === selectedId ? null : p.id)}
-                className={`flex cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 transition hover:bg-surface ${
-                  selectedId === p.id
-                    ? "border border-blue/40 bg-surface"
-                    : ""
-                }`}
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <div
-                    className={`h-2 w-2 shrink-0 rounded-full ${
-                      isScraping
-                        ? "animate-pulse bg-blue"
-                        : p.active
-                          ? "bg-green"
-                          : "bg-text-muted"
-                    }`}
-                  />
-                  <div className="min-w-0">
-                    <span className="block truncate text-xs font-medium text-text">
-                      {p.display_name}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate font-mono text-[10px] text-text-muted">
-                        {p.handle}
+              <div key={p.id}>
+                <div
+                  onClick={() => onSelect(p.id === selectedId ? null : p.id)}
+                  className={`flex cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 transition hover:bg-surface ${
+                    selectedId === p.id
+                      ? "border border-blue/40 bg-surface"
+                      : ""
+                  }`}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div
+                      className={`h-2 w-2 shrink-0 rounded-full ${
+                        isScraping
+                          ? "animate-pulse bg-blue"
+                          : p.active
+                            ? "bg-green"
+                            : "bg-text-muted"
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <span className="block truncate text-xs font-medium text-text">
+                        {p.display_name}
                       </span>
-                      {p.platform === "instagram" && (
-                        <span className="font-mono text-[9px] text-text-muted/60">
-                          {isScraping ? "scraping..." : formatLastScraped(p.last_scraped_at)}
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate font-mono text-[10px] text-text-muted">
+                          {p.handle}
                         </span>
-                      )}
+                        {p.platform === "instagram" && (
+                          <span className="font-mono text-[9px] text-text-muted/60">
+                            {isScraping ? "scraping..." : formatLastScraped(p.last_scraped_at)}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    <PlatformBadge platform={p.platform} />
                   </div>
-                  <PlatformBadge platform={p.platform} />
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {p.platform === "instagram" && (
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {p.platform === "instagram" && (
+                      <>
+                        <button
+                          onClick={(e) => handlePullNow(e, p.id)}
+                          disabled={pullingId === p.id || isScraping}
+                          title="Puxar posts agora"
+                          className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-card flex items-center gap-1.5 disabled:opacity-40"
+                        >
+                          {pullingId === p.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Download className="h-3 w-3" />
+                          )}
+                          {pullingId === p.id ? "Puxando..." : "Puxar posts"}
+                        </button>
+                        <button
+                          onClick={(e) => handleRescrape(e, p.id)}
+                          disabled={isScraping}
+                          title="Re-scraper posts"
+                          className="font-mono text-[10px] text-blue transition hover:opacity-70 disabled:opacity-30"
+                        >
+                          {isScraping ? "..." : "re-scrape"}
+                        </button>
+                      </>
+                    )}
                     <button
-                      onClick={(e) => handleRescrape(e, p.id)}
-                      disabled={isScraping}
-                      title="Re-scraper posts"
-                      className="font-mono text-[10px] text-blue transition hover:opacity-70 disabled:opacity-30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(p.id);
+                      }}
+                      className="font-mono text-[10px] text-text-muted transition hover:text-accent"
                     >
-                      {isScraping ? "..." : "re-scrape"}
+                      x
                     </button>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(p.id);
-                    }}
-                    className="font-mono text-[10px] text-text-muted transition hover:text-accent"
-                  >
-                    x
-                  </button>
+                  </div>
                 </div>
+                {result && (
+                  <div className={`px-2 pb-1 ${result.isError ? "text-red text-xs" : "text-green text-xs font-medium"}`}>
+                    {result.message}
+                  </div>
+                )}
               </div>
             );
           })}

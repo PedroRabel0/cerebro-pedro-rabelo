@@ -322,6 +322,135 @@ export async function rescrapeProfile(profileId: string) {
   );
 }
 
+/**
+ * On-demand scrape for a single profile. Deduplicates by caption,
+ * analyzes DNA in parallel batches of 5, logs activity, returns counts.
+ */
+export async function scrapeProfileNow(
+  profileId: string,
+): Promise<{ posts_found: number; posts_new: number } | { error: string }> {
+  try {
+    const supabase = await createClient();
+
+    // 1. Fetch the profile
+    const { data: profile, error: profileError } = await supabase
+      .from("reference_profiles")
+      .select("*")
+      .eq("id", profileId)
+      .single();
+
+    if (profileError || !profile) {
+      return { error: "Perfil não encontrado" };
+    }
+
+    if (profile.platform !== "instagram") {
+      return { error: "Scrape só disponível para perfis Instagram" };
+    }
+
+    // 2. Scrape latest 15 posts
+    console.log(`[ScrapeNow] Scraping @${profile.handle}...`);
+    const scraped = await scrapeInstagramProfile(profile.handle, 15);
+
+    if ("error" in scraped) {
+      return { error: scraped.error };
+    }
+
+    const postsFound = scraped.length;
+
+    // 3. Get existing captions for deduplication (first 100 chars)
+    const { data: existingPosts } = await supabase
+      .from("reference_posts")
+      .select("caption_text")
+      .eq("profile_id", profileId);
+
+    const existingCaptions = new Set(
+      (existingPosts || [])
+        .map((p) => p.caption_text?.slice(0, 100))
+        .filter(Boolean),
+    );
+
+    // 4. Filter to new posts only
+    const newPosts = scraped.filter((post) => {
+      if (!post.caption) return false;
+      return !existingCaptions.has(post.caption.slice(0, 100));
+    });
+
+    // 5. Process in parallel batches of 5
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < newPosts.length; i += BATCH_SIZE) {
+      const batch = newPosts.slice(i, i + BATCH_SIZE);
+
+      const batchResults = await Promise.all(
+        batch.map(async (post) => {
+          let dna: Record<string, string> = {} as Record<string, string>;
+          if (post.caption) {
+            const dnaResult = await analyzeDNA({ content: post.caption });
+            if (!("error" in dnaResult)) {
+              dna = dnaResult as unknown as Record<string, string>;
+            }
+          }
+          return { post, dna };
+        }),
+      );
+
+      // Save all posts from this batch
+      for (const { post, dna } of batchResults) {
+        const postUrl = post.owner_username
+          ? `https://www.instagram.com/${post.owner_username}/`
+          : null;
+
+        await supabase.from("reference_posts").insert({
+          profile_id: profileId,
+          platform: "instagram",
+          url: postUrl,
+          thumbnail_url: post.thumbnail_url,
+          caption_text: post.caption,
+          likes: post.likes,
+          comments: post.comments,
+          engagement_rate: post.engagement_rate,
+          posted_at: post.posted_at,
+          dna_hook_type: dna.hook_type || null,
+          dna_structure: dna.structure || null,
+          dna_length: dna.length || null,
+          dna_tone: dna.tone || null,
+          dna_cta_type: dna.cta_type || null,
+          dna_main_theme: dna.main_theme || null,
+          dna_sub_theme: dna.sub_theme || null,
+          dna_thesis: dna.thesis || null,
+          saved_as_reference: true,
+        });
+      }
+    }
+
+    // 6. Update last_scraped_at
+    await supabase
+      .from("reference_profiles")
+      .update({ last_scraped_at: new Date().toISOString() })
+      .eq("id", profileId);
+
+    // 7. Log activity
+    await supabase.from("activity_log").insert({
+      actor: "ia",
+      action: `Puxar agora: ${newPosts.length} novos posts de @${profile.handle} (${postsFound} total)`,
+      entity_type: "reference_profile",
+      entity_id: profileId,
+      entity_title: profile.display_name,
+    });
+
+    console.log(
+      `[ScrapeNow] @${profile.handle}: ${newPosts.length} new / ${postsFound} total`,
+    );
+
+    revalidatePath(PATH);
+
+    return { posts_found: postsFound, posts_new: newPosts.length };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    console.error(`[ScrapeNow] Error:`, message);
+    return { error: message };
+  }
+}
+
 export async function deleteProfile(id: string) {
   const supabase = await createClient();
   const { error } = await supabase

@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 import UniversalInput from "@/components/UniversalInput";
-import { getRecentInputs, getDashboardStats } from "./actions";
+import BrainChat from "@/components/BrainChat";
+import { getDashboardStats, getActivityFeed } from "./actions";
 import Link from "next/link";
 import {
   Inbox,
@@ -10,39 +11,64 @@ import {
   BookMarked,
   Sparkles,
   Clock,
-  Video,
-  Mic,
-  FileText,
-  MessageSquare,
-  Paperclip,
   Brain,
   Zap,
+  Search,
+  CheckCircle2,
   ArrowUpRight,
 } from "lucide-react";
 
-const sourceIcons: Record<string, typeof Video> = {
-  youtube: Video,
-  transcript: Mic,
-  pdf: FileText,
-  manual: MessageSquare,
-};
+function getActivityIcon(
+  action: string,
+  entityType: string | null
+): typeof BookOpen {
+  if (entityType === "playbook") return BookOpen;
+  if (entityType === "story") return BookMarked;
+  if (entityType === "generated_content") return Sparkles;
+  if (entityType === "reference_post") return Search;
+  if (action.toLowerCase().includes("proposta") || action.toLowerCase().includes("aprovou"))
+    return CheckCircle2;
+  if (action.toLowerCase().includes("scrape") || action.toLowerCase().includes("instagram"))
+    return Search;
+  return Zap;
+}
 
-const statusColors: Record<string, string> = {
-  pending: "bg-accent/10 text-accent",
-  processed: "bg-green/10 text-green",
-  archived: "bg-text-muted/10 text-text-muted",
-};
+function relativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = now - then;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "agora";
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "ontem";
+  if (days < 7) return `há ${days} dias`;
+  return new Date(dateStr).toLocaleDateString("pt-BR");
+}
 
-const statusLabels: Record<string, string> = {
-  pending: "pendente",
-  processed: "processado",
-  archived: "arquivado",
-};
+function getActivityLink(entityType: string | null): string {
+  switch (entityType) {
+    case "playbook":
+      return "/base-de-conhecimento";
+    case "story":
+      return "/base-de-conhecimento";
+    case "capture":
+      return "/insights-pedro";
+    case "reference_post":
+      return "/referencias";
+    case "generated_content":
+      return "/gerar-conteudo";
+    default:
+      return "/";
+  }
+}
 
 export default async function DashboardHome() {
-  const [recentInputs, stats] = await Promise.all([
-    getRecentInputs(),
+  const [stats, activityFeed] = await Promise.all([
     getDashboardStats(),
+    getActivityFeed(),
   ]);
 
   const statItems = [
@@ -89,100 +115,129 @@ export default async function DashboardHome() {
       <div>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 to-purple/20">
-            <Zap className="h-5 w-5 text-accent" />
+            <Brain className="h-5 w-5 text-accent" />
           </div>
           <div>
             <h1 className="font-display text-2xl font-bold text-text sm:text-3xl">
-              Alimentar o Cérebro
+              Cérebro do Pedro
             </h1>
             <p className="text-sm text-text-secondary">
-              Cole qualquer link, texto ou transcrição. A IA processa e organiza
-              automaticamente.
+              Seu cérebro sabe{" "}
+              <span className="font-medium text-text">
+                {stats.playbooks} playbooks
+              </span>
+              ,{" "}
+              <span className="font-medium text-text">
+                {stats.stories} histórias
+              </span>{" "}
+              e{" "}
+              <span className="font-medium text-text">
+                {stats.contents} referências
+              </span>
             </p>
           </div>
         </div>
       </div>
 
-      {/* Universal Input */}
-      <UniversalInput />
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {statItems.map((stat, i) => (
-          <div
-            key={stat.label}
-            className="card-hover animate-fade-in rounded-2xl border border-border bg-card px-4 py-3"
-            style={{ animationDelay: `${i * 80}ms` }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={`flex h-9 w-9 items-center justify-center rounded-xl ${stat.bg}`}
-              >
-                <stat.Icon className={`h-4 w-4 ${stat.color}`} />
-              </div>
-              <div>
-                <span className="block font-mono text-xl font-bold text-text">
-                  {stat.value}
-                </span>
-                <span className="block font-mono text-[10px] uppercase tracking-wider text-text-muted">
-                  {stat.label}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* Brain Chat */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <h2 className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-text-muted">
+          <Brain className="h-3.5 w-3.5" />
+          Perguntar ao Cérebro
+        </h2>
+        <BrainChat />
       </div>
 
-      {/* Recent Inputs */}
+      {/* Feed the Brain */}
+      <div>
+        <h2 className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-text-muted">
+          <Zap className="h-3.5 w-3.5" />
+          Alimentar o Cérebro
+        </h2>
+        <UniversalInput />
+      </div>
+
+      {/* Brain Health Stats */}
+      <div>
+        <h2 className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-text-muted">
+          <Sparkles className="h-3.5 w-3.5" />
+          Saúde do Cérebro
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {statItems.map((stat, i) => (
+            <div
+              key={stat.label}
+              className="card-hover animate-fade-in rounded-2xl border border-border bg-card px-4 py-3"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-xl ${stat.bg}`}
+                >
+                  <stat.Icon className={`h-4 w-4 ${stat.color}`} />
+                </div>
+                <div>
+                  <span className="block font-mono text-xl font-bold text-text">
+                    {stat.value}
+                  </span>
+                  <span className="block font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                    {stat.label}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Activity Feed */}
       <div>
         <h2 className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-text-muted">
           <Clock className="h-3.5 w-3.5" />
-          Inputs Recentes
+          Atividade Recente
         </h2>
-        {recentInputs.length === 0 ? (
+        {activityFeed.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-card/50 px-6 py-16 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10">
               <Brain className="h-8 w-8 text-accent" />
             </div>
             <p className="text-sm font-medium text-text">
-              O cérebro está vazio
+              Nenhuma atividade ainda
             </p>
             <p className="mt-1 text-xs text-text-muted">
-              Cole algo acima para começar a alimentar o sistema.
+              Alimente o cérebro acima para começar a gerar atividade.
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {recentInputs.map((item, i) => {
-              const SourceIcon =
-                sourceIcons[item.source_type] || Paperclip;
+            {activityFeed.map((item, i) => {
+              const ActionIcon = getActivityIcon(
+                item.action,
+                item.entity_type
+              );
+              const link = getActivityLink(item.entity_type);
               return (
                 <Link
                   key={item.id}
-                  href="/insights-pedro"
+                  href={link}
                   className="card-hover animate-fade-in flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3"
                   style={{ animationDelay: `${i * 50}ms` }}
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface">
-                    <SourceIcon className="h-4 w-4 text-text-muted" />
+                    <ActionIcon className="h-4 w-4 text-text-muted" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-text">
-                      {item.title}
+                      {item.action}
                     </p>
-                    {item.context && (
+                    {item.entity_title && (
                       <p className="truncate text-xs text-text-muted">
-                        {item.context}
+                        {item.entity_title}
                       </p>
                     )}
                   </div>
-                  <span
-                    className={`hidden shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] sm:inline ${statusColors[item.status] || ""}`}
-                  >
-                    {statusLabels[item.status] || item.status}
-                  </span>
                   <span className="shrink-0 font-mono text-[10px] text-text-muted">
-                    {new Date(item.created_at).toLocaleDateString("pt-BR")}
+                    {relativeTime(item.created_at)}
                   </span>
                   <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-text-muted" />
                 </Link>

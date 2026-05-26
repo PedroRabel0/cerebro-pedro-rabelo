@@ -150,9 +150,17 @@ export default function StoryList({ stories }: { stories: Story[] }) {
               className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 transition hover:border-border-light"
             >
               <div className="min-w-0 flex-1">
-                <h3 className="truncate font-sans text-sm font-medium text-text">
-                  {s.title}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="truncate font-sans text-sm font-medium text-text">
+                    {s.title}
+                  </h3>
+                  {s.created_at &&
+                    Date.now() - new Date(s.created_at).getTime() < 24 * 60 * 60 * 1000 && (
+                    <span className="bg-green/15 text-green text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                      Novo
+                    </span>
+                  )}
+                </div>
                 {s.summary && (
                   <p className="mt-0.5 truncate text-xs text-text-muted">
                     {s.summary}

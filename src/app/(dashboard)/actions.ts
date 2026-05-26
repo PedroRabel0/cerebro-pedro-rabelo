@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { processUniversalInput } from "@/lib/ai/universal";
 import { scrapeInstagramPost } from "@/lib/ai/apify";
 import { analyzeDNA } from "@/lib/ai";
+import { getClient, logCost } from "@/lib/ai/client";
 import type { CaptureSourceType } from "@/lib/supabase/types";
 
 // --- Universal Input ---
@@ -278,4 +279,122 @@ export async function getDashboardStats() {
     contents: contentsRes.count ?? 0,
     pendingProposals: pendingRes.count ?? 0,
   };
+}
+
+// --- Brain Chat ---
+
+export async function askBrain(question: string): Promise<string> {
+  const supabase = await createClient();
+
+  const [identity, playbooks, stories, recentRefs] = await Promise.all([
+    supabase.from("identity").select("*").limit(1).single(),
+    supabase
+      .from("playbooks")
+      .select("id, title, body_markdown")
+      .limit(30),
+    supabase
+      .from("stories")
+      .select("id, title, summary, body_markdown, tags")
+      .limit(30),
+    supabase
+      .from("reference_posts")
+      .select(
+        "caption_text, dna_hook_type, dna_structure, dna_main_theme, profile:reference_profiles(display_name, handle)"
+      )
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+
+  // Build context
+  const parts: string[] = [];
+
+  if (identity.data) {
+    parts.push(
+      `## Identidade do Pedro\n${JSON.stringify(identity.data, null, 2)}`
+    );
+  }
+
+  if (playbooks.data && playbooks.data.length > 0) {
+    const playbookText = playbooks.data
+      .map(
+        (p) =>
+          `### ${p.title}\n${p.body_markdown || "(sem conteúdo)"}`
+      )
+      .join("\n\n");
+    parts.push(`## Playbooks (${playbooks.data.length})\n${playbookText}`);
+  }
+
+  if (stories.data && stories.data.length > 0) {
+    const storyText = stories.data
+      .map(
+        (s) =>
+          `### ${s.title}\n${s.summary || ""}\n${s.body_markdown || "(sem conteúdo)"}\nTags: ${(s.tags || []).join(", ")}`
+      )
+      .join("\n\n");
+    parts.push(`## Histórias (${stories.data.length})\n${storyText}`);
+  }
+
+  if (recentRefs.data && recentRefs.data.length > 0) {
+    const refText = recentRefs.data
+      .map((r) => {
+        const profile = r.profile as unknown as {
+          display_name: string;
+          handle: string;
+        } | null;
+        const profileName = profile
+          ? `${profile.display_name} (@${profile.handle})`
+          : "Desconhecido";
+        return `- ${profileName}: ${(r.caption_text || "").slice(0, 200)} [Hook: ${r.dna_hook_type || "?"}, Tema: ${r.dna_main_theme || "?"}]`;
+      })
+      .join("\n");
+    parts.push(
+      `## Referências Recentes (${recentRefs.data.length})\n${refText}`
+    );
+  }
+
+  const knowledgeContext = parts.join("\n\n---\n\n");
+
+  const systemPrompt =
+    "Você é o Segundo Cérebro do Pedro Rabelo. Você sabe TUDO que está na base de conhecimento dele. " +
+    "Responda como se fosse a memória e inteligência do Pedro — use os playbooks, histórias e referências " +
+    "para dar respostas completas e contextualizadas. Se não souber algo, diga que ainda não tem essa " +
+    "informação na base. Responda sempre em português brasileiro, de forma direta e útil.\n\n" +
+    "=== BASE DE CONHECIMENTO ===\n\n" +
+    knowledgeContext;
+
+  const client = getClient();
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 2048,
+    system: [
+      {
+        type: "text" as const,
+        text: systemPrompt,
+        cache_control: { type: "ephemeral" as const },
+      },
+    ],
+    messages: [{ role: "user", content: question }],
+  });
+
+  logCost(
+    "claude-sonnet-4-6",
+    response.usage.input_tokens,
+    response.usage.output_tokens
+  );
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text : "";
+  return text;
+}
+
+// --- Activity Feed ---
+
+export async function getActivityFeed() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("activity_log")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(10);
+  return data ?? [];
 }

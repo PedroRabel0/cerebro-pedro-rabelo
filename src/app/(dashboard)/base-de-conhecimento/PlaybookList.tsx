@@ -202,6 +202,12 @@ export default function PlaybookList({
                       <h3 className="truncate font-sans text-sm font-medium text-text">
                         {p.title}
                       </h3>
+                      {p.created_at &&
+                        Date.now() - new Date(p.created_at).getTime() < 24 * 60 * 60 * 1000 && (
+                        <span className="bg-green/15 text-green text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                          Novo
+                        </span>
+                      )}
                       {p.theme && (
                         <span
                           className="inline-block rounded-full px-2 py-0.5 font-mono text-[10px] text-white"
