@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from "react";
 import type { ReferencePost, ReferenceProfile } from "@/lib/supabase/types";
 import { getPostsByProfile, createPost, deletePost } from "./actions";
+import ProfileInsights from "./ProfileInsights";
 
 function DnaTag({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
@@ -214,6 +215,15 @@ export default function PostList({
           + Novo Post
         </button>
       </div>
+
+      {/* Profile Analysis Dashboard */}
+      {!isPending && posts.length > 0 && (
+        <ProfileInsights
+          profileId={profile.id}
+          profileHandle={profile.handle}
+          posts={posts}
+        />
+      )}
 
       {!isPending && posts.length === 0 ? (
         <p className="py-8 text-center text-sm text-text-muted">

@@ -658,6 +658,133 @@ export async function createFormatFromPattern(
   revalidatePath("/gerar-conteudo");
 }
 
+// --- Profile Analysis for Pedro ---
+
+export async function analyzeProfileForPedro(
+  profileId: string,
+): Promise<{ analysis: string } | { error: string }> {
+  try {
+    const supabase = await createClient();
+
+    const { data: profile } = await supabase
+      .from("reference_profiles")
+      .select("*")
+      .eq("id", profileId)
+      .single();
+
+    if (!profile) return { error: "Perfil não encontrado" };
+
+    const { data: posts } = await supabase
+      .from("reference_posts")
+      .select("*")
+      .eq("profile_id", profileId)
+      .order("likes", { ascending: false });
+
+    if (!posts || posts.length === 0) {
+      return { error: "Nenhum post encontrado para analisar" };
+    }
+
+    const client = getAIClient();
+
+    // Build context with top posts and DNA breakdown
+    const topPosts = posts.slice(0, 10);
+    const postsContext = topPosts
+      .map(
+        (p, i) =>
+          `### Post ${i + 1} (${p.likes ?? 0} likes, ${p.comments ?? 0} comments${p.engagement_rate ? `, ${p.engagement_rate}% eng` : ""})
+Legenda: ${p.caption_text?.slice(0, 400) || "(sem legenda)"}
+DNA: hook=${p.dna_hook_type || "?"}, estrutura=${p.dna_structure || "?"}, tom=${p.dna_tone || "?"}, tema=${p.dna_main_theme || "?"}, tese=${p.dna_thesis || "?"}`,
+      )
+      .join("\n\n");
+
+    // Compute stats
+    const totalPosts = posts.length;
+    const avgLikes = posts.reduce((s, p) => s + (p.likes ?? 0), 0) / totalPosts;
+    const avgComments = posts.reduce((s, p) => s + (p.comments ?? 0), 0) / totalPosts;
+
+    // DNA frequencies
+    const hookCounts: Record<string, number> = {};
+    const themeCounts: Record<string, number> = {};
+    const toneCounts: Record<string, number> = {};
+    for (const p of posts) {
+      if (p.dna_hook_type) hookCounts[p.dna_hook_type] = (hookCounts[p.dna_hook_type] || 0) + 1;
+      if (p.dna_main_theme) themeCounts[p.dna_main_theme] = (themeCounts[p.dna_main_theme] || 0) + 1;
+      if (p.dna_tone) toneCounts[p.dna_tone] = (toneCounts[p.dna_tone] || 0) + 1;
+    }
+
+    const topHooks = Object.entries(hookCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const topThemes = Object.entries(themeCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const topTones = Object.entries(toneCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 3000,
+      system: `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR).
+
+Você é o analista de referências do Pedro Rabelo. Sua tarefa é analisar um perfil de referência do Instagram e gerar RECOMENDAÇÕES PRÁTICAS que o Pedro pode aplicar imediatamente no conteúdo dele.
+
+Pedro é criador de conteúdo sobre marketing digital, vendas, gestão e empreendedorismo. Tom: direto, prático, contrário ao senso comum.
+
+## O que você deve entregar:
+
+### 1. O que está funcionando pra esse criador
+- Quais tipos de post performam melhor (mais likes/comments)
+- Padrões de hook que geram mais engajamento
+- Temas que a audiência mais curte
+
+### 2. O que o Pedro pode copiar/adaptar
+- Formatos específicos de carrossel ou post
+- Estruturas de hook que funcionam
+- Tipos de CTA que geram ação
+- Frequência e ritmo de postagem
+
+### 3. Ideias concretas de conteúdo
+- 3 a 5 ideias ESPECÍFICAS de posts que o Pedro pode criar, inspiradas nos padrões desse perfil
+- Cada ideia com: título do post + hook sugerido + formato (carrossel/reel/imagem)
+
+Use markdown com ## para títulos, - para listas, **negrito** para destaque.
+Seja DIRETO e PRÁTICO — sem enrolação.`,
+      messages: [
+        {
+          role: "user",
+          content: `## Análise do perfil @${profile.handle} (${profile.display_name})
+
+**Estatísticas gerais:**
+- ${totalPosts} posts analisados
+- Média de ${Math.round(avgLikes)} likes por post
+- Média de ${Math.round(avgComments)} comentários por post
+
+**Hooks mais usados:** ${topHooks.map(([h, c]) => `${h} (${c}x)`).join(", ") || "N/A"}
+**Temas mais frequentes:** ${topThemes.map(([t, c]) => `${t} (${c}x)`).join(", ") || "N/A"}
+**Tons mais usados:** ${topTones.map(([t, c]) => `${t} (${c}x)`).join(", ") || "N/A"}
+
+## Top 10 posts (ordenados por likes):
+
+${postsContext}
+
+Com base nisso, o que o Pedro pode aprender e aplicar?`,
+        },
+      ],
+    });
+
+    const text = response.content[0].type === "text" ? response.content[0].text : "";
+
+    await supabase.from("activity_log").insert({
+      actor: "ia",
+      action: `Analisou perfil @${profile.handle} para recomendações`,
+      entity_type: "reference_profile",
+      entity_id: profileId,
+      entity_title: profile.display_name,
+    });
+
+    return { analysis: text };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    console.error("[AnalyzeProfile] Error:", message);
+    return { error: message };
+  }
+}
+
 // --- Reference Knowledge ---
 
 export async function getKnowledge() {
