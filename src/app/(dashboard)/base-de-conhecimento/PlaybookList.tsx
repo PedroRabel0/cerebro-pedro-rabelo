@@ -5,6 +5,7 @@ import type { Playbook, Theme } from "@/lib/supabase/types";
 import { createPlaybook, updatePlaybook, deletePlaybook } from "./actions";
 import BookQuestionsPanel from "./BookQuestionsPanel";
 import DiffView from "./DiffView";
+import { useUserRole } from "@/lib/hooks/useUserRole";
 
 function CompletenessBar({ score }: { score: number }) {
   const color =
@@ -117,6 +118,7 @@ export default function PlaybookList({
   const [filterTheme, setFilterTheme] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [diffId, setDiffId] = useState<string | null>(null);
+  const { isPedro } = useUserRole();
 
   const filtered = filterTheme
     ? playbooks.filter((p) => p.theme_id === filterTheme)
@@ -248,12 +250,14 @@ export default function PlaybookList({
                     >
                       Editar
                     </button>
-                    <button
-                      onClick={() => handleDelete(p.id)}
-                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
-                    >
-                      Apagar
-                    </button>
+                    {isPedro && (
+                      <button
+                        onClick={() => handleDelete(p.id)}
+                        className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
+                      >
+                        Apagar
+                      </button>
+                    )}
                   </div>
                 </div>
 

@@ -18,8 +18,15 @@ import {
   LogOut,
   User,
 } from "lucide-react";
+import { useUserRole, type UserRole } from "@/lib/hooks/useUserRole";
 
-const navItems = [
+const navItems: {
+  href: string;
+  label: string;
+  Icon: typeof Brain;
+  description: string;
+  roles?: UserRole[];
+}[] = [
   {
     href: "/",
     label: "Cérebro",
@@ -37,12 +44,14 @@ const navItems = [
     label: "Referências",
     Icon: Search,
     description: "Perfis e posts",
+    roles: ["pedro"],
   },
   {
     href: "/identidade",
     label: "Identidade",
     Icon: Target,
     description: "Voz e tom",
+    roles: ["pedro"],
   },
   {
     href: "/insights-pedro",
@@ -55,6 +64,7 @@ const navItems = [
     label: "Gerar",
     Icon: Sparkles,
     description: "Criar conteúdo",
+    roles: ["pedro"],
   },
 ];
 
@@ -72,6 +82,7 @@ export default function Sidebar() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | undefined>();
+  const { role, isPedro } = useUserRole();
 
   useEffect(() => {
     const supabase = createClient();
@@ -79,6 +90,11 @@ export default function Sidebar() {
       setUserEmail(user?.email ?? undefined);
     });
   }, []);
+
+  // Filtrar itens de navegacao conforme role do usuario
+  const visibleNavItems = navItems.filter(
+    (item) => !item.roles || (role && item.roles.includes(role))
+  );
 
   async function handleLogout() {
     const supabase = createClient();
@@ -104,7 +120,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive =
             item.href === "/"
               ? pathname === "/"
@@ -144,38 +160,40 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Settings link */}
-      <div className="px-3 pb-2">
-        <Link
-          href="/configuracoes"
-          onClick={() => setMobileOpen(false)}
-          className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ${
-            pathname.startsWith("/configuracoes")
-              ? "bg-accent/10 text-accent shadow-sm shadow-accent/5"
-              : "text-text-secondary hover:bg-card-hover hover:text-text"
-          }`}
-        >
-          <Settings
-            className={`h-[18px] w-[18px] transition-colors ${
+      {/* Settings link — apenas para Pedro */}
+      {isPedro && (
+        <div className="px-3 pb-2">
+          <Link
+            href="/configuracoes"
+            onClick={() => setMobileOpen(false)}
+            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ${
               pathname.startsWith("/configuracoes")
-                ? "text-accent"
-                : "text-text-muted group-hover:text-text-secondary"
+                ? "bg-accent/10 text-accent shadow-sm shadow-accent/5"
+                : "text-text-secondary hover:bg-card-hover hover:text-text"
             }`}
-          />
-          <div>
-            <span
-              className={`block text-sm font-medium ${
-                pathname.startsWith("/configuracoes") ? "text-accent" : ""
+          >
+            <Settings
+              className={`h-[18px] w-[18px] transition-colors ${
+                pathname.startsWith("/configuracoes")
+                  ? "text-accent"
+                  : "text-text-muted group-hover:text-text-secondary"
               }`}
-            >
-              Configurações
-            </span>
-            <span className="block text-[11px] text-text-muted">
-              Custos e preferências
-            </span>
-          </div>
-        </Link>
-      </div>
+            />
+            <div>
+              <span
+                className={`block text-sm font-medium ${
+                  pathname.startsWith("/configuracoes") ? "text-accent" : ""
+                }`}
+              >
+                Configurações
+              </span>
+              <span className="block text-[11px] text-text-muted">
+                Custos e preferências
+              </span>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Usuário logado */}
       <div className="border-t border-border px-4 py-3">

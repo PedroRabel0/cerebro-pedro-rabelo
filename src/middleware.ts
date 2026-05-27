@@ -48,6 +48,25 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Protecao por role: rotas restritas ao Pedro
+  const role = user.user_metadata?.role as string | undefined;
+  const pedroOnlyRoutes = [
+    "/gerar-conteudo",
+    "/referencias",
+    "/identidade",
+    "/configuracoes",
+  ];
+
+  if (role === "henrique") {
+    const isRestricted = pedroOnlyRoutes.some(
+      (route) => pathname === route || pathname.startsWith(route + "/")
+    );
+    if (isRestricted) {
+      const homeUrl = new URL("/", request.url);
+      return NextResponse.redirect(homeUrl);
+    }
+  }
+
   return response;
 }
 
