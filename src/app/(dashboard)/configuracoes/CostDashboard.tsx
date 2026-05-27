@@ -45,7 +45,7 @@ const PROVIDERS: Record<string, ProviderInfo> = {
     icon: Image,
     description: "Geração de imagens e prompts visuais",
     models: ["GPT Image 1", "GPT-4o Mini"],
-    pricing: "$0.011 / imagem",
+    pricing: "$0.17 / imagem (alta qualidade)",
   },
   gemini: {
     label: "Google Gemini",
@@ -441,7 +441,7 @@ export default function CostDashboard({
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {[
             { action: "Gerar 1 conteúdo", cost: "~$0.05-0.15", icon: "✍️" },
-            { action: "Gerar 1 imagem", cost: "~$0.011", icon: "🖼️" },
+            { action: "Gerar 1 imagem", cost: "~$0.17", icon: "🖼️" },
             { action: "BrainChat (1 pergunta)", cost: "~$0.02-0.08", icon: "🧠" },
             { action: "Processar 1 input", cost: "~$0.03-0.10", icon: "📥" },
             { action: "Scrape 1 perfil IG", cost: "~$0.01", icon: "📸" },
