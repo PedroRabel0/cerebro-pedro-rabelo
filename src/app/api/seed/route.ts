@@ -321,7 +321,7 @@ Nos primeiros 15 dias, entrei em panico. Tive que demitir 4 pessoas. Passei noit
 ## A licao
 
 Nunca mais deixei um unico cliente representar mais de 15% do faturamento. Criei uma regra interna: se qualquer cliente passa de 20%, a prioridade numero 1 e diversificar. Parece obvio agora, mas so aprendi depois de quase quebrar.`,
-        period: "maturidade",
+        period: null,
         tags: ["vendas", "resiliencia"],
         lesson: "Nunca dependa de um unico cliente para mais de 15% do faturamento.",
       },
@@ -339,7 +339,7 @@ Adiei por 6 meses. Nesse periodo, o time inteiro sofreu. Quem era bom comecou a 
 ## A licao
 
 Adiar uma demissao necessaria nao e bondade — e covardia. Voce prejudica a pessoa (que poderia estar em outro lugar crescendo), o time (que carrega o peso) e a empresa. Liderar e tomar decisoes dificeis no timing certo.`,
-        period: "maturidade",
+        period: null,
         tags: ["lideranca", "gestao"],
         lesson: "Adiar decisoes dificeis de pessoas prejudica todo mundo, inclusive a pessoa.",
       },
@@ -357,7 +357,7 @@ Naqueles 14 meses aprendi mais sobre vendas, rejeicao e resiliencia do que em qu
 ## A licao
 
 Toda vez que alguem me pergunta qual o melhor curso de empreendedorismo, eu respondo: va vender algo porta a porta por 6 meses. Voce vai aprender mais sobre negocios, pessoas e sobre voce mesmo do que em qualquer sala de aula.`,
-        period: "inicio_carreira",
+        period: null,
         tags: ["mentalidade", "vendas"],
         lesson: "Experiencia pratica em vendas e o melhor MBA que existe.",
       },
@@ -375,7 +375,7 @@ Na reuniao, ele me fez uma unica pergunta: "Quantas decisoes voce toma por dia q
 ## A licao
 
 Gestao nao e sobre tomar mais decisoes — e sobre criar sistemas que eliminam a necessidade de decisoes. Nos 6 meses seguintes, documentei processos, deleguei e reduzi minha carga para 8 horas. O faturamento subiu 40%.`,
-        period: "recente",
+        period: null,
         tags: ["gestao", "lideranca"],
         lesson: "Gestao de verdade e criar sistemas que eliminam a necessidade de voce decidir tudo.",
       },
