@@ -121,17 +121,23 @@ export async function scrapeInstagramProfile(
     const token = process.env.APIFY_TOKEN;
     if (!token) return { error: 'APIFY_TOKEN not configured' };
 
-    const actorId = 'apify~instagram-scraper';
+    // Clean username: remove @, spaces, trailing slashes
+    const cleanUsername = username.replace(/^@/, '').replace(/\//g, '').trim();
+    if (!cleanUsername) return { error: 'Username vazio' };
+
+    const profileUrl = `https://www.instagram.com/${cleanUsername}/`;
+
+    // Use instagram-profile-scraper actor (more reliable for profiles)
+    const actorId = 'apify~instagram-profile-scraper';
     const apiUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${token}`;
 
-    console.log(`[Apify] Scraping profile: ${username} (limit: ${maxPosts})`);
+    console.log(`[Apify] Scraping profile: @${cleanUsername} (limit: ${maxPosts}) URL: ${profileUrl}`);
 
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        directUrls: [`https://www.instagram.com/${username}/`],
-        resultsType: 'posts',
+        usernames: [cleanUsername],
         resultsLimit: maxPosts,
       }),
       signal: AbortSignal.timeout(120_000), // 2 min timeout for profiles

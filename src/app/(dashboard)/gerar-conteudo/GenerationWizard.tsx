@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import type { ContentType } from "@/lib/supabase/types";
 import { createWizardContent, updateContentStatus } from "./actions";
+import SlideDesigner from "@/components/SlideDesigner";
 import {
   Sparkles,
   Copy,
@@ -15,6 +16,7 @@ import {
   Pencil,
   ThumbsDown,
   ChevronDown,
+  Image as ImageIcon,
 } from "lucide-react";
 
 // --------------- constants ---------------
@@ -800,6 +802,7 @@ interface GenerationResult {
   contentType: ContentType;
   content: string;
   sourceMap: Record<string, unknown> | null;
+  imageUrl?: string | null;
 }
 
 function SourceMapDisplay({ sourceMap }: { sourceMap: Record<string, unknown> | null }) {
@@ -817,16 +820,71 @@ function SourceMapDisplay({ sourceMap }: { sourceMap: Record<string, unknown> | 
   );
 }
 
+// --- Carousel Parsing ---
+
+function parseCarouselSlides(content: string): {
+  slides: string[];
+  hook: string;
+  cta: string;
+} {
+  // Try splitting by --- or numbered markers (1., 2., etc.)
+  const parts = content
+    .split(/---|\n\n(?=\d+\.)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length >= 3) {
+    return {
+      hook: parts[0],
+      slides: parts.slice(1, -1),
+      cta: parts[parts.length - 1],
+    };
+  }
+  // Fallback: split by double newlines
+  const lines = content.split(/\n\n+/).filter((s) => s.trim());
+  return {
+    hook: lines[0] || "",
+    slides: lines.slice(1, -1),
+    cta: lines[lines.length - 1] || "",
+  };
+}
+
+function CarouselDesignPreview({
+  content,
+  wizardState,
+}: {
+  content: string;
+  wizardState: WizardState;
+}) {
+  const parsed = parseCarouselSlides(content);
+  const details = wizardState.typeDetails["instagram_carousel"] || {};
+  const title =
+    wizardState.freeTopic ||
+    wizardState.recorte ||
+    "Carousel";
+
+  return (
+    <SlideDesigner
+      slides={parsed.slides}
+      hook={details.gancho || parsed.hook}
+      cta={details.cta || parsed.cta}
+      title={title}
+      hashtags={[]}
+    />
+  );
+}
+
 function ResultCard({
   result,
   onRegenerate,
   regenerating,
   onFeedback,
+  wizardState,
 }: {
   result: GenerationResult;
   onRegenerate: () => void;
   regenerating: boolean;
   onFeedback: (rating: string) => void;
+  wizardState: WizardState;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(result.content);
@@ -876,6 +934,30 @@ function ResultCard({
       )}
 
       <SourceMapDisplay sourceMap={result.sourceMap} />
+
+      {/* Image preview for all content types */}
+      {result.imageUrl && (
+        <div className="mt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <ImageIcon className="h-3.5 w-3.5 text-purple" />
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-purple">
+              Imagem gerada
+            </span>
+          </div>
+          <img
+            src={result.imageUrl}
+            alt="Imagem gerada para o conteudo"
+            className="max-w-[300px] rounded-xl ring-1 ring-border"
+          />
+        </div>
+      )}
+
+      {/* SlideDesigner for carousels */}
+      {result.contentType === "instagram_carousel" && (
+        <div className="mt-4">
+          <CarouselDesignPreview content={text} wizardState={wizardState} />
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
@@ -1259,6 +1341,7 @@ export default function GenerationWizard({
             onRegenerate={() => handleRegenerate(r.contentType)}
             regenerating={regeneratingType === r.contentType}
             onFeedback={(rating) => handleFeedback(r.id, rating)}
+            wizardState={state}
           />
         ))}
 

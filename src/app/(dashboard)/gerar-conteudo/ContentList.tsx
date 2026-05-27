@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { GeneratedContent, ContentStatus } from "@/lib/supabase/types";
 import { updateContentStatus, updateContentText, deleteContent, savePublishedUrl } from "./actions";
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
+import SlideDesigner from "@/components/SlideDesigner";
 import {
   MessageSquare,
   ThumbsUp,
@@ -16,6 +17,7 @@ import {
   ChevronDown,
   Link,
   ExternalLink,
+  Layout,
 } from "lucide-react";
 
 function statusBadge(status: ContentStatus) {
@@ -266,6 +268,30 @@ function PublishedUrlInput({
   );
 }
 
+function parseCarouselSlides(content: string): {
+  slides: string[];
+  hook: string;
+  cta: string;
+} {
+  const parts = content
+    .split(/---|\n\n(?=\d+\.)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length >= 3) {
+    return {
+      hook: parts[0],
+      slides: parts.slice(1, -1),
+      cta: parts[parts.length - 1],
+    };
+  }
+  const lines = content.split(/\n\n+/).filter((s) => s.trim());
+  return {
+    hook: lines[0] || "",
+    slides: lines.slice(1, -1),
+    cta: lines[lines.length - 1] || "",
+  };
+}
+
 export default function ContentList({
   contents,
 }: {
@@ -274,6 +300,7 @@ export default function ContentList({
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [publishUrlId, setPublishUrlId] = useState<string | null>(null);
+  const [designId, setDesignId] = useState<string | null>(null);
 
   async function handleDelete(id: string) {
     if (!confirm("Apagar este conteudo?")) return;
@@ -414,6 +441,17 @@ export default function ContentList({
                   <MessageSquare className="h-3 w-3" />
                   <span className="hidden sm:inline">Feedback</span>
                 </button>
+                {c.content_type === "instagram_carousel" && (
+                  <button
+                    onClick={() =>
+                      setDesignId(designId === c.id ? null : c.id)
+                    }
+                    className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-purple transition hover:bg-purple/10"
+                  >
+                    <Layout className="h-3 w-3" />
+                    <span className="hidden sm:inline">Ver Design</span>
+                  </button>
+                )}
                 <button
                   onClick={() => handleDelete(c.id)}
                   className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-red transition hover:bg-red/10"
@@ -435,6 +473,22 @@ export default function ContentList({
                 currentUrl={c.published_url}
                 onClose={() => setPublishUrlId(null)}
               />
+            )}
+            {designId === c.id && c.content_type === "instagram_carousel" && c.content_text && (
+              <div className="mt-4 rounded-xl border border-border bg-surface/30 p-4">
+                {(() => {
+                  const parsed = parseCarouselSlides(c.content_text);
+                  return (
+                    <SlideDesigner
+                      slides={parsed.slides}
+                      hook={parsed.hook}
+                      cta={parsed.cta}
+                      title={c.free_text_input || c.playbook?.title || "Carousel"}
+                      hashtags={[]}
+                    />
+                  );
+                })()}
+              </div>
             )}
           </div>
         ))}
