@@ -8,40 +8,25 @@ import { Brain } from "lucide-react";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
   const router = useRouter();
   const supabase = createClient();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setMessage("");
     setLoading(true);
 
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (error) {
-        setError(error.message);
-      } else {
-        setMessage("Conta criada! Verifique seu email para confirmar.");
-      }
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      setError(error.message);
     } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) {
-        setError(error.message);
-      } else {
-        router.push("/");
-        router.refresh();
-      }
+      router.push("/");
+      router.refresh();
     }
 
     setLoading(false);
@@ -106,35 +91,15 @@ export default function LoginPage() {
           {error && (
             <p className="text-sm text-red">{error}</p>
           )}
-          {message && (
-            <p className="text-sm text-green">{message}</p>
-          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full rounded-xl bg-accent px-4 py-2 font-mono text-sm font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50"
           >
-            {loading
-              ? "Carregando..."
-              : isSignUp
-              ? "Criar conta"
-              : "Entrar"}
+            {loading ? "Carregando..." : "Entrar"}
           </button>
         </form>
-
-        <button
-          onClick={() => {
-            setIsSignUp(!isSignUp);
-            setError("");
-            setMessage("");
-          }}
-          className="mt-4 w-full text-center text-sm text-text-muted hover:text-text-secondary"
-        >
-          {isSignUp
-            ? "Ja tem conta? Faca login"
-            : "Nao tem conta? Crie uma"}
-        </button>
       </div>
     </div>
   );

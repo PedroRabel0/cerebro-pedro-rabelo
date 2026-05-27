@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   BookOpen,
   Search,
@@ -14,6 +15,8 @@ import {
   X,
   Wifi,
   Settings,
+  LogOut,
+  User,
 } from "lucide-react";
 
 const navItems = [
@@ -55,9 +58,34 @@ const navItems = [
   },
 ];
 
+function getUserName(email: string | undefined): string {
+  if (!email) return "Usuário";
+  const nameMap: Record<string, string> = {
+    "pedro@cerebro.app": "Pedro",
+    "henrique@cerebro.app": "Henrique",
+  };
+  return nameMap[email] || email.split("@")[0];
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | undefined>();
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserEmail(user?.email ?? undefined);
+    });
+  }, []);
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   const sidebarContent = (
     <>
@@ -147,6 +175,30 @@ export default function Sidebar() {
             </span>
           </div>
         </Link>
+      </div>
+
+      {/* Usuário logado */}
+      <div className="border-t border-border px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10">
+            <User className="h-3.5 w-3.5 text-accent" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-text truncate">
+              {getUserName(userEmail)}
+            </p>
+            <p className="text-[10px] text-text-muted truncate">
+              {userEmail ?? "..."}
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="rounded-lg p-1.5 text-text-muted hover:bg-card-hover hover:text-red transition-colors"
+            title="Sair"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Footer */}
