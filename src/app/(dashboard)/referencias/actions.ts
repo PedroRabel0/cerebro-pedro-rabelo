@@ -61,23 +61,15 @@ async function scrapeAndAnalyzeProfile(profileId: string, handle: string, displa
 
     console.log(`[AutoScrape] Got ${scraped.length} posts for @${handle}`);
 
-    // 2. For each post: analyze DNA and save
-    const savedPosts: Array<{ caption: string; dna: Record<string, string> }> = [];
+    // 2. Save all posts FIRST (fast), then analyze DNA
+    const savedPostIds: string[] = [];
 
     for (const post of scraped) {
-      let dna: Record<string, string> = {} as Record<string, string>;
-      if (post.caption) {
-        const dnaResult = await analyzeDNA({ content: post.caption });
-        if (!("error" in dnaResult)) {
-          dna = dnaResult as unknown as Record<string, string>;
-        }
-      }
-
       const postUrl = post.owner_username
         ? `https://www.instagram.com/${post.owner_username}/`
         : null;
 
-      await supabase.from("reference_posts").insert({
+      const { data: saved } = await supabase.from("reference_posts").insert({
         profile_id: profileId,
         platform: "instagram",
         url: postUrl,
@@ -87,19 +79,43 @@ async function scrapeAndAnalyzeProfile(profileId: string, handle: string, displa
         comments: post.comments,
         engagement_rate: post.engagement_rate,
         posted_at: post.posted_at,
-        dna_hook_type: dna.hook_type || null,
-        dna_structure: dna.structure || null,
-        dna_length: dna.length || null,
-        dna_tone: dna.tone || null,
-        dna_cta_type: dna.cta_type || null,
-        dna_main_theme: dna.main_theme || null,
-        dna_sub_theme: dna.sub_theme || null,
-        dna_thesis: dna.thesis || null,
         saved_as_reference: true,
-      });
+      }).select("id").single();
 
-      if (post.caption && Object.keys(dna).length > 0) {
-        savedPosts.push({ caption: post.caption, dna });
+      if (saved) savedPostIds.push(saved.id);
+    }
+
+    revalidatePath(PATH); // Show posts immediately
+
+    // 2b. Now analyze DNA for each post (slower, but posts are already visible)
+    const savedPosts: Array<{ caption: string; dna: Record<string, string> }> = [];
+
+    for (let i = 0; i < scraped.length; i++) {
+      const post = scraped[i];
+      const postId = savedPostIds[i];
+      if (!post.caption || !postId) continue;
+
+      try {
+        const dnaResult = await analyzeDNA({ content: post.caption });
+        if (!("error" in dnaResult)) {
+          const dna = dnaResult as unknown as Record<string, string>;
+          await supabase
+            .from("reference_posts")
+            .update({
+              dna_hook_type: dna.hook_type || null,
+              dna_structure: dna.structure || null,
+              dna_length: dna.length || null,
+              dna_tone: dna.tone || null,
+              dna_cta_type: dna.cta_type || null,
+              dna_main_theme: dna.main_theme || null,
+              dna_sub_theme: dna.sub_theme || null,
+              dna_thesis: dna.thesis || null,
+            })
+            .eq("id", postId);
+          savedPosts.push({ caption: post.caption, dna });
+        }
+      } catch (err) {
+        console.error(`[AutoScrape] DNA error for post ${postId}:`, err);
       }
     }
 
@@ -347,9 +363,9 @@ export async function scrapeProfileNow(
       return { error: "Scrape só disponível para perfis Instagram" };
     }
 
-    // 2. Scrape latest 50 posts (pega bastante pra ter um bom volume)
+    // 2. Scrape latest 12 posts (fast, within Vercel timeout)
     console.log(`[ScrapeNow] Scraping @${profile.handle}...`);
-    const scraped = await scrapeInstagramProfile(profile.handle, 50);
+    const scraped = await scrapeInstagramProfile(profile.handle, 12);
 
     if ("error" in scraped) {
       return { error: scraped.error };
@@ -369,57 +385,33 @@ export async function scrapeProfileNow(
         .filter(Boolean),
     );
 
-    // 4. Filter to new posts only
+    // 4. Filter to new posts only (keep posts without captions too)
     const newPosts = scraped.filter((post) => {
-      if (!post.caption) return false;
+      if (!post.caption) return true; // keep posts without captions
       return !existingCaptions.has(post.caption.slice(0, 100));
     });
 
-    // 5. Process in parallel batches of 5
-    const BATCH_SIZE = 5;
-    for (let i = 0; i < newPosts.length; i += BATCH_SIZE) {
-      const batch = newPosts.slice(i, i + BATCH_SIZE);
+    // 5. Save posts IMMEDIATELY (without DNA) so UI shows them fast
+    const savedPostIds: string[] = [];
+    for (const post of newPosts) {
+      const postUrl = post.owner_username
+        ? `https://www.instagram.com/${post.owner_username}/`
+        : null;
 
-      const batchResults = await Promise.all(
-        batch.map(async (post) => {
-          let dna: Record<string, string> = {} as Record<string, string>;
-          if (post.caption) {
-            const dnaResult = await analyzeDNA({ content: post.caption });
-            if (!("error" in dnaResult)) {
-              dna = dnaResult as unknown as Record<string, string>;
-            }
-          }
-          return { post, dna };
-        }),
-      );
+      const { data: saved } = await supabase.from("reference_posts").insert({
+        profile_id: profileId,
+        platform: "instagram",
+        url: postUrl,
+        thumbnail_url: post.thumbnail_url,
+        caption_text: post.caption,
+        likes: post.likes,
+        comments: post.comments,
+        engagement_rate: post.engagement_rate,
+        posted_at: post.posted_at,
+        saved_as_reference: true,
+      }).select("id").single();
 
-      // Save all posts from this batch
-      for (const { post, dna } of batchResults) {
-        const postUrl = post.owner_username
-          ? `https://www.instagram.com/${post.owner_username}/`
-          : null;
-
-        await supabase.from("reference_posts").insert({
-          profile_id: profileId,
-          platform: "instagram",
-          url: postUrl,
-          thumbnail_url: post.thumbnail_url,
-          caption_text: post.caption,
-          likes: post.likes,
-          comments: post.comments,
-          engagement_rate: post.engagement_rate,
-          posted_at: post.posted_at,
-          dna_hook_type: dna.hook_type || null,
-          dna_structure: dna.structure || null,
-          dna_length: dna.length || null,
-          dna_tone: dna.tone || null,
-          dna_cta_type: dna.cta_type || null,
-          dna_main_theme: dna.main_theme || null,
-          dna_sub_theme: dna.sub_theme || null,
-          dna_thesis: dna.thesis || null,
-          saved_as_reference: true,
-        });
-      }
+      if (saved) savedPostIds.push(saved.id);
     }
 
     // 6. Update last_scraped_at
@@ -443,12 +435,58 @@ export async function scrapeProfileNow(
 
     revalidatePath(PATH);
 
+    // 8. Analyze DNA in background (fire-and-forget) — won't block the response
+    analyzeDNAInBackground(newPosts, savedPostIds).catch((err) =>
+      console.error("[ScrapeNow] Background DNA analysis error:", err),
+    );
+
     return { posts_found: postsFound, posts_new: newPosts.length };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
     console.error(`[ScrapeNow] Error:`, message);
     return { error: message };
   }
+}
+
+/**
+ * Background DNA analysis — updates posts that were saved without DNA.
+ */
+async function analyzeDNAInBackground(
+  posts: InstagramPostData[],
+  postIds: string[],
+) {
+  const supabase = await createClient();
+
+  for (let i = 0; i < posts.length; i++) {
+    const post = posts[i];
+    const postId = postIds[i];
+    if (!post.caption || !postId) continue;
+
+    try {
+      const dnaResult = await analyzeDNA({ content: post.caption });
+      if (!("error" in dnaResult)) {
+        const dna = dnaResult as unknown as Record<string, string>;
+        await supabase
+          .from("reference_posts")
+          .update({
+            dna_hook_type: dna.hook_type || null,
+            dna_structure: dna.structure || null,
+            dna_length: dna.length || null,
+            dna_tone: dna.tone || null,
+            dna_cta_type: dna.cta_type || null,
+            dna_main_theme: dna.main_theme || null,
+            dna_sub_theme: dna.sub_theme || null,
+            dna_thesis: dna.thesis || null,
+          })
+          .eq("id", postId);
+      }
+    } catch (err) {
+      console.error(`[DNA Background] Error for post ${postId}:`, err);
+    }
+  }
+
+  revalidatePath(PATH);
+  console.log(`[DNA Background] Finished analyzing ${posts.length} posts`);
 }
 
 export async function deleteProfile(id: string) {
