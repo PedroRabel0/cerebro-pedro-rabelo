@@ -347,9 +347,9 @@ export async function scrapeProfileNow(
       return { error: "Scrape só disponível para perfis Instagram" };
     }
 
-    // 2. Scrape latest 15 posts
+    // 2. Scrape latest 50 posts (pega bastante pra ter um bom volume)
     console.log(`[ScrapeNow] Scraping @${profile.handle}...`);
-    const scraped = await scrapeInstagramProfile(profile.handle, 15);
+    const scraped = await scrapeInstagramProfile(profile.handle, 50);
 
     if ("error" in scraped) {
       return { error: scraped.error };

@@ -109,7 +109,7 @@ export default function ProfileManager({
         setPullResult((prev) => ({
           ...prev,
           [profileId]: {
-            message: `${result.posts_new} posts novos encontrados!`,
+            message: `${result.posts_found} posts puxados (${result.posts_new} novos)`,
             isError: false,
           },
         }));
