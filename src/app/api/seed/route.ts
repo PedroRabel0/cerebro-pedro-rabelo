@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient();
+    const url = new URL(request.url);
+    const force = url.searchParams.get("force") === "true";
 
     // Check if data already exists
     const { data: existingPlaybooks, error: checkError } = await supabase
@@ -20,11 +22,21 @@ export async function GET() {
       );
     }
 
-    if (existingPlaybooks && existingPlaybooks.length > 0) {
+    if (existingPlaybooks && existingPlaybooks.length > 0 && !force) {
       return NextResponse.json({
-        message: "Data already seeded",
+        message: "Data already seeded. Use ?force=true para recriar.",
         seeded: false,
       });
+    }
+
+    // If force=true, clean existing demo data first
+    if (force) {
+      await supabase.from("generated_contents").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await supabase.from("proposals").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await supabase.from("captures").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await supabase.from("playbooks").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await supabase.from("stories").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await supabase.from("themes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
     }
 
     const summary: Record<string, number> = {};
