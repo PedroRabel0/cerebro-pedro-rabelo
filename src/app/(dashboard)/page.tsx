@@ -65,6 +65,9 @@ function getActivityLink(entityType: string | null): string {
   }
 }
 
+// TODO: Filtrar activity feed por usuario/role quando implementar
+// server-side role detection (ex: ler role do cookie/session no server component).
+// Atualmente o feed mostra toda atividade para ambos os usuarios.
 export default async function DashboardHome() {
   const [stats, activityFeed] = await Promise.all([
     getDashboardStats(),

@@ -3,6 +3,7 @@
 // Falls back to InnerTube API and page scraping
 
 import { YoutubeTranscript } from 'youtube-transcript';
+import { logApiCost } from '@/lib/ai/client';
 
 export interface YouTubeExtraction {
   video_id: string;
@@ -207,6 +208,7 @@ async function fetchTranscriptSupadata(videoId: string): Promise<string | null> 
     const data = await response.json() as { content?: string; lang?: string };
     if (data.content && data.content.length > 50) {
       console.log(`[YouTube/Supadata] Transcript found: ${data.content.length} chars (lang: ${data.lang || 'unknown'})`);
+      logApiCost('supadata', 'transcript', 0.001, { unit: 'request', quantity: 1 });
       return data.content;
     }
 
@@ -285,6 +287,12 @@ Responda TUDO em português brasileiro, mesmo que o vídeo seja em outro idioma.
     for (const part of parts) {
       if (part.text && part.text.length > 100) {
         console.log(`[YouTube/Gemini] Video analysis successful: ${part.text.length} chars`);
+        // Gemini Flash video analysis cost (~1000 input, ~2000 output tokens)
+        const videoCost = (1000 / 1_000_000) * 0.10 + (2000 / 1_000_000) * 0.40;
+        logApiCost('gemini', 'gemini-2.0-flash', videoCost, {
+          input_tokens: 1000,
+          output_tokens: 2000,
+        });
         return `[Análise do vídeo via Gemini AI]\n\n${part.text}`;
       }
     }

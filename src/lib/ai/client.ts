@@ -7,6 +7,37 @@ export function getClient(): Anthropic {
   });
 }
 
+/**
+ * Generic cost logger for any API provider.
+ * Fire-and-forget: persists to Supabase silently.
+ */
+export function logApiCost(
+  provider: string,
+  model: string,
+  cost_usd: number,
+  details?: { input_tokens?: number; output_tokens?: number; unit?: string; quantity?: number }
+) {
+  console.log(`[API Cost] ${provider}/${model} | $${cost_usd.toFixed(4)}`);
+
+  createClient()
+    .then((supabase) =>
+      supabase.from('api_cost_log').insert({
+        provider,
+        model,
+        input_tokens: details?.input_tokens ?? 0,
+        output_tokens: details?.output_tokens ?? 0,
+        cost_usd: parseFloat(cost_usd.toFixed(6)),
+        created_at: new Date().toISOString(),
+      })
+    )
+    .catch(() => {
+      // Silently ignore — table/column may not exist yet
+    });
+}
+
+/**
+ * Legacy cost logger for Anthropic models. Calls logApiCost internally.
+ */
 export function logCost(model: string, inputTokens: number, outputTokens: number) {
   const costs: Record<string, { input: number; output: number }> = {
     'claude-sonnet-4-6': { input: 3.0, output: 15.0 },
@@ -16,24 +47,11 @@ export function logCost(model: string, inputTokens: number, outputTokens: number
   const cost =
     (inputTokens / 1_000_000) * rate.input +
     (outputTokens / 1_000_000) * rate.output;
-  console.log(
-    `[AI Cost] ${model} | in: ${inputTokens} | out: ${outputTokens} | $${cost.toFixed(4)}`
-  );
 
-  // Fire-and-forget: persist cost to Supabase
-  createClient()
-    .then((supabase) =>
-      supabase.from('api_cost_log').insert({
-        model,
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        cost_usd: parseFloat(cost.toFixed(6)),
-        created_at: new Date().toISOString(),
-      })
-    )
-    .catch(() => {
-      // Silently ignore — table may not exist yet
-    });
+  logApiCost('anthropic', model, cost, {
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+  });
 }
 
 export function parseJSON<T>(text: string): T | null {

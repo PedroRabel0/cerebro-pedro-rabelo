@@ -59,6 +59,42 @@ export async function getMonthlyCosts(): Promise<MonthlyCostRow[]> {
   );
 }
 
+export interface ProviderCostRow {
+  provider: string;
+  calls: number;
+  cost_usd: number;
+}
+
+export async function getCostsByProvider(): Promise<ProviderCostRow[]> {
+  const supabase = await createClient();
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const { data, error } = await supabase
+    .from("api_cost_log")
+    .select("provider, cost_usd")
+    .gte("created_at", startOfMonth.toISOString());
+
+  if (error || !data) {
+    return [];
+  }
+
+  const grouped = new Map<string, ProviderCostRow>();
+
+  for (const row of data) {
+    const provider = (row.provider as string) || "anthropic";
+    if (!grouped.has(provider)) {
+      grouped.set(provider, { provider, calls: 0, cost_usd: 0 });
+    }
+    const entry = grouped.get(provider)!;
+    entry.calls += 1;
+    entry.cost_usd += row.cost_usd ?? 0;
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => b.cost_usd - a.cost_usd);
+}
+
 export async function getCurrentMonthCost(): Promise<number> {
   const supabase = await createClient();
 

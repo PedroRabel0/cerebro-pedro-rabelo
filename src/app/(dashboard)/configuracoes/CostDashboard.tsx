@@ -1,7 +1,7 @@
 "use client";
 
 import { DollarSign, AlertTriangle, XCircle } from "lucide-react";
-import type { MonthlyCostRow } from "./actions";
+import type { MonthlyCostRow, ProviderCostRow } from "./actions";
 
 const MONTHLY_LIMIT = 50;
 
@@ -18,6 +18,30 @@ function formatNumber(n: number): string {
   return n.toLocaleString("pt-BR");
 }
 
+const PROVIDER_COLORS: Record<string, string> = {
+  anthropic: "#9b72b8",
+  openai: "#6b9b5f",
+  gemini: "#5b8cb8",
+  apify: "#c9412b",
+  supadata: "#d4a843",
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  gemini: "Gemini",
+  apify: "Apify",
+  supadata: "Supadata",
+};
+
+function getProviderColor(provider: string): string {
+  return PROVIDER_COLORS[provider] || "#888888";
+}
+
+function getProviderLabel(provider: string): string {
+  return PROVIDER_LABELS[provider] || provider;
+}
+
 function getProgressColor(pct: number): string {
   if (pct > 80) return "bg-[#dc2626]";
   if (pct > 50) return "bg-accent";
@@ -27,9 +51,11 @@ function getProgressColor(pct: number): string {
 export default function CostDashboard({
   currentMonthCost,
   monthlyCosts,
+  providerCosts = [],
 }: {
   currentMonthCost: number;
   monthlyCosts: MonthlyCostRow[];
+  providerCosts?: ProviderCostRow[];
 }) {
   const pct = Math.min((currentMonthCost / MONTHLY_LIMIT) * 100, 100);
   const progressColor = getProgressColor(pct);
@@ -93,6 +119,48 @@ export default function CostDashboard({
           {pct.toFixed(1)}% utilizado
         </p>
       </div>
+
+      {/* Provider breakdown */}
+      {providerCosts.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <p className="mb-4 font-mono text-xs uppercase tracking-wider text-text-secondary">
+            Custo por provedor (mês atual)
+          </p>
+          <div className="space-y-3">
+            {providerCosts.map((row) => {
+              const maxCost = providerCosts[0]?.cost_usd || 1;
+              const barPct = Math.max((row.cost_usd / maxCost) * 100, 2);
+              const color = getProviderColor(row.provider);
+              return (
+                <div key={row.provider} className="flex items-center gap-3">
+                  <span
+                    className="inline-flex min-w-[90px] items-center justify-center rounded-full px-3 py-1 text-xs font-semibold text-white"
+                    style={{ backgroundColor: color }}
+                  >
+                    {getProviderLabel(row.provider)}
+                  </span>
+                  <div className="flex-1">
+                    <div className="h-3 w-full overflow-hidden rounded-full bg-surface">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${barPct}%`, backgroundColor: color }}
+                      />
+                    </div>
+                  </div>
+                  <div className="min-w-[100px] text-right">
+                    <span className="font-mono text-sm font-medium text-text">
+                      ${row.cost_usd.toFixed(4)}
+                    </span>
+                    <span className="ml-2 font-mono text-xs text-text-muted">
+                      ({row.calls} {row.calls === 1 ? "chamada" : "chamadas"})
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Monthly breakdown table */}
       <div className="rounded-2xl border border-border bg-card p-6">

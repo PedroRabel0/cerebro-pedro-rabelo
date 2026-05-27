@@ -3,6 +3,8 @@
  * Uses Gemini REST API directly (no SDK needed).
  */
 
+import { logApiCost } from '@/lib/ai/client';
+
 export interface ImageGenerationResult {
   image_url: string;
   image_prompt: string;
@@ -53,6 +55,13 @@ export async function generateImageWithGemini(
       promptData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
       'Professional modern abstract background for social media';
 
+    // Log Gemini Flash prompt cost (~500 input, ~100 output tokens)
+    const flashCost = (500 / 1_000_000) * 0.10 + (100 / 1_000_000) * 0.40;
+    logApiCost('gemini', 'gemini-2.0-flash', flashCost, {
+      input_tokens: 500,
+      output_tokens: 100,
+    });
+
     // Step 2: Generate image using Imagen 3 via Gemini API
     const imageRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
@@ -102,6 +111,7 @@ export async function generateImageWithGemini(
       for (const part of parts) {
         if (part.inlineData) {
           const mimeType = part.inlineData.mimeType || 'image/png';
+          logApiCost('gemini', 'gemini-flash-image', 0.03, { unit: 'image', quantity: 1 });
           return {
             image_url: `data:${mimeType};base64,${part.inlineData.data}`,
             image_prompt: imagePrompt,
@@ -118,6 +128,7 @@ export async function generateImageWithGemini(
     const predictions = imageData.predictions || [];
 
     if (predictions.length > 0 && predictions[0].bytesBase64Encoded) {
+      logApiCost('gemini', 'imagen-3', 0.03, { unit: 'image', quantity: 1 });
       return {
         image_url: `data:image/png;base64,${predictions[0].bytesBase64Encoded}`,
         image_prompt: imagePrompt,

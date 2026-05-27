@@ -3,6 +3,8 @@
  * Uses Apify's REST API directly (no SDK needed).
  */
 
+import { logApiCost } from '@/lib/ai/client';
+
 export interface InstagramPostData {
   caption: string | null;
   likes: number;
@@ -102,6 +104,8 @@ export async function scrapeInstagramPost(
       `[Apify] Scraped Instagram post | likes: ${result.likes} | comments: ${result.comments}`,
     );
 
+    logApiCost('apify', 'instagram-scraper', 0.005, { unit: 'post', quantity: 1 });
+
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -155,9 +159,13 @@ export async function scrapeInstagramProfile(
       return { error: 'Apify não retornou dados para este perfil' };
     }
 
-    return data.map((post) =>
+    const posts = data.map((post) =>
       mapPost(post as Record<string, unknown>, username),
     );
+
+    logApiCost('apify', 'instagram-profile-scraper', 0.01, { unit: 'profile', quantity: 1 });
+
+    return posts;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[Apify Error] scrapeInstagramProfile:', message);

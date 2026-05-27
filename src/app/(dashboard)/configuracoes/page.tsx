@@ -1,4 +1,4 @@
-import { getMonthlyCosts, getCurrentMonthCost } from "./actions";
+import { getMonthlyCosts, getCurrentMonthCost, getCostsByProvider } from "./actions";
 import CostDashboard from "./CostDashboard";
 
 export const metadata = {
@@ -6,9 +6,10 @@ export const metadata = {
 };
 
 export default async function ConfiguracoesPage() {
-  const [monthlyCosts, currentMonthCost] = await Promise.all([
+  const [monthlyCosts, currentMonthCost, providerCosts] = await Promise.all([
     getMonthlyCosts(),
     getCurrentMonthCost(),
+    getCostsByProvider(),
   ]);
 
   return (
@@ -23,6 +24,7 @@ export default async function ConfiguracoesPage() {
       <CostDashboard
         currentMonthCost={currentMonthCost}
         monthlyCosts={monthlyCosts}
+        providerCosts={providerCosts}
       />
     </div>
   );
