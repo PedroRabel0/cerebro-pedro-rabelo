@@ -159,8 +159,20 @@ export async function scrapeInstagramProfile(
       return { error: 'Apify não retornou dados para este perfil' };
     }
 
-    const posts = data.map((post) =>
-      mapPost(post as Record<string, unknown>, username),
+    // instagram-profile-scraper returns profile objects with posts nested
+    // inside `latestPosts`. Extract those instead of treating data items as posts.
+    const profileData = data[0] as Record<string, unknown>;
+    const latestPosts = (profileData.latestPosts ?? []) as Record<string, unknown>[];
+
+    if (latestPosts.length === 0) {
+      console.warn(`[Apify] Profile @${cleanUsername} returned 0 latestPosts`);
+      return { error: 'Nenhum post encontrado neste perfil' };
+    }
+
+    console.log(`[Apify] Profile @${cleanUsername}: found ${latestPosts.length} posts in latestPosts`);
+
+    const posts = latestPosts.slice(0, maxPosts).map((post) =>
+      mapPost(post, cleanUsername),
     );
 
     logApiCost('apify', 'instagram-profile-scraper', 0.01, { unit: 'profile', quantity: 1 });
