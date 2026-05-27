@@ -130,7 +130,7 @@ async function generateWithGPTImage(slidePrompt: SlidePrompt): Promise<string | 
       prompt,
       n: 1,
       size: '1024x1024',
-      quality: 'medium',
+      quality: 'low',
     });
 
     // gpt-image-1 returns b64_json by default

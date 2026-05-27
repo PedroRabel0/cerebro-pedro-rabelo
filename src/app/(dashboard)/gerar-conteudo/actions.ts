@@ -131,17 +131,17 @@ export async function createGeneratedContent(formData: FormData) {
         })
         .eq("id", inserted.id);
 
-      // Generate image (Gemini first, fallback to DALL-E)
+      // Generate image (GPT Image first, fallback to Gemini)
       try {
-        let imageResult = await generateImageWithGemini(
+        let imageResult = await generateImageWithDalle(
           result.content_text,
           contentType
         );
 
-        // Fallback to DALL-E if Gemini fails
+        // Fallback to Gemini if GPT Image fails
         if ("error" in imageResult) {
-          console.log("[AI] Gemini image failed, trying DALL-E...", imageResult.error);
-          imageResult = await generateImageWithDalle(
+          console.log("[AI] GPT Image failed, trying Gemini...", imageResult.error);
+          imageResult = await generateImageWithGemini(
             result.content_text,
             contentType
           );
@@ -337,7 +337,7 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR sobre o topico acima. Use as info
 
     // Generate image in background (non-blocking)
     try {
-      const imageResult = await generateImageWithGemini(
+      const imageResult = await generateImageWithDalle(
         result.content_text,
         contentType
       );
@@ -356,8 +356,8 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR sobre o topico acima. Use as info
           })
           .eq("id", inserted.id);
       } else {
-        // Fallback to DALL-E
-        const dalleResult = await generateImageWithDalle(
+        // Fallback to Gemini
+        const dalleResult = await generateImageWithGemini(
           result.content_text,
           contentType
         );
@@ -875,11 +875,12 @@ async function generateImageForContent(
 ) {
   const supabase = await createClient();
 
-  let imageResult = await generateImageWithGemini(contentText, contentType);
+  // GPT Image primeiro (mais confiável), Gemini como fallback
+  let imageResult = await generateImageWithDalle(contentText, contentType);
 
   if ("error" in imageResult) {
-    console.log("[AI] Gemini image failed, trying DALL-E...", imageResult.error);
-    imageResult = await generateImageWithDalle(contentText, contentType);
+    console.log("[AI] GPT Image failed, trying Gemini...", imageResult.error);
+    imageResult = await generateImageWithGemini(contentText, contentType);
   }
 
   if (!("error" in imageResult)) {

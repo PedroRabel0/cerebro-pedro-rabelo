@@ -16,17 +16,16 @@ function getOpenAIClient(): OpenAI {
 }
 
 /**
- * Generate a cover/thumbnail image using DALL-E 3.
+ * Generate a cover/thumbnail image using GPT Image (gpt-image-1).
  */
 export async function generateImageWithDalle(
   contentText: string,
   contentType: string,
-  style: 'vivid' | 'natural' = 'vivid'
 ): Promise<DalleImageResult | { error: string }> {
   try {
     const client = getOpenAIClient();
 
-    // First, use GPT to create an optimized DALL-E prompt
+    // First, use GPT to create an optimized image prompt
     const promptResponse = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       max_tokens: 200,
@@ -34,7 +33,7 @@ export async function generateImageWithDalle(
         {
           role: 'system',
           content:
-            'You are an art director. Create a short DALL-E prompt (max 80 words) for a professional social media image. NO text in the image. Modern, clean aesthetic. Reply ONLY with the prompt.',
+            'You are an art director. Create a short image prompt (max 80 words) for a professional social media image. NO text in the image. Modern, clean aesthetic with dark tones (black background, red accents #C9412B). Reply ONLY with the prompt.',
         },
         {
           role: 'user',
@@ -45,35 +44,44 @@ export async function generateImageWithDalle(
 
     const imagePrompt =
       promptResponse.choices[0]?.message?.content?.trim() ||
-      'Professional modern abstract background for social media content';
+      'Professional modern abstract background for social media content, dark black background with red accent lighting';
 
-    // Generate image with DALL-E 3
+    // Generate image with gpt-image-1
+    console.log(`[GPT-Image] Generating image | prompt: ${imagePrompt.slice(0, 80)}...`);
+
     const imageResponse = await client.images.generate({
-      model: 'dall-e-3',
+      model: 'gpt-image-1',
       prompt: imagePrompt,
       n: 1,
       size: '1024x1024',
-      quality: 'standard',
-      style,
+      quality: 'low',
     });
 
-    const imageUrl = imageResponse.data?.[0]?.url;
-    if (!imageUrl) {
-      return { error: 'DALL-E não retornou URL de imagem' };
+    // gpt-image-1 returns b64_json by default
+    const b64 = imageResponse.data?.[0]?.b64_json;
+    if (b64) {
+      console.log(`[GPT-Image] Generated image successfully (base64)`);
+      return {
+        image_url: `data:image/png;base64,${b64}`,
+        image_prompt: imagePrompt,
+        image_model: 'gpt-image-1',
+      };
     }
 
-    console.log(
-      `[DALL-E] Generated image | prompt: ${imagePrompt.slice(0, 50)}...`
-    );
+    const url = imageResponse.data?.[0]?.url;
+    if (url) {
+      console.log(`[GPT-Image] Generated image successfully (URL)`);
+      return {
+        image_url: url,
+        image_prompt: imagePrompt,
+        image_model: 'gpt-image-1',
+      };
+    }
 
-    return {
-      image_url: imageUrl,
-      image_prompt: imagePrompt,
-      image_model: 'dall-e-3',
-    };
+    return { error: 'GPT Image não retornou imagem' };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[OpenAI Error] generateImage:', message);
-    return { error: `Falha ao gerar imagem com DALL-E: ${message}` };
+    return { error: `Falha ao gerar imagem com GPT Image: ${message}` };
   }
 }
