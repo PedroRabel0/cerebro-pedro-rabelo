@@ -1,5 +1,10 @@
-import { getMonthlyCosts, getCurrentMonthCost, getCostsByProvider } from "./actions";
+import {
+  getMonthlyCosts,
+  getCurrentMonthCost,
+  getCostsByProvider,
+} from "./actions";
 import CostDashboard from "./CostDashboard";
+import { Settings } from "lucide-react";
 
 export const metadata = {
   title: "Configurações — Segundo Cérebro",
@@ -14,11 +19,16 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div>
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold text-text">Configurações</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Gerencie custos e preferências do sistema
-        </p>
+      <header className="mb-8 flex items-center gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10">
+          <Settings className="h-6 w-6 text-accent" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-text">Configurações</h1>
+          <p className="text-sm text-text-muted">
+            Painel de custos e consumo de APIs
+          </p>
+        </div>
       </header>
 
       <CostDashboard
