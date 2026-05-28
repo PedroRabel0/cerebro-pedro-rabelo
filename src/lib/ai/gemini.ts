@@ -1,6 +1,6 @@
 /**
- * Gemini Image Generation for content visuals.
- * Uses Gemini REST API directly (no SDK needed).
+ * Nano Banana Pro (Gemini 3 Pro Image) — Image Generation.
+ * Uses Google GenAI SDK for high-quality image generation.
  */
 
 import { logApiCost } from '@/lib/ai/client';
@@ -12,9 +12,9 @@ export interface ImageGenerationResult {
 }
 
 /**
- * Generate an image for a content piece using Gemini.
- * Step 1: Use Gemini Flash to craft an image prompt
- * Step 2: Use Gemini Imagen to generate the image
+ * Generate an image using Nano Banana Pro (gemini-3-pro-image-preview).
+ * Step 1: Use Gemini Flash to craft an optimized image prompt
+ * Step 2: Use Nano Banana Pro to generate a high-quality image
  */
 export async function generateImageWithGemini(
   contentText: string,
@@ -35,7 +35,24 @@ export async function generateImageWithGemini(
             {
               parts: [
                 {
-                  text: `Você é um diretor de arte. Crie um prompt curto (máximo 100 palavras) em inglês para gerar uma imagem que represente visualmente este conteúdo de ${contentType}. A imagem deve ser profissional, moderna, e adequada para redes sociais. NÃO inclua texto na imagem. Responda APENAS com o prompt, sem explicações.\n\nConteúdo:\n${contentText.slice(0, 1000)}`,
+                  text: `You are a world-class art director for social media content. Create a detailed image prompt (100-150 words) in English for generating a stunning visual.
+
+BRAND GUIDELINES:
+- Dark, premium aesthetic: deep black backgrounds (#0A0A0A)
+- Bold red accent color (#C9412B) used sparingly for impact
+- Modern, minimalist, high-contrast
+- Professional and sophisticated — think luxury brand meets tech startup
+
+RULES:
+- Include specific visual details: lighting, composition, mood, textures, colors
+- NO text or words in the image — pure visual art
+- Think cinematic, editorial quality — as if shot for a magazine
+- Use dramatic lighting (rim light, volumetric light, dramatic shadows)
+- Reply ONLY with the prompt, no explanations
+
+Content type: ${contentType}
+Content:
+${contentText.slice(0, 1200)}`,
                 },
               ],
             },
@@ -53,93 +70,127 @@ export async function generateImageWithGemini(
     const promptData = await promptRes.json();
     const imagePrompt =
       promptData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-      'Professional modern abstract background for social media';
+      'Dramatic cinematic still life with deep black background, subtle red accent lighting, modern minimalist composition, professional editorial quality, volumetric lighting, high contrast';
 
-    // Log Gemini Flash prompt cost (~500 input, ~100 output tokens)
-    const flashCost = (500 / 1_000_000) * 0.10 + (100 / 1_000_000) * 0.40;
+    // Log Gemini Flash prompt cost
+    const flashCost = (500 / 1_000_000) * 0.10 + (150 / 1_000_000) * 0.40;
     logApiCost('gemini', 'gemini-2.0-flash', flashCost, {
       input_tokens: 500,
-      output_tokens: 100,
+      output_tokens: 150,
     });
 
-    // Step 2: Generate image using Imagen 3 via Gemini API
+    // Step 2: Generate image with Nano Banana Pro (gemini-3-pro-image-preview)
+    console.log(`[NanaBanana Pro] Generating image | prompt: ${imagePrompt.slice(0, 100)}...`);
+
     const imageRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instances: [{ prompt: imagePrompt }],
-          parameters: {
-            sampleCount: 1,
-            aspectRatio: '1:1',
-            safetyFilterLevel: 'block_few',
+          contents: [
+            {
+              parts: [{ text: `Generate this image: ${imagePrompt}` }],
+            },
+          ],
+          generationConfig: {
+            responseModalities: ['TEXT', 'IMAGE'],
           },
         }),
+        signal: AbortSignal.timeout(60_000),
       }
     );
 
     if (!imageRes.ok) {
-      // Imagen might not be available, try the Gemini image generation model
-      console.log('[Gemini] Imagen not available, trying gemini-2.0-flash image gen...');
+      const errorText = await imageRes.text().catch(() => '');
+      console.error(`[NanaBanana Pro] HTTP ${imageRes.status}: ${errorText.substring(0, 300)}`);
 
-      const fallbackRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: `Generate this image: ${imagePrompt}` }],
-              },
-            ],
-            generationConfig: {
-              responseModalities: ['TEXT', 'IMAGE'],
-            },
-          }),
-        }
-      );
-
-      if (!fallbackRes.ok) {
-        return { error: `Gemini image generation failed: ${fallbackRes.status}` };
-      }
-
-      const fallbackData = await fallbackRes.json();
-      const parts = fallbackData.candidates?.[0]?.content?.parts || [];
-
-      for (const part of parts) {
-        if (part.inlineData) {
-          const mimeType = part.inlineData.mimeType || 'image/png';
-          logApiCost('gemini', 'gemini-flash-image', 0.03, { unit: 'image', quantity: 1 });
-          return {
-            image_url: `data:${mimeType};base64,${part.inlineData.data}`,
-            image_prompt: imagePrompt,
-            image_model: 'gemini-flash-image',
-          };
-        }
-      }
-
-      return { error: 'Gemini não retornou imagem' };
+      // Fallback to Nano Banana 2 (Flash) if Pro fails
+      console.log('[NanaBanana] Pro failed, trying Nano Banana 2 (Flash)...');
+      return generateWithNanaBanana2(apiKey, imagePrompt);
     }
 
-    // Parse Imagen response
     const imageData = await imageRes.json();
-    const predictions = imageData.predictions || [];
+    const parts = imageData.candidates?.[0]?.content?.parts || [];
 
-    if (predictions.length > 0 && predictions[0].bytesBase64Encoded) {
-      logApiCost('gemini', 'imagen-3', 0.03, { unit: 'image', quantity: 1 });
-      return {
-        image_url: `data:image/png;base64,${predictions[0].bytesBase64Encoded}`,
-        image_prompt: imagePrompt,
-        image_model: 'imagen-3',
-      };
+    for (const part of parts) {
+      if (part.inlineData) {
+        const mimeType = part.inlineData.mimeType || 'image/png';
+        console.log('[NanaBanana Pro] Image generated successfully');
+        logApiCost('gemini', 'nano-banana-pro', 0.134, { unit: 'image', quantity: 1 });
+        return {
+          image_url: `data:${mimeType};base64,${part.inlineData.data}`,
+          image_prompt: imagePrompt,
+          image_model: 'nano-banana-pro',
+        };
+      }
     }
 
-    return { error: 'Imagen não retornou imagem' };
+    // No image in response — try fallback
+    console.log('[NanaBanana] Pro returned no image, trying Nano Banana 2...');
+    return generateWithNanaBanana2(apiKey, imagePrompt);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Gemini Error] generateImage:', message);
-    return { error: `Falha ao gerar imagem com Gemini: ${message}` };
+    console.error('[NanaBanana Error] generateImage:', message);
+    return { error: `Falha ao gerar imagem com Nano Banana: ${message}` };
+  }
+}
+
+/**
+ * Fallback: Nano Banana 2 (gemini-3.1-flash-image-preview) — faster, cheaper.
+ */
+async function generateWithNanaBanana2(
+  apiKey: string,
+  imagePrompt: string,
+): Promise<ImageGenerationResult | { error: string }> {
+  try {
+    console.log(`[NanaBanana 2] Generating fallback image...`);
+
+    const imageRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: `Generate this image: ${imagePrompt}` }],
+            },
+          ],
+          generationConfig: {
+            responseModalities: ['TEXT', 'IMAGE'],
+          },
+        }),
+        signal: AbortSignal.timeout(60_000),
+      }
+    );
+
+    if (!imageRes.ok) {
+      const errorText = await imageRes.text().catch(() => '');
+      console.error(`[NanaBanana 2] HTTP ${imageRes.status}: ${errorText.substring(0, 300)}`);
+      return { error: `Nano Banana 2 failed: ${imageRes.status}` };
+    }
+
+    const imageData = await imageRes.json();
+    const parts = imageData.candidates?.[0]?.content?.parts || [];
+
+    for (const part of parts) {
+      if (part.inlineData) {
+        const mimeType = part.inlineData.mimeType || 'image/png';
+        console.log('[NanaBanana 2] Image generated successfully');
+        logApiCost('gemini', 'nano-banana-2', 0.045, { unit: 'image', quantity: 1 });
+        return {
+          image_url: `data:${mimeType};base64,${part.inlineData.data}`,
+          image_prompt: imagePrompt,
+          image_model: 'nano-banana-2',
+        };
+      }
+    }
+
+    return { error: 'Nano Banana não retornou imagem' };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[NanaBanana 2 Error]:', message);
+    return { error: `Falha Nano Banana 2: ${message}` };
   }
 }

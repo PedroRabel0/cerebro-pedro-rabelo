@@ -51,9 +51,9 @@ const PROVIDERS: Record<string, ProviderInfo> = {
     label: "Google Gemini",
     color: "#5b8cb8",
     icon: Globe,
-    description: "Imagens fallback, análise de vídeo",
-    models: ["Gemini 2.0 Flash", "Imagen 3"],
-    pricing: "$0.03 / imagem",
+    description: "Geração de imagens (Nano Banana Pro)",
+    models: ["Nano Banana Pro", "Nano Banana 2", "Gemini Flash"],
+    pricing: "$0.134 / imagem (Pro) | $0.045 / imagem (Flash)",
   },
   apify: {
     label: "Apify",

@@ -131,17 +131,17 @@ export async function createGeneratedContent(formData: FormData) {
         })
         .eq("id", inserted.id);
 
-      // Generate image (GPT Image first, fallback to Gemini)
+      // Generate image (Nano Banana Pro first, fallback to GPT Image)
       try {
-        let imageResult = await generateImageWithDalle(
+        let imageResult = await generateImageWithGemini(
           result.content_text,
           contentType
         );
 
-        // Fallback to Gemini if GPT Image fails
+        // Fallback to GPT Image if Nano Banana fails
         if ("error" in imageResult) {
-          console.log("[AI] GPT Image failed, trying Gemini...", imageResult.error);
-          imageResult = await generateImageWithGemini(
+          console.log("[AI] Nano Banana failed, trying GPT Image...", imageResult.error);
+          imageResult = await generateImageWithDalle(
             result.content_text,
             contentType
           );
@@ -335,9 +335,9 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR sobre o topico acima. Use as info
 
     if (insertError) throw insertError;
 
-    // Generate image in background (non-blocking)
+    // Generate image in background (Nano Banana Pro first, GPT Image fallback)
     try {
-      const imageResult = await generateImageWithDalle(
+      const imageResult = await generateImageWithGemini(
         result.content_text,
         contentType
       );
@@ -356,8 +356,8 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR sobre o topico acima. Use as info
           })
           .eq("id", inserted.id);
       } else {
-        // Fallback to Gemini
-        const dalleResult = await generateImageWithGemini(
+        // Fallback to GPT Image
+        const dalleResult = await generateImageWithDalle(
           result.content_text,
           contentType
         );
@@ -875,12 +875,12 @@ async function generateImageForContent(
 ) {
   const supabase = await createClient();
 
-  // GPT Image primeiro (mais confiável), Gemini como fallback
-  let imageResult = await generateImageWithDalle(contentText, contentType);
+  // Nano Banana Pro primeiro, GPT Image como fallback
+  let imageResult = await generateImageWithGemini(contentText, contentType);
 
   if ("error" in imageResult) {
-    console.log("[AI] GPT Image failed, trying Gemini...", imageResult.error);
-    imageResult = await generateImageWithGemini(contentText, contentType);
+    console.log("[AI] Nano Banana failed, trying GPT Image...", imageResult.error);
+    imageResult = await generateImageWithDalle(contentText, contentType);
   }
 
   if (!("error" in imageResult)) {
