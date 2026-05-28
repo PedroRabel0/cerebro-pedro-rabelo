@@ -3,9 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
-import { generateImageWithGemini } from "@/lib/ai/gemini";
-import { generateImageWithDalle } from "@/lib/ai/openai-images";
-import { uploadImageToStorage } from "@/lib/supabase/storage";
+import { generateImagePrompt } from "@/lib/ai/gemini";
 import { randomUUID } from "crypto";
 
 const PATH = "/repurpose";
@@ -228,7 +226,7 @@ ${adaptationGuide}
       });
 
       // Generate image in background
-      generateImageForRepurposedContent(
+      generateImagePromptForContent(
         result.content_text,
         targetType,
         inserted.id
@@ -250,35 +248,22 @@ ${adaptationGuide}
   }
 }
 
-// Helper to generate images in background
-async function generateImageForRepurposedContent(
+// Helper to generate image PROMPT in background (no actual image)
+async function generateImagePromptForContent(
   contentText: string,
   contentType: string,
   contentId: string
 ) {
   const supabase = await createClient();
 
-  let imageResult = await generateImageWithGemini(contentText, contentType);
+  const promptResult = await generateImagePrompt(contentText, contentType);
 
-  if ("error" in imageResult) {
-    console.log(
-      "[AI] Nano Banana failed, trying GPT Image...",
-      imageResult.error
-    );
-    imageResult = await generateImageWithDalle(contentText, contentType);
-  }
-
-  if (!("error" in imageResult)) {
-    const storageUrl = await uploadImageToStorage(
-      imageResult.image_url,
-      contentId
-    );
+  if (!("error" in promptResult)) {
     await supabase
       .from("generated_contents")
       .update({
-        image_url: storageUrl ?? imageResult.image_url,
-        image_prompt: imageResult.image_prompt,
-        image_model: imageResult.image_model,
+        image_prompt: promptResult.image_prompt,
+        image_model: "prompt-only",
       })
       .eq("id", contentId);
   }

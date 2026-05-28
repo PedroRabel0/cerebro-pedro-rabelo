@@ -115,42 +115,44 @@ Responda APENAS com o prompt. Sem explicações.`;
 // ---------------------------------------------------------------------------
 
 /**
- * Main entry: generates image with Nano Banana Pro, falls back through chain.
+ * Generate ONLY the image prompt text (no actual image generation).
+ * The user copies this prompt and pastes into their preferred image AI tool.
+ */
+export async function generateImagePrompt(
+  contentText: string,
+  contentType: string
+): Promise<{ image_prompt: string } | { error: string }> {
+  try {
+    const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
+    if (!apiKey) return { error: 'GOOGLE_GEMINI_API_KEY not configured' };
+
+    const imagePrompt = await generateArtDirectorPrompt(apiKey, contentText, contentType);
+    if (!imagePrompt) return { error: 'Falha ao gerar prompt de imagem' };
+
+    console.log(`[ImageEngine] Prompt generated (${imagePrompt.length} chars) — prompt-only mode`);
+    return { image_prompt: imagePrompt };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[ImageEngine Error]:', message);
+    return { error: `Falha ao gerar prompt: ${message}` };
+  }
+}
+
+/**
+ * @deprecated Use generateImagePrompt() instead. Image generation removed — only prompt generation.
  */
 export async function generateImageWithGemini(
   contentText: string,
   contentType: string
 ): Promise<ImageGenerationResult | { error: string }> {
-  try {
-    const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
-    if (!apiKey) return { error: 'GOOGLE_GEMINI_API_KEY not configured' };
-
-    // Step 1: Generate a world-class image prompt using Gemini Flash
-    const imagePrompt = await generateArtDirectorPrompt(apiKey, contentText, contentType);
-    if (!imagePrompt) return { error: 'Failed to generate image prompt' };
-
-    console.log(`[ImageEngine] Prompt ready (${imagePrompt.length} chars), starting generation chain...`);
-
-    // Step 2: Try Nano Banana Pro first (best quality for composed images)
-    const nanaBananaResult = await generateWithNanaBananaPro(apiKey, imagePrompt);
-    if (nanaBananaResult) return nanaBananaResult;
-
-    // Step 3: Fallback to Imagen 4 Ultra (best photorealism)
-    console.log('[ImageEngine] Nano Banana Pro failed, trying Imagen 4 Ultra...');
-    const imagenResult = await generateWithImagen4Ultra(apiKey, imagePrompt);
-    if (imagenResult) return imagenResult;
-
-    // Step 4: Final fallback to Nano Banana 2 (fast, reliable)
-    console.log('[ImageEngine] Imagen 4 Ultra failed, trying Nano Banana 2...');
-    const flashResult = await generateWithNanaBanana2(apiKey, imagePrompt);
-    if (flashResult) return flashResult;
-
-    return { error: 'Todos os modelos de imagem falharam' };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[ImageEngine Error]:', message);
-    return { error: `Falha ao gerar imagem: ${message}` };
-  }
+  const result = await generateImagePrompt(contentText, contentType);
+  if ('error' in result) return result;
+  // Return prompt only, no image
+  return {
+    image_url: '',
+    image_prompt: result.image_prompt,
+    image_model: 'prompt-only',
+  };
 }
 
 // ---------------------------------------------------------------------------

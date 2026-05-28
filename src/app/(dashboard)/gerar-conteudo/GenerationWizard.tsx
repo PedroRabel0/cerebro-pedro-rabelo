@@ -802,7 +802,7 @@ interface GenerationResult {
   contentType: ContentType;
   content: string;
   sourceMap: Record<string, unknown> | null;
-  imageUrl?: string | null;
+  imagePrompt?: string | null;
 }
 
 function SourceMapDisplay({ sourceMap }: { sourceMap: Record<string, unknown> | null }) {
@@ -873,6 +873,56 @@ function CarouselDesignPreview({
   );
 }
 
+function ImagePromptDisplay({ prompt }: { prompt: string }) {
+  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-purple/20 bg-purple/5 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <ImageIcon className="h-3.5 w-3.5 text-purple" />
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-purple">
+            Prompt de imagem
+          </span>
+        </div>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="rounded-lg px-2 py-1 font-mono text-[10px] text-text-muted transition hover:text-text hover:bg-surface"
+          >
+            {expanded ? "Recolher" : "Expandir"}
+          </button>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1 rounded-lg bg-purple/10 px-2.5 py-1 font-mono text-[10px] text-purple transition hover:bg-purple/20"
+          >
+            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            {copied ? "Copiado!" : "Copiar prompt"}
+          </button>
+        </div>
+      </div>
+      <p className={`text-xs text-text-secondary leading-relaxed ${expanded ? "" : "line-clamp-3"}`}>
+        {prompt}
+      </p>
+      {!expanded && prompt.length > 200 && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="mt-1 font-mono text-[10px] text-purple hover:text-purple/80"
+        >
+          Ver prompt completo →
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ResultCard({
   result,
   onRegenerate,
@@ -935,21 +985,9 @@ function ResultCard({
 
       <SourceMapDisplay sourceMap={result.sourceMap} />
 
-      {/* Image preview for all content types */}
-      {result.imageUrl && (
-        <div className="mt-3">
-          <div className="flex items-center gap-2 mb-2">
-            <ImageIcon className="h-3.5 w-3.5 text-purple" />
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-purple">
-              Imagem gerada
-            </span>
-          </div>
-          <img
-            src={result.imageUrl}
-            alt="Imagem gerada para o conteudo"
-            className="max-w-[300px] rounded-xl ring-1 ring-border"
-          />
-        </div>
+      {/* Image prompt for user to copy to their preferred AI tool */}
+      {result.imagePrompt && (
+        <ImagePromptDisplay prompt={result.imagePrompt} />
       )}
 
       {/* SlideDesigner for carousels */}

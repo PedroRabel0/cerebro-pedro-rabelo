@@ -3,9 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
-import { generateImageWithGemini } from "@/lib/ai/gemini";
-import { generateImageWithDalle } from "@/lib/ai/openai-images";
-import { uploadImageToStorage } from "@/lib/supabase/storage";
+import { generateImagePrompt } from "@/lib/ai/gemini";
 import type { ContentType } from "@/lib/supabase/types";
 
 const PATH = "/gerar-conteudo";
@@ -131,42 +129,24 @@ export async function createGeneratedContent(formData: FormData) {
         })
         .eq("id", inserted.id);
 
-      // Generate image (Nano Banana Pro first, fallback to GPT Image)
+      // Generate image PROMPT only (user copies to their own image AI)
       try {
-        let imageResult = await generateImageWithGemini(
+        const promptResult = await generateImagePrompt(
           result.content_text,
           contentType
         );
 
-        // Fallback to GPT Image if Nano Banana fails
-        if ("error" in imageResult) {
-          console.log("[AI] Nano Banana failed, trying GPT Image...", imageResult.error);
-          imageResult = await generateImageWithDalle(
-            result.content_text,
-            contentType
-          );
-        }
-
-        if (!("error" in imageResult)) {
-          // Upload to Supabase Storage; fall back to original URL on failure
-          const storageUrl = await uploadImageToStorage(
-            imageResult.image_url,
-            inserted.id
-          );
-
+        if (!("error" in promptResult)) {
           await supabase
             .from("generated_contents")
             .update({
-              image_url: storageUrl ?? imageResult.image_url,
-              image_prompt: imageResult.image_prompt,
-              image_model: imageResult.image_model,
+              image_prompt: promptResult.image_prompt,
+              image_model: "prompt-only",
             })
             .eq("id", inserted.id);
-        } else {
-          console.log("[AI] Image generation failed:", imageResult.error);
         }
       } catch (imgError) {
-        console.error("[AI] Image generation error:", imgError);
+        console.error("[AI] Image prompt generation error:", imgError);
       }
     }
   } catch (aiError) {
@@ -335,49 +315,23 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR sobre o topico acima. Use as info
 
     if (insertError) throw insertError;
 
-    // Generate image in background (Nano Banana Pro first, GPT Image fallback)
+    // Generate image PROMPT only (user copies to their own image AI)
     try {
-      const imageResult = await generateImageWithGemini(
+      const promptResult = await generateImagePrompt(
         result.content_text,
         contentType
       );
-
-      if (!("error" in imageResult)) {
-        const storageUrl = await uploadImageToStorage(
-          imageResult.image_url,
-          inserted.id
-        );
+      if (!("error" in promptResult)) {
         await supabase
           .from("generated_contents")
           .update({
-            image_url: storageUrl ?? imageResult.image_url,
-            image_prompt: imageResult.image_prompt,
-            image_model: imageResult.image_model,
+            image_prompt: promptResult.image_prompt,
+            image_model: "prompt-only",
           })
           .eq("id", inserted.id);
-      } else {
-        // Fallback to GPT Image
-        const dalleResult = await generateImageWithDalle(
-          result.content_text,
-          contentType
-        );
-        if (!("error" in dalleResult)) {
-          const storageUrl = await uploadImageToStorage(
-            dalleResult.image_url,
-            inserted.id
-          );
-          await supabase
-            .from("generated_contents")
-            .update({
-              image_url: storageUrl ?? dalleResult.image_url,
-              image_prompt: dalleResult.image_prompt,
-              image_model: dalleResult.image_model,
-            })
-            .eq("id", inserted.id);
-        }
       }
     } catch (imgError) {
-      console.error("[AI] Image generation error:", imgError);
+      console.error("[AI] Image prompt error:", imgError);
     }
 
     revalidatePath(PATH);
@@ -476,6 +430,7 @@ export interface WizardResult {
   contentType: ContentType;
   content: string;
   sourceMap: Record<string, unknown> | null;
+  imagePrompt?: string | null;
 }
 
 export async function createWizardContent(
@@ -844,17 +799,28 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR. Use as informacoes dos playbooks
 
       if (insertError) throw insertError;
 
+      // Generate image prompt inline so it's included in results
+      let imagePrompt: string | null = null;
+      try {
+        const promptResult = await generateImagePrompt(result.content_text, contentType);
+        if (!("error" in promptResult)) {
+          imagePrompt = promptResult.image_prompt;
+          await supabase
+            .from("generated_contents")
+            .update({ image_prompt: imagePrompt, image_model: "prompt-only" })
+            .eq("id", inserted.id);
+        }
+      } catch (e) {
+        console.error("[AI] Image prompt error:", e);
+      }
+
       results.push({
         id: inserted.id,
         contentType: contentType as ContentType,
         content: result.content_text,
         sourceMap: result.source_map,
+        imagePrompt,
       });
-
-      // Generate image in background (non-blocking, fire and forget)
-      generateImageForContent(result.content_text, contentType, inserted.id).catch(
-        (e) => console.error("[AI] Image generation error:", e)
-      );
     }
 
     revalidatePath(PATH);
@@ -867,33 +833,22 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR. Use as informacoes dos playbooks
   }
 }
 
-// Helper to generate images in background
-async function generateImageForContent(
+// Helper to generate image PROMPT in background (no actual image)
+async function generateImagePromptForContent(
   contentText: string,
   contentType: string,
   contentId: string
 ) {
   const supabase = await createClient();
 
-  // Nano Banana Pro primeiro, GPT Image como fallback
-  let imageResult = await generateImageWithGemini(contentText, contentType);
+  const promptResult = await generateImagePrompt(contentText, contentType);
 
-  if ("error" in imageResult) {
-    console.log("[AI] Nano Banana failed, trying GPT Image...", imageResult.error);
-    imageResult = await generateImageWithDalle(contentText, contentType);
-  }
-
-  if (!("error" in imageResult)) {
-    const storageUrl = await uploadImageToStorage(
-      imageResult.image_url,
-      contentId
-    );
+  if (!("error" in promptResult)) {
     await supabase
       .from("generated_contents")
       .update({
-        image_url: storageUrl ?? imageResult.image_url,
-        image_prompt: imageResult.image_prompt,
-        image_model: imageResult.image_model,
+        image_prompt: promptResult.image_prompt,
+        image_model: "prompt-only",
       })
       .eq("id", contentId);
   }
