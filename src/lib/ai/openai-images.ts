@@ -1,5 +1,6 @@
 /**
- * OpenAI DALL-E Image Generation for content covers and thumbnails.
+ * OpenAI GPT Image — Fallback image generation.
+ * Used when Nano Banana Pro / Imagen 4 are unavailable.
  */
 import OpenAI from 'openai';
 import { logApiCost } from '@/lib/ai/client';
@@ -18,7 +19,7 @@ function getOpenAIClient(): OpenAI {
 
 /**
  * Generate a cover/thumbnail image using GPT Image (gpt-image-1).
- * Uses HIGH quality for professional results comparable to ChatGPT.
+ * This is the fallback — called when Nano Banana Pro and Imagen 4 both fail.
  */
 export async function generateImageWithDalle(
   contentText: string,
@@ -27,43 +28,50 @@ export async function generateImageWithDalle(
   try {
     const client = getOpenAIClient();
 
-    // Use GPT-4o to create a rich, detailed image prompt (not mini — quality matters)
+    // Use GPT-4o with the same elite art director prompt system
     const promptResponse = await client.chat.completions.create({
       model: 'gpt-4o',
       max_tokens: 500,
       messages: [
         {
           role: 'system',
-          content: `You are a world-class art director for social media content. Your job is to create detailed, vivid image prompts that produce stunning visuals.
+          content: `You are an elite creative director at a top agency. You specialize in dark, premium visual identities for thought leaders.
 
-BRAND GUIDELINES:
-- Dark, premium aesthetic: deep black backgrounds (#0A0A0A)
-- Bold red accent color (#C9412B) used sparingly for impact
-- Modern, minimalist, high-contrast
-- Professional and sophisticated — think luxury brand meets tech startup
+Your client is Pedro Rabelo — a Brazilian entrepreneur. His brand is ANTI-GURU: direct, provocative, real.
 
-RULES:
-- Write a detailed prompt (100-150 words) describing the EXACT image to generate
-- Include specific visual details: lighting, composition, mood, textures, colors
-- NO text or words in the image — pure visual art
-- Think cinematic, editorial quality — as if shot for a magazine
-- Use dramatic lighting (rim light, volumetric light, dramatic shadows)
-- Reply ONLY with the prompt, no explanations`,
+BRAND IDENTITY:
+- Primary: Pure black (#0A0A0B) — 90% of the image
+- Accent: Blood red (#C9412B) — used sparingly like a wound on darkness
+- Aesthetic: Dark luxury minimalism. Apple keynote meets fight club poster.
+- Mood: Powerful, provocative, premium.
+
+CRITICAL RULES:
+1. ZERO text, letters, numbers, logos, or watermarks
+2. ZERO faces or recognizable people
+3. Use SYMBOLIC/ABSTRACT imagery — gallery-worthy art
+4. Lighting: rim light, volumetric beams, caustics, neon glow
+5. Color: 90% deep blacks/grays, 10% blood red (#C9412B) accents
+6. Quality: hyperrealistic, 8K, sharp focus
+7. Composition: rule of thirds, strong leading lines, negative space
+8. Textures: brushed metal, dark concrete, leather, smoke, glass
+9. Camera: cinematic, shallow depth of field
+
+Write a detailed prompt (120-180 words). Be specific about subject, lighting, camera angle, textures, atmosphere. Reply ONLY with the prompt.`,
         },
         {
           role: 'user',
-          content: `Create a stunning image prompt for this ${contentType} content. The image will be used as a cover/thumbnail on Instagram.\n\nContent:\n${contentText.slice(0, 1200)}`,
+          content: `Create a stunning image prompt for this ${contentType} content:\n\n${contentText.slice(0, 1200)}`,
         },
       ],
     });
 
     const imagePrompt =
       promptResponse.choices[0]?.message?.content?.trim() ||
-      'Dramatic cinematic still life with deep black background, subtle red accent lighting, modern minimalist composition, professional editorial quality, volumetric lighting, high contrast';
+      'Dramatic cinematic still life: a single chess king piece carved from obsidian stone, lit by a blood-red volumetric beam cutting through darkness, particles of dust floating in the light, deep black background with subtle smoke tendrils, macro lens perspective, extreme shallow depth of field, the red light creates caustic reflections on the polished stone surface';
 
     // Log GPT-4o cost
-    const promptInputTokens = promptResponse.usage?.prompt_tokens ?? 300;
-    const promptOutputTokens = promptResponse.usage?.completion_tokens ?? 150;
+    const promptInputTokens = promptResponse.usage?.prompt_tokens ?? 400;
+    const promptOutputTokens = promptResponse.usage?.completion_tokens ?? 180;
     const promptCost =
       (promptInputTokens / 1_000_000) * 2.50 +
       (promptOutputTokens / 1_000_000) * 10.0;
@@ -72,8 +80,8 @@ RULES:
       output_tokens: promptOutputTokens,
     });
 
-    // Generate image with gpt-image-1 at HIGH quality
-    console.log(`[GPT-Image] Generating HIGH quality image | prompt: ${imagePrompt.slice(0, 100)}...`);
+    // Generate image with gpt-image-1
+    console.log(`[GPT-Image] Generating | prompt: ${imagePrompt.slice(0, 100)}...`);
 
     const imageResponse = await client.images.generate({
       model: 'gpt-image-1',
@@ -83,11 +91,9 @@ RULES:
       quality: 'high',
     });
 
-    // gpt-image-1 returns b64_json by default
     const b64 = imageResponse.data?.[0]?.b64_json;
     if (b64) {
-      console.log(`[GPT-Image] Generated HIGH quality image successfully`);
-      // High quality costs ~$0.167 per image
+      console.log('[GPT-Image] Generated successfully');
       logApiCost('openai', 'gpt-image-1', 0.167, { unit: 'image', quantity: 1 });
       return {
         image_url: `data:image/png;base64,${b64}`,
@@ -98,7 +104,7 @@ RULES:
 
     const url = imageResponse.data?.[0]?.url;
     if (url) {
-      console.log(`[GPT-Image] Generated HIGH quality image successfully (URL)`);
+      console.log('[GPT-Image] Generated successfully (URL)');
       logApiCost('openai', 'gpt-image-1', 0.167, { unit: 'image', quantity: 1 });
       return {
         image_url: url,
@@ -110,7 +116,7 @@ RULES:
     return { error: 'GPT Image não retornou imagem' };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[OpenAI Error] generateImage:', message);
-    return { error: `Falha ao gerar imagem com GPT Image: ${message}` };
+    console.error('[GPT-Image Error]:', message);
+    return { error: `Falha GPT Image: ${message}` };
   }
 }
