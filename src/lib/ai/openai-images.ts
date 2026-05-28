@@ -35,28 +35,29 @@ export async function generateImageWithDalle(
       messages: [
         {
           role: 'system',
-          content: `You are an elite creative director at a top agency. You specialize in dark, premium visual identities for thought leaders.
+          content: `Você é um designer gráfico especialista em infográficos para Instagram no estilo dos maiores criadores brasileiros: Alfredo Soares (@alfredosoares), Thiago Nigro, Flavio Augusto.
 
-Your client is Pedro Rabelo — a Brazilian entrepreneur. His brand is ANTI-GURU: direct, provocative, real.
+Seu cliente é Pedro Rabelo — empreendedor brasileiro.
 
-BRAND IDENTITY:
-- Primary: Pure black (#0A0A0B) — 90% of the image
-- Accent: Blood red (#C9412B) — used sparingly like a wound on darkness
-- Aesthetic: Dark luxury minimalism. Apple keynote meets fight club poster.
-- Mood: Powerful, provocative, premium.
+IDENTIDADE VISUAL:
+- Fundo: PRETO PURO (#0A0A0B) — sempre
+- Destaque: VERMELHO VIBRANTE (#E31B23) — elementos 3D, badges, destaques
+- Texto: BRANCO (#FFFFFF) — títulos bold grandes
+- Secundário: CINZA (#666666) — labels, linhas conectoras
 
-CRITICAL RULES:
-1. ZERO text, letters, numbers, logos, or watermarks
-2. ZERO faces or recognizable people
-3. Use SYMBOLIC/ABSTRACT imagery — gallery-worthy art
-4. Lighting: rim light, volumetric beams, caustics, neon glow
-5. Color: 90% deep blacks/grays, 10% blood red (#C9412B) accents
-6. Quality: hyperrealistic, 8K, sharp focus
-7. Composition: rule of thirds, strong leading lines, negative space
-8. Textures: brushed metal, dark concrete, leather, smoke, glass
-9. Camera: cinematic, shallow depth of field
+ESTILO OBRIGATÓRIO — INFOGRÁFICO EDUCATIVO:
+1. É DESIGN GRÁFICO / INFOGRÁFICO — NÃO é foto, NÃO é arte abstrata
+2. Fundo SEMPRE preto puro (#0A0A0B)
+3. Elementos visuais: diagramas de Venn, escadas 3D vermelhas, blocos, fluxogramas, matrizes
+4. Tipografia: títulos ENORMES em branco bold no topo
+5. Ícones minimalistas brancos dentro de shapes vermelhos
+6. Linhas conectoras finas ligando conceitos
+7. Labels explicativas em caixas com borda tracejada
+8. Elementos 3D vermelhos com sombra realista
+9. Pode ter TEXTO no design (títulos, labels, números)
+10. Composição limpa, hierarquia visual clara
 
-Write a detailed prompt (120-180 words). Be specific about subject, lighting, camera angle, textures, atmosphere. Reply ONLY with the prompt.`,
+Escreva um prompt detalhado (120-180 palavras) para gerar um INFOGRÁFICO PROFISSIONAL. Responda APENAS com o prompt.`,
         },
         {
           role: 'user',
@@ -67,7 +68,7 @@ Write a detailed prompt (120-180 words). Be specific about subject, lighting, ca
 
     const imagePrompt =
       promptResponse.choices[0]?.message?.content?.trim() ||
-      'Dramatic cinematic still life: a single chess king piece carved from obsidian stone, lit by a blood-red volumetric beam cutting through darkness, particles of dust floating in the light, deep black background with subtle smoke tendrils, macro lens perspective, extreme shallow depth of field, the red light creates caustic reflections on the polished stone surface';
+      'Infográfico profissional estilo Instagram brasileiro: fundo preto puro (#0A0A0B), título grande em branco bold no topo "FRAMEWORK DE DECISÃO", diagrama de 4 quadrantes com bordas vermelhas (#E31B23) sobre fundo preto, cada quadrante com ícone branco minimalista e label em branco, linhas conectoras finas cinza entre os quadrantes, elemento central vermelho 3D com sombra, labels explicativas em caixas com borda tracejada cinza ao redor, @pedrorabelo pequeno no canto inferior direito em cinza, design limpo e profissional';
 
     // Log GPT-4o cost
     const promptInputTokens = promptResponse.usage?.prompt_tokens ?? 400;

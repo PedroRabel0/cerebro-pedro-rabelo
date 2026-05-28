@@ -20,89 +20,94 @@ export interface ImageGenerationResult {
 const PEDRO_BRAND = {
   colors: {
     bg: '#0A0A0B',
-    accent: '#C9412B',
-    text: '#F5F5F5',
+    accent: '#E31B23', // vermelho vibrante
+    text: '#FFFFFF',
     subtle: '#1A1A1C',
   },
-  aesthetic: 'Dark luxury minimalism. Think Apple keynote meets fight club poster.',
-  mood: 'Powerful, provocative, premium. Anti-guru energy.',
-  references: 'Alex Hormozi visual style, Naval Ravikant simplicity, high-end editorial photography',
+  aesthetic: 'Infográficos educativos premium no estilo @alfredosoares / #BORAVENDER. Design gráfico, NÃO fotografia.',
+  mood: 'Educativo, direto, autoridade. Frameworks visuais e diagramas.',
+  references: 'Alfredo Soares @alfredosoares, Thiago Nigro, Flavio Augusto — carrosséis infográficos brasileiros',
 };
 
 const CONTENT_TYPE_STYLES: Record<string, string> = {
   instagram_carousel: `
-    Instagram carousel cover slide design.
-    - Square format (1:1), designed for mobile-first impact
-    - Bold, dramatic composition that stops the scroll
-    - Abstract or symbolic imagery — NO literal illustrations
-    - Deep shadows, selective accent lighting in blood red (#C9412B)
-    - Cinematic depth of field, bokeh effects welcome
-    - Think: movie poster meets premium brand campaign
-    - Textures: brushed metal, dark concrete, leather, smoke, glass
-    - NO text, NO logos, NO watermarks — pure visual art`,
+    Instagram carousel INFOGRAPHIC slide — estilo @alfredosoares / #BORAVENDER.
+    - Square format (1:1), 1080x1080px
+    - FUNDO PRETO PURO (#0A0A0B), texto BRANCO BOLD, destaques em VERMELHO VIBRANTE (#E31B23)
+    - Estilo INFOGRÁFICO EDUCATIVO: diagramas, frameworks, escadas, Venn diagrams, fluxogramas
+    - Elementos 3D em vermelho (blocos, escadas, cubos) com sombras realistas sobre fundo preto
+    - Ícones brancos minimalistas dentro de elementos vermelhos
+    - Linhas conectoras finas (brancas ou cinza) ligando conceitos
+    - Labels explicativas em caixas com borda tracejada
+    - Tipografia: headline MUITO GRANDE e bold no topo, subtextos menores
+    - Watermark pequeno no rodapé: @pedrorabelo à direita
+    - NÃO é foto, NÃO é arte abstrata — é DESIGN GRÁFICO / INFOGRÁFICO
+    - Referência visual: slides do Alfredo Soares, Thiago Nigro, Flavio Augusto`,
 
   instagram_reel: `
-    Instagram reel thumbnail / cover frame.
-    - Vertical format feel, dramatic portrait-oriented composition
-    - High energy, dynamic movement implied through blur or light trails
-    - Dark background with punchy red accent elements
-    - Think: trailer frame of a business documentary
-    - Motion blur, light streaks, particles welcome`,
+    Instagram reel thumbnail — estilo infográfico brasileiro.
+    - Vertical feel, fundo preto puro
+    - Título GRANDE em branco bold no topo
+    - Palavra-chave destacada em VERMELHO (#E31B23) com fundo vermelho
+    - Elemento visual central (ícone 3D, diagrama simples)
+    - Design limpo, alto contraste, sem fotos`,
 
   linkedin_post: `
-    LinkedIn professional content visual.
-    - Slightly more polished and corporate, but still dark and bold
-    - Think: Bloomberg or The Economist premium visual style
-    - Data visualization aesthetics — abstract charts, grids, matrices
-    - Muted red accents, more cool-toned shadows
-    - Sophisticated, intellectual, authority-driven`,
+    LinkedIn infographic — profissional mas impactante.
+    - Fundo preto, texto branco, destaques vermelhos
+    - Estilo framework/matriz: quadrantes, listas numeradas, comparações
+    - Mais clean e organizado que Instagram, mas mesmo DNA visual
+    - Dados e métricas em destaque com números grandes
+    - @pedrorabelo no rodapé`,
 
   x_thread: `
-    Twitter/X thread cover image.
-    - Widescreen feel, panoramic composition
-    - Stark, high-contrast, almost monochrome with selective red
-    - Graphic, bold, punchy — designed for the timeline
-    - Think: film noir meets tech startup branding`,
+    Twitter/X cover image — gráfico de impacto.
+    - Widescreen feel, fundo preto
+    - Uma frase BOLD gigante em branco
+    - Palavra-chave em vermelho destacado
+    - Minimalista: poucos elementos, máximo impacto
+    - Estilo statement/manifesto visual`,
 };
 
 function buildMasterPrompt(contentText: string, contentType: string): string {
   const styleGuide = CONTENT_TYPE_STYLES[contentType] || CONTENT_TYPE_STYLES.instagram_carousel;
 
-  return `You are an elite creative director at a top agency like Wieden+Kennedy or Droga5. You specialize in dark, premium visual identities for thought leaders and disruptive brands.
+  return `Você é um designer gráfico especialista em infográficos para Instagram no estilo dos maiores criadores de conteúdo brasileiros: Alfredo Soares (@alfredosoares), Thiago Nigro, Flavio Augusto.
 
-Your client is Pedro Rabelo — a Brazilian entrepreneur and content creator. His brand is ANTI-GURU: direct, provocative, real. His visual identity is:
-- Primary color: Pure black (#0A0A0B)
-- Accent color: Blood red (#C9412B) — used sparingly, like a wound on darkness
-- Aesthetic: ${PEDRO_BRAND.aesthetic}
-- Mood: ${PEDRO_BRAND.mood}
-- Visual references: ${PEDRO_BRAND.references}
+Seu cliente é Pedro Rabelo — empreendedor brasileiro. Identidade visual:
+- Fundo: PRETO PURO (#0A0A0B) — sempre
+- Destaque: VERMELHO VIBRANTE (#E31B23) — elementos 3D, badges, destaques
+- Texto: BRANCO (#FFFFFF) — títulos bold grandes
+- Cinza (#666666) — textos secundários, linhas, labels
 
-## Content type & format:
+## ESTILO OBRIGATÓRIO — INFOGRÁFICO EDUCATIVO:
 ${styleGuide}
 
-## Critical rules:
-1. ZERO text, letters, numbers, logos, or watermarks in the image
-2. ZERO faces or recognizable people
-3. Use SYMBOLIC/ABSTRACT imagery that captures the FEELING of the content
-4. The image must work as a standalone piece of art — gallery worthy
-5. Lighting is everything: use rim light, volumetric beams, caustics, neon glow
-6. Color palette: 90% deep blacks and dark grays, 10% blood red (#C9412B) accents
-7. Resolution and detail: hyperrealistic, 8K quality, sharp focus on key elements
-8. Composition: follow rule of thirds, strong leading lines, negative space
+## REGRAS CRÍTICAS:
+1. É INFOGRÁFICO / DESIGN GRÁFICO — NÃO é foto, NÃO é arte abstrata
+2. Fundo SEMPRE preto puro (#0A0A0B)
+3. Elementos visuais: diagramas de Venn, escadas 3D, blocos vermelhos, fluxogramas, matrizes, frameworks
+4. Tipografia: títulos ENORMES em branco bold, subtítulos menores
+5. Ícones minimalistas brancos dentro de shapes vermelhos
+6. Linhas conectoras finas ligando conceitos
+7. Labels explicativas em caixas com borda tracejada cinza
+8. Elementos 3D vermelhos com sombra realista (blocos, cubos, escadas)
+9. Composição limpa, espaçamento generoso, hierarquia visual clara
+10. Pode ter TEXTO no design (títulos, labels, números) — FAZ PARTE do infográfico
 
-## The content this image represents:
+## O conteúdo que este infográfico representa:
 ${contentText.slice(0, 800)}
 
-## Your task:
-Write a detailed image generation prompt (120-180 words) that will produce a STUNNING, scroll-stopping visual. Be extremely specific about:
-- Exact subject/objects and their arrangement
-- Lighting setup (direction, color temperature, intensity)
-- Camera angle and lens feel (wide, macro, telephoto)
-- Textures and materials
-- Atmosphere (fog, particles, reflections)
-- Color grading
+## Sua tarefa:
+Escreva um prompt detalhado (120-180 palavras) para gerar um INFOGRÁFICO PROFISSIONAL no estilo descrito acima. Seja específico sobre:
+- Tipo de diagrama/framework visual (Venn, escada, matriz, fluxo, lista)
+- Layout dos elementos e sua disposição
+- Textos que aparecem no design (título, labels, números)
+- Cores exatas de cada elemento
+- Estilo dos ícones e shapes 3D
+- Hierarquia visual e composição
 
-Reply with ONLY the prompt. No explanations, no preamble.`;
+Responda APENAS com o prompt. Sem explicações.`;
 }
 
 // ---------------------------------------------------------------------------
