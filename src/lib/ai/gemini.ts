@@ -72,42 +72,67 @@ const CONTENT_TYPE_STYLES: Record<string, string> = {
 function buildMasterPrompt(contentText: string, contentType: string): string {
   const styleGuide = CONTENT_TYPE_STYLES[contentType] || CONTENT_TYPE_STYLES.instagram_carousel;
 
-  return `Você é um designer gráfico especialista em infográficos para Instagram no estilo dos maiores criadores de conteúdo brasileiros: Alfredo Soares (@alfredosoares), Thiago Nigro, Flavio Augusto.
+  return `Você é um designer gráfico sênior que cria prompts de imagem ULTRA DETALHADOS para IA generativa. Seus prompts geram infográficos profissionais no estilo dos maiores criadores brasileiros (@alfredosoares, Thiago Nigro).
 
-Seu cliente é Pedro Rabelo — empreendedor brasileiro. Identidade visual:
-- Fundo: PRETO PURO (#0A0A0B) — sempre
-- Destaque: VERMELHO VIBRANTE (#E31B23) — elementos 3D, badges, destaques
-- Texto: BRANCO (#FFFFFF) — títulos bold grandes
-- Cinza (#666666) — textos secundários, linhas, labels
+Seu cliente é Pedro Rabelo — empreendedor brasileiro.
 
-## ESTILO OBRIGATÓRIO — INFOGRÁFICO EDUCATIVO:
+## FORMATO DO SLIDE:
 ${styleGuide}
 
-## REGRAS CRÍTICAS:
-1. É INFOGRÁFICO / DESIGN GRÁFICO — NÃO é foto, NÃO é arte abstrata
-2. Fundo SEMPRE preto puro (#0A0A0B)
-3. Elementos visuais: diagramas de Venn, escadas 3D, blocos vermelhos, fluxogramas, matrizes, frameworks
-4. Tipografia: títulos ENORMES em branco bold, subtítulos menores
-5. Ícones minimalistas brancos dentro de shapes vermelhos
-6. Linhas conectoras finas ligando conceitos
-7. Labels explicativas em caixas com borda tracejada cinza
-8. Elementos 3D vermelhos com sombra realista (blocos, cubos, escadas)
-9. Composição limpa, espaçamento generoso, hierarquia visual clara
-10. Pode ter TEXTO no design (títulos, labels, números) — FAZ PARTE do infográfico
+## PALETA FIXA (use SEMPRE esses hex codes exatos):
+- Fundo: solid black (#0A0A0B), completamente flat, sem gradientes
+- Destaque/acento: vermelho vibrante (#E31B23) — para títulos-chave, shapes, badges
+- Texto principal: branco puro (#FFFFFF) — títulos bold
+- Texto secundário: cinza (#666666) — labels, linhas, referências, rodapé
+- Linhas/conectores: cinza (#444444) ou branco fino
 
-## O conteúdo que este infográfico representa:
-${contentText.slice(0, 800)}
+## CONTEÚDO A REPRESENTAR:
+${contentText.slice(0, 1200)}
 
-## Sua tarefa:
-Escreva um prompt detalhado (120-180 palavras) para gerar um INFOGRÁFICO PROFISSIONAL no estilo descrito acima. Seja específico sobre:
-- Tipo de diagrama/framework visual (Venn, escada, matriz, fluxo, lista)
-- Layout dos elementos e sua disposição
-- Textos que aparecem no design (título, labels, números)
-- Cores exatas de cada elemento
-- Estilo dos ícones e shapes 3D
-- Hierarquia visual e composição
+## SUA TAREFA:
+Analise o conteúdo acima e crie um prompt de imagem EXTREMAMENTE DETALHADO seguindo EXATAMENTE esta estrutura (em inglês para melhor resultado na IA de imagem):
 
-Responda APENAS com o prompt. Sem explicações.`;
+---
+Professional Instagram infographic slide, 1080x1080px square.
+
+BACKGROUND: [descrever o fundo — sempre solid black #0A0A0B, flat, no gradients]
+
+LAYOUT - TOP SECTION (20% do slide):
+- [subtítulo pequeno em branco fino, tamanho, posição exata]
+- [headline principal ENORME em bold, quais palavras em vermelho #E31B23, quais em branco #FFFFFF, tamanho relativo]
+
+LAYOUT - CENTER (60% do slide):
+- [tipo de diagrama: Venn com N círculos / escada com N degraus / matriz 2x2 / fluxograma / lista numerada / pirâmide]
+- [descrição EXATA de cada elemento: posição, cor do outline, cor do fill, texto dentro]
+- [labels de cada seção: texto exato, cor, tamanho]
+- [elemento central se houver: shape vermelho com ícone branco, texto abaixo]
+- [interseções/conexões: o que aparece onde os elementos se cruzam]
+
+LAYOUT - LABELS/EXPLICAÇÕES (ao redor do diagrama):
+- [N caixas explicativas com texto pequeno branco, conectadas por linhas tracejadas cinza #666666]
+- [posição de cada caixa: top-left, top-right, bottom-left, bottom-right]
+- [texto exato de cada label explicativa]
+
+LAYOUT - FOOTER:
+- Left: "@pedrorabelo" in gray (#666666) small text
+- Right: small attribution text in gray (#666666)
+
+STYLE:
+- Clean flat vector/graphic design, NOT photography, NOT 3D renders
+- High contrast, sharp edges, crisp typography
+- Professional infographic quality like top Brazilian Instagram educators
+---
+
+REGRAS DO PROMPT:
+1. O prompt deve ser em INGLÊS
+2. DEVE ter entre 250-400 palavras — seja MUITO específico
+3. Descreva CADA elemento: posição, cor hex exata, tamanho relativo, texto exato
+4. Invente textos curtos e relevantes para labels/explicações baseados no conteúdo
+5. Escolha o tipo de diagrama que MELHOR representa o conteúdo (Venn, escada, matriz, lista, pirâmide, fluxo)
+6. SEMPRE inclua: headline com palavra-chave em vermelho, diagrama central, labels explicativas, rodapé com @pedrorabelo
+7. NÃO descreva fotos, pessoas, paisagens — APENAS design gráfico flat
+
+Responda APENAS com o prompt. Sem explicações, sem "Here is the prompt:", sem nada antes ou depois.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,23 +142,33 @@ Responda APENAS com o prompt. Sem explicações.`;
 /**
  * Generate ONLY the image prompt text (no actual image generation).
  * The user copies this prompt and pastes into their preferred image AI tool.
+ * Falls back to GPT-4o if Gemini Flash fails.
  */
 export async function generateImagePrompt(
   contentText: string,
   contentType: string
 ): Promise<{ image_prompt: string } | { error: string }> {
+  // Try Gemini Flash first (cheaper)
   try {
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
-    if (!apiKey) return { error: 'GOOGLE_GEMINI_API_KEY not configured' };
+    if (apiKey) {
+      const imagePrompt = await generateArtDirectorPrompt(apiKey, contentText, contentType);
+      if (imagePrompt && imagePrompt.length > 100) {
+        console.log(`[ImageEngine] Prompt generated via Gemini (${imagePrompt.length} chars)`);
+        return { image_prompt: imagePrompt };
+      }
+    }
+  } catch (error) {
+    console.error('[ImageEngine] Gemini prompt failed, trying GPT-4o...', error);
+  }
 
-    const imagePrompt = await generateArtDirectorPrompt(apiKey, contentText, contentType);
-    if (!imagePrompt) return { error: 'Falha ao gerar prompt de imagem' };
-
-    console.log(`[ImageEngine] Prompt generated (${imagePrompt.length} chars) — prompt-only mode`);
-    return { image_prompt: imagePrompt };
+  // Fallback to GPT-4o
+  try {
+    const { generateImagePromptWithGPT } = await import('@/lib/ai/openai-images');
+    return await generateImagePromptWithGPT(contentText, contentType);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[ImageEngine Error]:', message);
+    console.error('[ImageEngine] All prompt generators failed:', message);
     return { error: `Falha ao gerar prompt: ${message}` };
   }
 }
