@@ -67,14 +67,12 @@ const navItems: {
     label: "Gerar",
     Icon: Sparkles,
     description: "Criar conteúdo",
-    roles: ["pedro"],
   },
   {
     href: "/repurpose",
     label: "Repurpose",
     Icon: Repeat2,
     description: "Reaproveitar conteúdo",
-    roles: ["pedro"],
   },
   {
     href: "/hooks",

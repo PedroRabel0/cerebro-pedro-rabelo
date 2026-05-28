@@ -51,7 +51,6 @@ export async function middleware(request: NextRequest) {
   // Protecao por role: rotas restritas ao Pedro
   const role = user.user_metadata?.role as string | undefined;
   const pedroOnlyRoutes = [
-    "/gerar-conteudo",
     "/referencias",
     "/identidade",
     "/configuracoes",

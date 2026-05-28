@@ -6,6 +6,7 @@
  */
 
 import { logApiCost } from '@/lib/ai/client';
+import { generateImagePromptWithGPT } from '@/lib/ai/openai-images';
 
 export interface ImageGenerationResult {
   image_url: string;
@@ -164,8 +165,14 @@ export async function generateImagePrompt(
 
   // Fallback to GPT-4o
   try {
-    const { generateImagePromptWithGPT } = await import('@/lib/ai/openai-images');
-    return await generateImagePromptWithGPT(contentText, contentType);
+    console.log('[ImageEngine] Gemini unavailable, falling back to GPT-4o...');
+    const result = await generateImagePromptWithGPT(contentText, contentType);
+    if ('error' in result) {
+      console.error('[ImageEngine] GPT-4o fallback also failed:', result.error);
+    } else {
+      console.log(`[ImageEngine] GPT-4o prompt generated (${result.image_prompt.length} chars)`);
+    }
+    return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[ImageEngine] All prompt generators failed:', message);
