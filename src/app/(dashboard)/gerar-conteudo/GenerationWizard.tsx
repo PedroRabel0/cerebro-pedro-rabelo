@@ -1046,10 +1046,16 @@ export default function GenerationWizard({
     });
   }
 
+  // If no playbooks exist, force free_text mode
+  const effectiveTopicMode =
+    state.topicMode === "from_base" && playbooks.length === 0
+      ? "free_text"
+      : state.topicMode;
+
   const canNext = useMemo(() => {
     switch (step) {
       case "source":
-        if (state.topicMode === "from_base") return !!state.selectedPlaybookId;
+        if (effectiveTopicMode === "from_base") return !!state.selectedPlaybookId;
         return state.freeTopic.trim().length > 0;
       case "types":
         return state.selectedTypes.length > 0;
@@ -1058,7 +1064,7 @@ export default function GenerationWizard({
       default:
         return false;
     }
-  }, [step, state.topicMode, state.selectedPlaybookId, state.freeTopic, state.selectedTypes]);
+  }, [step, effectiveTopicMode, state.selectedPlaybookId, state.freeTopic, state.selectedTypes]);
 
   function goNext() {
     const i = STEPS.indexOf(step);
@@ -1178,7 +1184,7 @@ export default function GenerationWizard({
           />
         </div>
 
-        {state.topicMode === "from_base" ? (
+        {effectiveTopicMode === "from_base" ? (
           <div className="space-y-4">
             <SelectField
               label="Playbook"
@@ -1196,13 +1202,20 @@ export default function GenerationWizard({
             />
           </div>
         ) : (
-          <TextField
-            label="Escreva o topico"
-            value={state.freeTopic}
-            onChange={(v) => updateState("freeTopic", v)}
-            placeholder="Ex: Post sobre frameworks de decisao, Thread sobre como lidar com incerteza..."
-            rows={3}
-          />
+          <div className="space-y-3">
+            {playbooks.length === 0 && state.topicMode === "from_base" && (
+              <div className="rounded-xl border border-accent/20 bg-accent/5 px-3 py-2 text-xs text-accent">
+                Nenhum playbook na base ainda. Escreva o topico livremente.
+              </div>
+            )}
+            <TextField
+              label="Escreva o topico"
+              value={state.freeTopic}
+              onChange={(v) => updateState("freeTopic", v)}
+              placeholder="Ex: Post sobre frameworks de decisao, Thread sobre como lidar com incerteza..."
+              rows={3}
+            />
+          </div>
         )}
 
         <TextField
