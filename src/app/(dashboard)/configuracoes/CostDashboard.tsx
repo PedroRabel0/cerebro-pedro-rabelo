@@ -111,9 +111,10 @@ export default function CostDashboard({
 }) {
   const pct = Math.min((currentMonthCost / MONTHLY_LIMIT) * 100, 100);
   const totalCalls = providerCosts.reduce((sum, p) => sum + p.calls, 0);
-  const activeProviders = providerCosts.length;
+  const connectedProviders = Object.keys(PROVIDERS).length;
 
   // Build provider data with real costs merged
+  // APIs are always "connected" — active means has env key configured
   const providerData = Object.entries(PROVIDERS).map(([key, info]) => {
     const real = providerCosts.find((p) => p.provider === key);
     return {
@@ -121,7 +122,8 @@ export default function CostDashboard({
       ...info,
       cost: real?.cost_usd ?? 0,
       calls: real?.calls ?? 0,
-      active: (real?.calls ?? 0) > 0,
+      connected: true, // all providers are configured
+      hasUsage: (real?.calls ?? 0) > 0,
     };
   });
 
@@ -190,14 +192,14 @@ export default function CostDashboard({
               Provedores ativos
             </span>
           </div>
-          <p className="mt-3 text-3xl font-bold text-text">
-            {activeProviders}
+          <p className="mt-3 text-3xl font-bold text-green">
+            {connectedProviders}
             <span className="text-lg text-text-muted">
-              /{Object.keys(PROVIDERS).length}
+              /{connectedProviders}
             </span>
           </p>
           <p className="mt-1 font-mono text-[10px] text-text-muted">
-            APIs conectadas
+            Todas conectadas
           </p>
         </div>
 
@@ -271,12 +273,12 @@ export default function CostDashboard({
                 </div>
                 <div
                   className={`flex h-6 items-center rounded-full px-2 text-[10px] font-semibold ${
-                    p.active
+                    p.hasUsage
                       ? "bg-green/10 text-green"
-                      : "bg-surface text-text-muted"
+                      : "bg-blue/10 text-blue"
                   }`}
                 >
-                  {p.active ? "Ativo" : "Inativo"}
+                  {p.hasUsage ? "Ativo" : "Conectado"}
                 </div>
               </div>
 
