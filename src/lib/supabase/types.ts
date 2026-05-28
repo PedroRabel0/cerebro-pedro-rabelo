@@ -171,6 +171,23 @@ export type ContentType =
   | "x_thread"
   | "x_tweet";
 
+export type CalendarStatus = "scheduled" | "published" | "missed" | "cancelled";
+export type Platform = "instagram" | "linkedin" | "x" | "youtube";
+
+export interface CalendarEntry {
+  id: string;
+  content_id: string | null;
+  title: string;
+  content_type: string;
+  scheduled_for: string;
+  status: CalendarStatus;
+  platform: Platform;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  content?: GeneratedContent | null;
+}
+
 export interface ContentFormat {
   id: string;
   name: string;

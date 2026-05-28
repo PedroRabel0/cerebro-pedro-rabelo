@@ -17,6 +17,9 @@ import {
   Settings,
   LogOut,
   User,
+  Repeat2,
+  Anchor,
+  CalendarDays,
 } from "lucide-react";
 import { useUserRole, type UserRole } from "@/lib/hooks/useUserRole";
 
@@ -65,6 +68,25 @@ const navItems: {
     Icon: Sparkles,
     description: "Criar conteúdo",
     roles: ["pedro"],
+  },
+  {
+    href: "/repurpose",
+    label: "Repurpose",
+    Icon: Repeat2,
+    description: "Reaproveitar conteúdo",
+    roles: ["pedro"],
+  },
+  {
+    href: "/hooks",
+    label: "Hooks",
+    Icon: Anchor,
+    description: "Banco de ganchos",
+  },
+  {
+    href: "/calendario",
+    label: "Calendário",
+    Icon: CalendarDays,
+    description: "Agendar publicações",
   },
 ];
 
