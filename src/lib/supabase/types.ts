@@ -280,6 +280,39 @@ export interface VoiceSnapshot {
   created_at: string;
 }
 
+// --- News Hub ---
+export interface NewsTheme {
+  id: string;
+  name: string;
+  keywords: string[];
+  active: boolean;
+  created_at: string;
+}
+
+export interface NewsArticle {
+  id: string;
+  theme_id: string | null;
+  title: string;
+  description: string | null;
+  url: string;
+  source_name: string | null;
+  image_url: string | null;
+  published_at: string | null;
+  pedro_angle: string | null;
+  created_at: string;
+}
+
+export interface NewsDigest {
+  id: string;
+  theme_id: string | null;
+  theme_name: string;
+  period: string;
+  digest_markdown: string;
+  pedro_angles: { angle: string; news: string }[];
+  articles_count: number;
+  created_at: string;
+}
+
 export type ContentStatus = "draft" | "approved" | "published";
 
 export interface GeneratedContent {
