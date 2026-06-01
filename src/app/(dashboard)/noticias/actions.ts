@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
-import { searchNews } from "@/lib/ai/gnews";
+import { searchNews, topHeadlines, type GNewsArticle } from "@/lib/ai/gnews";
 import { revalidatePath } from "next/cache";
 
 const PATH = "/noticias";
@@ -135,6 +135,19 @@ export async function getDigests(limit = 10): Promise<NewsDigest[]> {
 // FETCH NEWS (GNews API)
 // ============================================================
 
+// Map theme names to GNews topics for top-headlines
+const THEME_TOPIC_MAP: Record<string, string> = {
+  empreendedorismo: "business",
+  "inteligencia artificial": "technology",
+  economia: "business",
+  tecnologia: "technology",
+};
+
+// Helper: wait between API calls to avoid rate limit
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function fetchNewsForTheme(
   themeId: string
 ): Promise<{ count: number } | { error: string }> {
@@ -152,13 +165,42 @@ export async function fetchNewsForTheme(
   const keywords: string[] = theme.keywords || [];
   if (keywords.length === 0) return { error: "Tema sem palavras-chave." };
 
-  // Buscar via GNews usando keywords combinadas
-  const query = keywords.join(" OR ");
-  const result = await searchNews(query, 10);
+  // Strategy: use top-headlines by mapped topic + search with first keyword
+  // This gives broader, more reliable results
+  const topicKey = theme.name.toLowerCase();
+  const gnewsTopic = THEME_TOPIC_MAP[topicKey];
 
-  if ("error" in result) return { error: result.error };
+  let allArticles: GNewsArticle[] = [];
 
-  // Buscar URLs existentes para dedup
+  // 1. Try top-headlines first (more reliable, broader coverage)
+  if (gnewsTopic) {
+    const headlines = await topHeadlines(gnewsTopic, 10);
+    if (!("error" in headlines)) {
+      allArticles.push(...headlines);
+    }
+    await delay(1500); // Rate limit: wait 1.5s between calls
+  }
+
+  // 2. Search with the FIRST keyword only (simpler, avoids OR issues)
+  const primaryKeyword = keywords[0];
+  const searchResult = await searchNews(primaryKeyword, 10);
+  if (!("error" in searchResult)) {
+    allArticles.push(...searchResult);
+  }
+
+  if (allArticles.length === 0) {
+    return { error: `Nenhum artigo encontrado para "${theme.name}".` };
+  }
+
+  // Dedup by URL (across both sources)
+  const seen = new Set<string>();
+  allArticles = allArticles.filter((a) => {
+    if (seen.has(a.url)) return false;
+    seen.add(a.url);
+    return true;
+  });
+
+  // Buscar URLs existentes no DB para dedup
   const { data: existing } = await supabase
     .from("news_articles")
     .select("url")
@@ -167,7 +209,7 @@ export async function fetchNewsForTheme(
   const existingUrls = new Set((existing || []).map((a) => a.url));
 
   let newCount = 0;
-  for (const article of result) {
+  for (const article of allArticles) {
     if (existingUrls.has(article.url)) continue;
 
     const { error: insertError } = await supabase.from("news_articles").insert({
@@ -210,7 +252,11 @@ export async function fetchAllNews(): Promise<{
   const details: { theme: string; count: number; error?: string }[] = [];
   let total = 0;
 
-  for (const theme of themes) {
+  for (let i = 0; i < themes.length; i++) {
+    const theme = themes[i];
+    // Wait 2s between themes to avoid GNews rate limit (free tier)
+    if (i > 0) await delay(2000);
+
     const result = await fetchNewsForTheme(theme.id);
     if ("error" in result) {
       details.push({ theme: theme.name, count: 0, error: result.error });
