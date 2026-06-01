@@ -17,8 +17,6 @@ import {
   Settings,
   LogOut,
   User,
-  Repeat2,
-  Anchor,
   CalendarDays,
   BarChart3,
   TrendingUp,
@@ -39,13 +37,13 @@ const navItems: {
     href: "/",
     label: "Cérebro",
     Icon: Brain,
-    description: "Chat e alimentar",
+    description: "Chat com o cérebro",
   },
   {
     href: "/base-de-conhecimento",
     label: "Conhecimento",
     Icon: BookOpen,
-    description: "Playbooks e histórias",
+    description: "Base, upload e alimentar",
   },
   {
     href: "/referencias",
@@ -69,21 +67,9 @@ const navItems: {
   },
   {
     href: "/gerar-conteudo",
-    label: "Gerar",
+    label: "Geração",
     Icon: Sparkles,
-    description: "Criar conteúdo",
-  },
-  {
-    href: "/repurpose",
-    label: "Repurpose",
-    Icon: Repeat2,
-    description: "Reaproveitar conteúdo",
-  },
-  {
-    href: "/hooks",
-    label: "Hooks",
-    Icon: Anchor,
-    description: "Banco de ganchos",
+    description: "Conteúdo, hooks e repurpose",
   },
   {
     href: "/calendario",

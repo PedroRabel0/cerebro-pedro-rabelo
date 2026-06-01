@@ -5,15 +5,20 @@ import type {
   ContentFormat,
   GeneratedContent,
 } from "@/lib/supabase/types";
+import type { Hook } from "@/app/(dashboard)/hooks/actions";
 import FormatList from "./FormatList";
 import GenerationWizard from "./GenerationWizard";
 import ContentList from "./ContentList";
-import { PlusCircle, LayoutGrid, Archive } from "lucide-react";
+import HooksBank from "@/app/(dashboard)/hooks/HooksBank";
+import RepurposePanel from "@/app/(dashboard)/repurpose/RepurposePanel";
+import { PlusCircle, LayoutGrid, Archive, Anchor, Repeat2 } from "lucide-react";
 
-type Tab = "novo" | "formatos" | "salvos";
+type Tab = "novo" | "hooks" | "repurpose" | "formatos" | "salvos";
 
 const TABS: { key: Tab; label: string; Icon: typeof PlusCircle }[] = [
-  { key: "novo", label: "Novo Conteudo", Icon: PlusCircle },
+  { key: "novo", label: "Novo", Icon: PlusCircle },
+  { key: "hooks", label: "Hooks", Icon: Anchor },
+  { key: "repurpose", label: "Reaproveitar", Icon: Repeat2 },
   { key: "formatos", label: "Formatos", Icon: LayoutGrid },
   { key: "salvos", label: "Salvos", Icon: Archive },
 ];
@@ -28,27 +33,39 @@ interface StoryOption {
   title: string;
 }
 
+interface RepurposeContent {
+  id: string;
+  content_type: string;
+  content_text: string | null;
+  status: string;
+  created_at: string;
+}
+
 export default function Tabs({
   formats,
   contents,
   playbooks,
   stories,
+  initialHooks,
+  repurposeContents,
 }: {
   formats: ContentFormat[];
   contents: GeneratedContent[];
   playbooks: PlaybookOption[];
   stories: StoryOption[];
+  initialHooks: Hook[];
+  repurposeContents: RepurposeContent[];
 }) {
   const [tab, setTab] = useState<Tab>("novo");
 
   return (
     <div>
-      <div className="mb-6 flex gap-1 rounded-2xl bg-surface p-1">
+      <div className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-surface p-1">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 font-mono text-xs transition-all ${
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2 font-mono text-xs transition-all ${
               tab === t.key
                 ? "bg-card text-accent shadow-sm"
                 : "text-text-muted hover:text-text"
@@ -62,6 +79,10 @@ export default function Tabs({
 
       {tab === "novo" && (
         <GenerationWizard playbooks={playbooks} stories={stories} />
+      )}
+      {tab === "hooks" && <HooksBank initialHooks={initialHooks} />}
+      {tab === "repurpose" && (
+        <RepurposePanel contents={repurposeContents} />
       )}
       {tab === "formatos" && <FormatList formats={formats} />}
       {tab === "salvos" && <ContentList contents={contents} />}

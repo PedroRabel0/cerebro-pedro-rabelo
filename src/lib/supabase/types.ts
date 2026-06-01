@@ -307,3 +307,17 @@ export interface GeneratedContent {
   story?: { id: string; title: string } | null;
   format?: ContentFormat | null;
 }
+
+// --- Trend Scans (Radar de Referências) ---
+export interface TrendScan {
+  id: string;
+  scanned_at: string;
+  profiles_scanned: number;
+  total_posts_analyzed: number;
+  new_posts_found: number;
+  cross_profile_insights: string | null;
+  top_themes: { theme: string; count: number; profiles: string[] }[];
+  content_recommendations: { title: string; hook: string; format: string; why: string; inspired_by: string }[];
+  per_profile_summary: { profile_id: string; handle: string; display_name: string; platform: string; posts_count: number; top_themes: string[]; avg_engagement: number; highlight: string }[];
+  created_at: string;
+}

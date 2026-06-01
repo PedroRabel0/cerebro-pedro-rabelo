@@ -7,16 +7,21 @@ import {
   getPlaybooks,
   getStories,
 } from "./actions";
+import { getHooks } from "@/app/(dashboard)/hooks/actions";
+import { getRepurposeableContents } from "@/app/(dashboard)/repurpose/actions";
 import Tabs from "./Tabs";
 import { Sparkles } from "lucide-react";
 
 export default async function GerarConteudoPage() {
-  const [formats, contents, playbooks, stories] = await Promise.all([
-    getFormats(),
-    getGeneratedContents(),
-    getPlaybooks(),
-    getStories(),
-  ]);
+  const [formats, contents, playbooks, stories, hooks, repurposeContents] =
+    await Promise.all([
+      getFormats(),
+      getGeneratedContents(),
+      getPlaybooks(),
+      getStories(),
+      getHooks(),
+      getRepurposeableContents(),
+    ]);
 
   return (
     <div>
@@ -27,10 +32,10 @@ export default async function GerarConteudoPage() {
           </div>
           <div>
             <h1 className="font-display text-2xl font-bold text-text sm:text-3xl">
-              Gerar Conteudo
+              Geração de Conteúdo
             </h1>
             <p className="mt-0.5 text-sm text-text-secondary">
-              Descreva o que voce quer e a IA gera o conteudo pronto para postar.
+              Crie, reaproveite e organize conteúdo com IA.
             </p>
           </div>
         </div>
@@ -41,6 +46,8 @@ export default async function GerarConteudoPage() {
         contents={contents}
         playbooks={playbooks}
         stories={stories}
+        initialHooks={hooks}
+        repurposeContents={repurposeContents}
       />
     </div>
   );

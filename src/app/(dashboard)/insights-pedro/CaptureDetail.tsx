@@ -242,6 +242,10 @@ export default function CaptureDetail({ captureId }: { captureId: string }) {
     );
   }
 
+  // Split into pending vs processed
+  const pendingProposals = proposals.filter((p) => p.status === "pending");
+  const processedProposals = proposals.filter((p) => p.status !== "pending");
+
   if (proposals.length === 0) {
     return (
       <p className="py-4 text-center text-sm text-text-muted">
@@ -252,12 +256,33 @@ export default function CaptureDetail({ captureId }: { captureId: string }) {
 
   return (
     <div className="space-y-3 pt-3">
-      <h4 className="font-mono text-xs uppercase tracking-wider text-text-secondary">
-        Propostas para a Base ({proposals.length})
-      </h4>
-      {proposals.map((p) => (
+      {/* Pending proposals — main focus */}
+      {pendingProposals.length > 0 && (
+        <h4 className="font-mono text-xs uppercase tracking-wider text-text-secondary">
+          Propostas pendentes ({pendingProposals.length})
+        </h4>
+      )}
+      {pendingProposals.map((p) => (
         <ProposalCard key={p.id} proposal={p} />
       ))}
+
+      {/* Summary of processed proposals (approved/rejected) */}
+      {processedProposals.length > 0 && pendingProposals.length === 0 && (
+        <div className="rounded-xl border border-green/20 bg-green/5 px-4 py-3 text-center">
+          <p className="text-sm text-green font-medium">
+            Todas as propostas foram processadas
+          </p>
+          <p className="text-xs text-text-muted mt-0.5">
+            {processedProposals.filter((p) => p.status === "approved").length} aprovadas, {processedProposals.filter((p) => p.status === "rejected").length} rejeitadas — conteúdo salvo em Conhecimento
+          </p>
+        </div>
+      )}
+
+      {processedProposals.length > 0 && pendingProposals.length > 0 && (
+        <p className="font-mono text-[10px] text-text-muted">
+          + {processedProposals.length} já processadas (salvas em Conhecimento)
+        </p>
+      )}
     </div>
   );
 }

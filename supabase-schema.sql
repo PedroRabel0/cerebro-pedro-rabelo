@@ -319,3 +319,21 @@ create policy "Authenticated users can read api_cost_log" on public.api_cost_log
   for select using (auth.role() = 'authenticated');
 create policy "Authenticated users can insert api_cost_log" on public.api_cost_log
   for insert with check (auth.role() = 'authenticated');
+
+-- Trend Scans (Radar de Referências)
+create table if not exists public.trend_scans (
+  id uuid primary key default gen_random_uuid(),
+  scanned_at timestamptz not null default now(),
+  profiles_scanned integer default 0,
+  total_posts_analyzed integer default 0,
+  new_posts_found integer default 0,
+  cross_profile_insights text,
+  top_themes jsonb default '[]',
+  content_recommendations jsonb default '[]',
+  per_profile_summary jsonb default '[]',
+  created_at timestamptz not null default now()
+);
+
+alter table public.trend_scans enable row level security;
+create policy "Authenticated users can manage trend_scans" on public.trend_scans
+  for all using (auth.role() = 'authenticated');

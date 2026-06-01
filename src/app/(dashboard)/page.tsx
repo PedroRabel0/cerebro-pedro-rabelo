@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-import UniversalInput from "@/components/UniversalInput";
 import BrainChat from "@/components/BrainChat";
 import ActivityAccordion from "@/components/ActivityAccordion";
 import { getDashboardStats, getActivityFeed } from "./actions";
@@ -12,25 +11,7 @@ import {
   Sparkles,
   Clock,
   Brain,
-  Zap,
 } from "lucide-react";
-
-// TODO: Filtrar activity feed por usuario/role quando implementar
-// server-side role detection (ex: ler role do cookie/session no server component).
-// Atualmente o feed mostra toda atividade para ambos os usuarios.
-function StatSkeleton() {
-  return (
-    <div className="rounded-2xl border border-border bg-card px-4 py-3">
-      <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl shimmer" />
-        <div className="space-y-2">
-          <div className="h-5 w-10 rounded shimmer" />
-          <div className="h-2.5 w-14 rounded shimmer" />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default async function DashboardHome() {
   const [stats, activityFeed] = await Promise.all([
@@ -106,22 +87,13 @@ export default async function DashboardHome() {
         </div>
       </div>
 
-      {/* Brain Chat */}
+      {/* Brain Chat — the main interaction */}
       <div className="rounded-2xl border border-border bg-card p-6">
         <h2 className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-text-muted">
           <Brain className="h-3.5 w-3.5" />
           Perguntar ao Cérebro
         </h2>
         <BrainChat />
-      </div>
-
-      {/* Feed the Brain */}
-      <div>
-        <h2 className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-text-muted">
-          <Zap className="h-3.5 w-3.5" />
-          Alimentar o Cérebro
-        </h2>
-        <UniversalInput />
       </div>
 
       {/* Brain Health Stats */}
