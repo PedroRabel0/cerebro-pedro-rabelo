@@ -19,7 +19,16 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: "Segundo Cérebro do Pedro",
-  description: "Sistema de gestão de conhecimento e geração de conteúdo",
+  description: "Sistema de gestão de conhecimento e geração de conteúdo com IA",
+  robots: { index: false, follow: false },
+  openGraph: {
+    title: "Segundo Cérebro do Pedro",
+    description: "Plataforma de gestão de conhecimento e geração de conteúdo com IA",
+    type: "website",
+  },
+  other: {
+    "theme-color": "#0a0a0b",
+  },
 };
 
 export default function RootLayout({

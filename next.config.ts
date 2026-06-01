@@ -9,10 +9,6 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '*.supabase.co',
-      },
-      {
-        protocol: 'https',
         hostname: 'ilredrdimvcfqimyfaqc.supabase.co',
       },
       {
@@ -21,6 +17,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  poweredByHeader: false, // Remove X-Powered-By header for security
 };
 
 export default nextConfig;

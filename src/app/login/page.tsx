@@ -40,7 +40,7 @@ export default function LoginPage() {
             <Brain className="h-6 w-6 text-white" />
           </div>
           <h1 className="font-display text-3xl font-bold text-text">
-            Segundo Cerebro
+            Segundo Cérebro
           </h1>
           <p className="mt-2 font-mono text-xs uppercase tracking-widest text-text-muted">
             do Pedro
@@ -64,6 +64,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               className="mt-1 block w-full rounded-xl border border-border bg-surface px-3 py-2 text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               placeholder="seu@email.com"
             />
@@ -83,13 +84,17 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
+              autoComplete="current-password"
               className="mt-1 block w-full rounded-xl border border-border bg-surface px-3 py-2 text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red">{error}</p>
+            <p role="alert" className="flex items-center gap-2 text-sm text-red">
+              <span aria-hidden="true">!</span>
+              {error}
+            </p>
           )}
 
           <button
