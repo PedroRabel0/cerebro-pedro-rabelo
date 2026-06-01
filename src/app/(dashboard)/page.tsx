@@ -18,6 +18,20 @@ import {
 // TODO: Filtrar activity feed por usuario/role quando implementar
 // server-side role detection (ex: ler role do cookie/session no server component).
 // Atualmente o feed mostra toda atividade para ambos os usuarios.
+function StatSkeleton() {
+  return (
+    <div className="rounded-2xl border border-border bg-card px-4 py-3">
+      <div className="flex items-center gap-3">
+        <div className="h-9 w-9 rounded-xl shimmer" />
+        <div className="space-y-2">
+          <div className="h-5 w-10 rounded shimmer" />
+          <div className="h-2.5 w-14 rounded shimmer" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function DashboardHome() {
   const [stats, activityFeed] = await Promise.all([
     getDashboardStats(),
@@ -75,7 +89,7 @@ export default async function DashboardHome() {
               Cérebro do Pedro
             </h1>
             <p className="text-sm text-text-secondary">
-              Seu cérebro sabe{" "}
+              Seu cérebro contém{" "}
               <span className="font-medium text-text">
                 {stats.playbooks} playbooks
               </span>

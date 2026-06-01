@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Story } from "@/lib/supabase/types";
 import { createStory, updateStory, deleteStory } from "./actions";
+import { BookMarked } from "lucide-react";
 
 const PERIODS = [
   { value: "", label: "Sem período" },
@@ -110,10 +111,12 @@ function StoryForm({
 export default function StoryList({ stories }: { stories: Story[] }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Story | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   async function handleDelete(id: string) {
-    if (!confirm("Apagar esta história?")) return;
     await deleteStory(id);
+    setDeleteTarget(null);
   }
 
   if (editing) {
@@ -126,6 +129,31 @@ export default function StoryList({ stories }: { stories: Story[] }) {
 
   return (
     <div>
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="animate-slide-in mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <p className="text-sm text-text">
+              Apagar a história <strong>&quot;{deleteTarget.title}&quot;</strong>? Esta ação não pode ser desfeita.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-lg border border-border px-4 py-2 font-mono text-xs text-text-muted transition hover:bg-surface hover:text-text"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDelete(deleteTarget.id)}
+                className="rounded-lg bg-red px-4 py-2 font-mono text-xs font-bold text-white transition hover:bg-red/80"
+              >
+                Apagar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-4 flex items-center justify-between">
         <span className="font-mono text-[10px] text-text-muted">
           {stories.length} história{stories.length !== 1 ? "s" : ""}
@@ -139,66 +167,99 @@ export default function StoryList({ stories }: { stories: Story[] }) {
       </div>
 
       {stories.length === 0 ? (
-        <p className="py-8 text-center text-sm text-text-muted">
-          Nenhuma história ainda. Crie a primeira!
-        </p>
+        <div className="rounded-xl border border-border bg-card py-12 text-center">
+          <BookMarked className="mx-auto h-8 w-8 text-text-muted" />
+          <p className="mt-3 text-sm text-text-muted">
+            Nenhuma história ainda.
+          </p>
+          <p className="text-xs text-text-muted">
+            Histórias dão vida aos seus playbooks.
+          </p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {stories.map((s) => (
-            <div
-              key={s.id}
-              className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 transition hover:border-border-light"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="truncate font-sans text-sm font-medium text-text">
-                    {s.title}
-                  </h3>
-                  {s.created_at &&
-                    Date.now() - new Date(s.created_at).getTime() < 24 * 60 * 60 * 1000 && (
-                    <span className="bg-green/15 text-green text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                      Novo
-                    </span>
-                  )}
-                </div>
-                {s.summary && (
-                  <p className="mt-0.5 truncate text-xs text-text-muted">
-                    {s.summary}
-                  </p>
-                )}
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {s.period && (
-                    <span className="rounded bg-blue/10 px-1.5 py-0.5 font-mono text-[10px] text-blue">
-                      {PERIODS.find((p) => p.value === s.period)?.label ??
-                        s.period}
-                    </span>
-                  )}
-                  {s.tags?.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded bg-card px-1.5 py-0.5 font-mono text-[10px] text-text-muted"
+          {stories.map((s) => {
+            const isExpanded = expandedId === s.id;
+            return (
+              <div
+                key={s.id}
+                className="rounded-xl border border-border bg-card transition hover:border-border-light"
+              >
+                <div className="flex items-center justify-between px-4 py-3">
+                  <button
+                    onClick={() => setExpandedId(isExpanded ? null : s.id)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate font-sans text-sm font-medium text-text">
+                        {s.title}
+                      </h3>
+                      {s.created_at &&
+                        Date.now() - new Date(s.created_at).getTime() < 24 * 60 * 60 * 1000 && (
+                        <span className="bg-green/15 text-green text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                          Novo
+                        </span>
+                      )}
+                    </div>
+                    {s.summary && (
+                      <p className="mt-0.5 truncate text-xs text-text-muted">
+                        {s.summary}
+                      </p>
+                    )}
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {s.period && (
+                        <span className="rounded bg-blue/10 px-1.5 py-0.5 font-mono text-[10px] text-blue">
+                          {PERIODS.find((p) => p.value === s.period)?.label ??
+                            s.period}
+                        </span>
+                      )}
+                      {s.tags?.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded bg-card px-1.5 py-0.5 font-mono text-[10px] text-text-muted"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                  <div className="ml-3 flex shrink-0 gap-1">
+                    <button
+                      onClick={() => setEditing(s)}
+                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-blue transition hover:bg-card"
                     >
-                      {tag}
-                    </span>
-                  ))}
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget({ id: s.id, title: s.title })}
+                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
+                    >
+                      Apagar
+                    </button>
+                  </div>
                 </div>
+
+                {/* Expandable content */}
+                {isExpanded && s.body_markdown && (
+                  <div className="border-t border-border px-4 pb-4">
+                    <div className="mt-3 rounded-lg bg-surface p-3">
+                      <pre className="whitespace-pre-wrap text-xs text-text-secondary font-sans leading-relaxed">
+                        {s.body_markdown}
+                      </pre>
+                    </div>
+                    {s.lesson && (
+                      <div className="mt-3 rounded-lg border border-green/20 bg-green/5 p-3">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-green">
+                          Lição
+                        </p>
+                        <p className="text-xs text-text-secondary">{s.lesson}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="ml-3 flex shrink-0 gap-1">
-                <button
-                  onClick={() => setEditing(s)}
-                  className="rounded-lg px-2 py-1 font-mono text-[10px] text-blue transition hover:bg-card"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => handleDelete(s.id)}
-                  className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
-                >
-                  Apagar
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

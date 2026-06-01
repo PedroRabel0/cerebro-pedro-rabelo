@@ -6,6 +6,7 @@ import { createPlaybook, updatePlaybook, deletePlaybook } from "./actions";
 import BookQuestionsPanel from "./BookQuestionsPanel";
 import DiffView from "./DiffView";
 import { useUserRole } from "@/lib/hooks/useUserRole";
+import { BookOpen } from "lucide-react";
 
 function CompletenessBar({ score }: { score: number }) {
   const color =
@@ -118,6 +119,7 @@ export default function PlaybookList({
   const [filterTheme, setFilterTheme] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [diffId, setDiffId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const { isPedro } = useUserRole();
 
   const filtered = filterTheme
@@ -125,8 +127,8 @@ export default function PlaybookList({
     : playbooks;
 
   async function handleDelete(id: string) {
-    if (!confirm("Apagar este playbook?")) return;
     await deletePlaybook(id);
+    setDeleteTarget(null);
   }
 
   if (editing) {
@@ -147,6 +149,31 @@ export default function PlaybookList({
 
   return (
     <div>
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="animate-slide-in mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <p className="text-sm text-text">
+              Apagar o playbook <strong>&quot;{deleteTarget.title}&quot;</strong>? Esta ação não pode ser desfeita.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-lg border border-border px-4 py-2 font-mono text-xs text-text-muted transition hover:bg-surface hover:text-text"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDelete(deleteTarget.id)}
+                className="rounded-lg bg-red px-4 py-2 font-mono text-xs font-bold text-white transition hover:bg-red/80"
+              >
+                Apagar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <select
@@ -174,9 +201,15 @@ export default function PlaybookList({
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-text-muted">
-          Nenhum playbook ainda. Crie o primeiro!
-        </p>
+        <div className="rounded-xl border border-border bg-card py-12 text-center">
+          <BookOpen className="mx-auto h-8 w-8 text-text-muted" />
+          <p className="mt-3 text-sm text-text-muted">
+            {filterTheme ? "Nenhum playbook neste tema." : "Nenhum playbook ainda."}
+          </p>
+          <p className="text-xs text-text-muted">
+            {filterTheme ? "Tente outro filtro ou crie um novo." : "Crie o primeiro para começar a organizar conhecimento."}
+          </p>
+        </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((p) => {
@@ -252,7 +285,7 @@ export default function PlaybookList({
                     </button>
                     {isPedro && (
                       <button
-                        onClick={() => handleDelete(p.id)}
+                        onClick={() => setDeleteTarget({ id: p.id, title: p.title })}
                         className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
                       >
                         Apagar

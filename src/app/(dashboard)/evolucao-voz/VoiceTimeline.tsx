@@ -19,6 +19,7 @@ export default function VoiceTimeline({
   const [snapshots, setSnapshots] = useState<VoiceSnapshot[]>(initialSnapshots);
   const [isCapturing, startCapture] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function handleCapture() {
@@ -34,7 +35,8 @@ export default function VoiceTimeline({
     });
   }
 
-  function handleDelete(id: string) {
+  function handleDeleteConfirmed(id: string) {
+    setDeleteConfirmId(null);
     setError(null);
     setDeletingId(id);
     startCapture(async () => {
@@ -76,6 +78,31 @@ export default function VoiceTimeline({
         </button>
       </div>
 
+      {/* Delete confirmation modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="animate-slide-in mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <p className="text-sm text-text">
+              Deletar este snapshot de voz? Esta ação não pode ser desfeita.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="rounded-lg border border-border px-4 py-2 font-mono text-xs text-text-muted transition hover:bg-surface hover:text-text"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDeleteConfirmed(deleteConfirmId)}
+                className="rounded-lg bg-red px-4 py-2 font-mono text-xs font-bold text-white transition hover:bg-red/80"
+              >
+                Deletar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {error}
@@ -85,8 +112,12 @@ export default function VoiceTimeline({
       {/* Empty state */}
       {snapshots.length === 0 && (
         <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
-          <p className="text-text-secondary">
-            Nenhum snapshot ainda. Capture o primeiro para começar a acompanhar.
+          <Camera className="mx-auto h-8 w-8 text-text-muted" />
+          <p className="mt-3 text-sm text-text-secondary">
+            Nenhum snapshot ainda.
+          </p>
+          <p className="text-xs text-text-muted">
+            Capture o primeiro para começar a acompanhar a evolução da voz.
           </p>
         </div>
       )}
@@ -126,7 +157,7 @@ export default function VoiceTimeline({
                   )}
                 </div>
                 <button
-                  onClick={() => handleDelete(snap.id)}
+                  onClick={() => setDeleteConfirmId(snap.id)}
                   disabled={deletingId === snap.id}
                   className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                   title="Deletar snapshot"

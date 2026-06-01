@@ -88,6 +88,8 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
   const [isResetting, startResetTransition] = useTransition();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [colorsError, setColorsError] = useState<string | null>(null);
+  const [fontsError, setFontsError] = useState<string | null>(null);
 
   const [colors, setColors] = useState(
     initial?.colors ? JSON.stringify(initial.colors, null, 2) : ""
@@ -118,10 +120,48 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
     initial?.brandbook_url ?? ""
   );
 
+  function validateJson(value: string, fieldName: string): boolean {
+    if (!value.trim()) return true; // empty is ok
+    try {
+      JSON.parse(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function handleColorsChange(value: string) {
+    setColors(value);
+    if (value.trim() && !validateJson(value, "cores")) {
+      setColorsError("JSON inválido. Exemplo: {\"primary\": \"#c9412b\"}");
+    } else {
+      setColorsError(null);
+    }
+  }
+
+  function handleFontsChange(value: string) {
+    setFonts(value);
+    if (value.trim() && !validateJson(value, "fontes")) {
+      setFontsError("JSON inválido. Exemplo: {\"display\": \"Fraunces\"}");
+    } else {
+      setFontsError(null);
+    }
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setSuccess(false);
+
+    // Validate JSON fields before submit
+    if (colors.trim() && !validateJson(colors, "cores")) {
+      setError("O campo Cores contém JSON inválido. Corrija antes de salvar.");
+      return;
+    }
+    if (fonts.trim() && !validateJson(fonts, "fontes")) {
+      setError("O campo Fontes contém JSON inválido. Corrija antes de salvar.");
+      return;
+    }
 
     const fd = new FormData();
     fd.set("colors", colors);
@@ -146,9 +186,12 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
     });
   }
 
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   function handleReset() {
     setError(null);
     setSuccess(false);
+    setShowResetConfirm(false);
     startResetTransition(async () => {
       try {
         await resetToPedroDefaults();
@@ -162,32 +205,77 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Reset confirmation modal */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="animate-slide-in mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <p className="text-sm text-text">
+              Resetar toda a identidade para os dados padrão do Pedro? Suas alterações serão perdidas.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="rounded-lg border border-border px-4 py-2 font-mono text-xs text-text-muted transition hover:bg-surface hover:text-text"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="rounded-lg bg-red px-4 py-2 font-mono text-xs font-bold text-white transition hover:bg-red/80"
+              >
+                Resetar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cores */}
-      <section className="rounded-2xl border border-border bg-card p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+      <section className={`rounded-2xl border bg-card p-5 ${colorsError ? "border-red" : "border-border"}`}>
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-1">
           Cores
         </h2>
+        <p className="text-[10px] text-text-muted mb-3">
+          JSON com as cores da marca. Ex: {"{\"primary\": \"#c9412b\", \"secondary\": \"#3a5a7a\"}"}
+        </p>
         <textarea
           value={colors}
-          onChange={(e) => setColors(e.target.value)}
+          onChange={(e) => handleColorsChange(e.target.value)}
           rows={6}
           placeholder='{"primary": "#c9412b", "secondary": "#3a5a7a"}'
-          className="w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
+          className={`w-full rounded-lg border bg-card px-3 py-2 font-mono text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 resize-y ${colorsError ? "border-red focus:ring-red/40" : "border-border focus:ring-accent/40"}`}
         />
+        {colorsError && (
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-red">
+            <AlertCircle className="h-3 w-3" />
+            {colorsError}
+          </p>
+        )}
       </section>
 
       {/* Fontes */}
-      <section className="rounded-2xl border border-border bg-card p-5">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+      <section className={`rounded-2xl border bg-card p-5 ${fontsError ? "border-red" : "border-border"}`}>
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted mb-1">
           Fontes
         </h2>
+        <p className="text-[10px] text-text-muted mb-3">
+          JSON com as fontes da marca. Ex: {"{\"display\": \"Fraunces\", \"body\": \"Inter\"}"}
+        </p>
         <textarea
           value={fonts}
-          onChange={(e) => setFonts(e.target.value)}
+          onChange={(e) => handleFontsChange(e.target.value)}
           rows={6}
           placeholder='{"display": "Fraunces", "body": "Inter"}'
-          className="w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
+          className={`w-full rounded-lg border bg-card px-3 py-2 font-mono text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 resize-y ${fontsError ? "border-red focus:ring-red/40" : "border-border focus:ring-accent/40"}`}
         />
+        {fontsError && (
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-red">
+            <AlertCircle className="h-3 w-3" />
+            {fontsError}
+          </p>
+        )}
       </section>
 
       {/* Voz - Usa */}
@@ -313,7 +401,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
         <button
           type="button"
           disabled={isPending || isResetting}
-          onClick={handleReset}
+          onClick={() => setShowResetConfirm(true)}
           className="flex items-center gap-2 rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface transition-colors disabled:opacity-50"
         >
           {isResetting ? (

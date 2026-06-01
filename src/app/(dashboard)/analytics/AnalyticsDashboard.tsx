@@ -55,6 +55,7 @@ export default function AnalyticsDashboard({
   const [insights, setInsights] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isInsightsPending, startInsightsTransition] = useTransition();
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   // --- Stats ---
 
@@ -108,6 +109,7 @@ export default function AnalyticsDashboard({
   // --- Handlers ---
 
   const handleDelete = (id: string) => {
+    setDeleteTarget(null);
     startTransition(async () => {
       await deleteMetric(id);
       const updated = await getMetrics();
@@ -143,6 +145,31 @@ export default function AnalyticsDashboard({
 
   return (
     <div className="space-y-6">
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="animate-slide-in mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <p className="text-sm text-text">
+              Apagar a métrica <strong>&quot;{deleteTarget.title}&quot;</strong>? Esta ação não pode ser desfeita.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-lg border border-border px-4 py-2 font-mono text-xs text-text-muted transition hover:bg-surface hover:text-text"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDelete(deleteTarget.id)}
+                className="rounded-lg bg-red px-4 py-2 font-mono text-xs font-bold text-white transition hover:bg-red/80"
+              >
+                Apagar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Loading bar */}
       {(isPending || isInsightsPending) && (
         <div className="h-1 overflow-hidden rounded-full bg-border">
@@ -243,7 +270,7 @@ export default function AnalyticsDashboard({
             <MetricCard
               key={metric.id}
               metric={metric}
-              onDelete={handleDelete}
+              onDelete={(id) => setDeleteTarget({ id, title: metric.title })}
               isPending={isPending}
             />
           ))}

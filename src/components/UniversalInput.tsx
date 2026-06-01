@@ -30,6 +30,39 @@ type ProcessingStep = {
   status: "pending" | "active" | "done";
 };
 
+// Confirmation modal component
+function ConfirmModal({
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="animate-slide-in mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+        <p className="text-sm text-text">{message}</p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="rounded-lg border border-border px-4 py-2 font-mono text-xs text-text-muted transition hover:bg-surface hover:text-text"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            className="rounded-lg bg-red px-4 py-2 font-mono text-xs font-bold text-white transition hover:bg-red/80"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface ProposalResult {
   type: "playbook" | "story" | "question";
   title: string;
@@ -124,11 +157,12 @@ function ProposalPreviewCard({
   proposal: ProposalResult;
   index: number;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const config = proposalTypeConfig[proposal.type] || proposalTypeConfig.playbook;
-  const preview =
-    proposal.content_markdown.length > 200
-      ? proposal.content_markdown.slice(0, 200) + "..."
-      : proposal.content_markdown;
+  const isLong = proposal.content_markdown.length > 200;
+  const displayText = expanded || !isLong
+    ? proposal.content_markdown
+    : proposal.content_markdown.slice(0, 200) + "...";
 
   return (
     <div
@@ -152,10 +186,18 @@ function ProposalPreviewCard({
         {/* Title */}
         <h4 className="text-sm font-semibold text-text">{proposal.title}</h4>
 
-        {/* Content preview */}
+        {/* Content preview — expandable */}
         <p className="text-xs leading-relaxed text-text-muted whitespace-pre-wrap">
-          {preview}
+          {displayText}
         </p>
+        {isLong && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-[11px] font-medium text-accent hover:text-accent-hover transition-colors"
+          >
+            {expanded ? "Ver menos" : "Ver conteúdo completo"}
+          </button>
+        )}
 
         {/* Tags */}
         {proposal.suggested_tags.length > 0 && (
@@ -175,6 +217,21 @@ function ProposalPreviewCard({
   );
 }
 
+function ElapsedTime() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return (
+    <span className="font-mono text-[10px] text-text-muted tabular-nums">
+      {mins > 0 ? `${mins}m ${secs.toString().padStart(2, "0")}s` : `${secs}s`}
+    </span>
+  );
+}
+
 export default function UniversalInput() {
   const [input, setInput] = useState("");
   const [state, setState] = useState<ProcessingState>("idle");
@@ -190,23 +247,6 @@ export default function UniversalInput() {
     : input.trim()
       ? detectInputType(input)
       : null;
-
-  // Simulate step progression during processing
-  useEffect(() => {
-    if (state !== "processing" || steps.length === 0) return;
-
-    const interval = setInterval(() => {
-      setCurrentStep((prev) => {
-        if (prev >= steps.length - 1) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 4500);
-
-    return () => clearInterval(interval);
-  }, [state, steps.length]);
 
   // Update steps statuses based on currentStep
   useEffect(() => {
@@ -232,24 +272,31 @@ export default function UniversalInput() {
     setState("processing");
     setResult(null);
 
+    // Only 2 real steps: Enviando → Processando com IA (server does the rest)
     const processingSteps = selectedFile
       ? [
-          { label: "Lendo arquivo", status: "pending" as const },
-          { label: "Extraindo conteúdo", status: "pending" as const },
-          { label: "Analisando conteúdo com Claude AI", status: "pending" as const },
-          { label: "Gerando propostas para a Base", status: "pending" as const },
+          { label: "Enviando arquivo", status: "active" as const },
+          { label: "Processando com Claude AI", status: "pending" as const },
         ]
-      : getProcessingSteps(input);
+      : [
+          { label: "Enviando input", status: "active" as const },
+          { label: "Processando com Claude AI", status: "pending" as const },
+        ];
     setSteps(processingSteps);
     setCurrentStep(0);
 
     try {
+      // Step 1 is active (sending)
       let res;
       if (selectedFile) {
         const formData = new FormData();
         formData.append("file", selectedFile);
+        // Move to step 2 right before the server call
+        setCurrentStep(1);
         res = await submitFileInput(formData);
       } else {
+        // Move to step 2 right before the server call
+        setCurrentStep(1);
         res = await submitUniversalInput(input.trim());
       }
       // Mark all steps as done
@@ -350,6 +397,7 @@ export default function UniversalInput() {
           <button
             onClick={handleSubmit}
             disabled={(!input.trim() && !selectedFile) || state === "processing"}
+            title="Ctrl+Enter para enviar"
             className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 font-mono text-xs font-bold text-white transition-all hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/20 disabled:opacity-40 disabled:hover:shadow-none"
           >
             {state === "processing" ? (
@@ -370,11 +418,14 @@ export default function UniversalInput() {
       {/* Processing Steps */}
       {state === "processing" && steps.length > 0 && (
         <div className="animate-slide-in rounded-2xl border border-border bg-card p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Brain className="h-4 w-4 text-accent" />
-            <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-accent">
-              Processando
-            </span>
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-accent" />
+              <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-accent">
+                Processando
+              </span>
+            </div>
+            <ElapsedTime />
           </div>
           <div className="space-y-2">
             {steps.map((step, i) => (
@@ -400,6 +451,9 @@ export default function UniversalInput() {
               </div>
             ))}
           </div>
+          <p className="mt-3 text-[10px] text-text-muted">
+            Isso pode levar de 10s a 2min dependendo do conteúdo.
+          </p>
         </div>
       )}
 
