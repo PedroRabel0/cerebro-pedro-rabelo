@@ -7,6 +7,7 @@
 
 import { logApiCost } from '@/lib/ai/client';
 import { generateImagePromptWithGPT } from '@/lib/ai/openai-images';
+import { createClient } from '@/lib/supabase/server';
 
 export interface ImageGenerationResult {
   image_url: string;
@@ -15,13 +16,20 @@ export interface ImageGenerationResult {
 }
 
 // ---------------------------------------------------------------------------
-// Brand-aware prompt system
+// Brand-aware prompt system (defaults, overridden by DB identity)
 // ---------------------------------------------------------------------------
 
-const PEDRO_BRAND = {
+interface BrandConfig {
+  colors: { bg: string; accent: string; text: string; subtle: string };
+  aesthetic: string;
+  mood: string;
+  references: string;
+}
+
+const DEFAULT_BRAND: BrandConfig = {
   colors: {
     bg: '#0A0A0B',
-    accent: '#E31B23', // vermelho vibrante
+    accent: '#E31B23',
     text: '#FFFFFF',
     subtle: '#1A1A1C',
   },
@@ -30,11 +38,32 @@ const PEDRO_BRAND = {
   references: 'Alfredo Soares @alfredosoares, Thiago Nigro, Flavio Augusto — carrosséis infográficos brasileiros',
 };
 
-const CONTENT_TYPE_STYLES: Record<string, string> = {
-  instagram_carousel: `
+function buildBrandFromIdentity(identity?: Record<string, unknown> | null): BrandConfig {
+  if (!identity) return DEFAULT_BRAND;
+
+  const dbColors = identity.colors as Record<string, string> | null;
+  const refCreators = identity.reference_creators as string | null;
+
+  return {
+    colors: {
+      bg: dbColors?.primary || DEFAULT_BRAND.colors.bg,
+      accent: dbColors?.accent || DEFAULT_BRAND.colors.accent,
+      text: DEFAULT_BRAND.colors.text,
+      subtle: DEFAULT_BRAND.colors.subtle,
+    },
+    aesthetic: DEFAULT_BRAND.aesthetic,
+    mood: (identity.tone_descriptors as string) || DEFAULT_BRAND.mood,
+    references: refCreators || DEFAULT_BRAND.references,
+  };
+}
+
+function getContentTypeStyles(brand: BrandConfig): Record<string, string> {
+  const { bg, accent } = brand.colors;
+  return {
+    instagram_carousel: `
     Instagram carousel INFOGRAPHIC slide — estilo @alfredosoares / #BORAVENDER.
     - Square format (1:1), 1080x1080px
-    - FUNDO PRETO PURO (#0A0A0B), texto BRANCO BOLD, destaques em VERMELHO VIBRANTE (#E31B23)
+    - FUNDO PRETO PURO (${bg}), texto BRANCO BOLD, destaques em VERMELHO VIBRANTE (${accent})
     - Estilo INFOGRÁFICO EDUCATIVO: diagramas, frameworks, escadas, Venn diagrams, fluxogramas
     - Elementos 3D em vermelho (blocos, escadas, cubos) com sombras realistas sobre fundo preto
     - Ícones brancos minimalistas dentro de elementos vermelhos
@@ -43,35 +72,37 @@ const CONTENT_TYPE_STYLES: Record<string, string> = {
     - Tipografia: headline MUITO GRANDE e bold no topo, subtextos menores
     - Watermark pequeno no rodapé: @pedrorabelo à direita
     - NÃO é foto, NÃO é arte abstrata — é DESIGN GRÁFICO / INFOGRÁFICO
-    - Referência visual: slides do Alfredo Soares, Thiago Nigro, Flavio Augusto`,
+    - Referência visual: ${brand.references}`,
 
-  instagram_reel: `
+    instagram_reel: `
     Instagram reel thumbnail — estilo infográfico brasileiro.
-    - Vertical feel, fundo preto puro
+    - Vertical feel, fundo preto puro (${bg})
     - Título GRANDE em branco bold no topo
-    - Palavra-chave destacada em VERMELHO (#E31B23) com fundo vermelho
+    - Palavra-chave destacada em VERMELHO (${accent}) com fundo vermelho
     - Elemento visual central (ícone 3D, diagrama simples)
     - Design limpo, alto contraste, sem fotos`,
 
-  linkedin_post: `
+    linkedin_post: `
     LinkedIn infographic — profissional mas impactante.
-    - Fundo preto, texto branco, destaques vermelhos
+    - Fundo preto (${bg}), texto branco, destaques vermelhos (${accent})
     - Estilo framework/matriz: quadrantes, listas numeradas, comparações
     - Mais clean e organizado que Instagram, mas mesmo DNA visual
     - Dados e métricas em destaque com números grandes
     - @pedrorabelo no rodapé`,
 
-  x_thread: `
+    x_thread: `
     Twitter/X cover image — gráfico de impacto.
-    - Widescreen feel, fundo preto
+    - Widescreen feel, fundo preto (${bg})
     - Uma frase BOLD gigante em branco
-    - Palavra-chave em vermelho destacado
+    - Palavra-chave em vermelho destacado (${accent})
     - Minimalista: poucos elementos, máximo impacto
     - Estilo statement/manifesto visual`,
-};
+  };
+}
 
-function buildMasterPrompt(contentText: string, contentType: string): string {
-  const styleGuide = CONTENT_TYPE_STYLES[contentType] || CONTENT_TYPE_STYLES.instagram_carousel;
+function buildMasterPrompt(contentText: string, contentType: string, brand: BrandConfig): string {
+  const styles = getContentTypeStyles(brand);
+  const styleGuide = styles[contentType] || styles.instagram_carousel;
 
   return `Você é um designer gráfico sênior que cria prompts de imagem ULTRA DETALHADOS para IA generativa. Seus prompts geram infográficos profissionais no estilo dos maiores criadores brasileiros (@alfredosoares, Thiago Nigro).
 
@@ -81,9 +112,9 @@ Seu cliente é Pedro Rabelo — empreendedor brasileiro.
 ${styleGuide}
 
 ## PALETA FIXA (use SEMPRE esses hex codes exatos):
-- Fundo: solid black (#0A0A0B), completamente flat, sem gradientes
-- Destaque/acento: vermelho vibrante (#E31B23) — para títulos-chave, shapes, badges
-- Texto principal: branco puro (#FFFFFF) — títulos bold
+- Fundo: solid black (${brand.colors.bg}), completamente flat, sem gradientes
+- Destaque/acento: vermelho vibrante (${brand.colors.accent}) — para títulos-chave, shapes, badges
+- Texto principal: branco puro (${brand.colors.text}) — títulos bold
 - Texto secundário: cinza (#666666) — labels, linhas, referências, rodapé
 - Linhas/conectores: cinza (#444444) ou branco fino
 
@@ -149,11 +180,22 @@ export async function generateImagePrompt(
   contentText: string,
   contentType: string
 ): Promise<{ image_prompt: string } | { error: string }> {
+  // Fetch identity from DB for brand colors/config
+  let brand = DEFAULT_BRAND;
+  try {
+    const supabase = await createClient();
+    const { data: identity } = await supabase.from('identity').select('*').limit(1).single();
+    brand = buildBrandFromIdentity(identity);
+    console.log(`[ImageEngine] Brand loaded from DB: accent=${brand.colors.accent}, bg=${brand.colors.bg}`);
+  } catch {
+    console.log('[ImageEngine] Could not load identity from DB, using defaults');
+  }
+
   // Try Gemini Flash first (cheaper)
   try {
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
     if (apiKey) {
-      const imagePrompt = await generateArtDirectorPrompt(apiKey, contentText, contentType);
+      const imagePrompt = await generateArtDirectorPrompt(apiKey, contentText, contentType, brand);
       if (imagePrompt && imagePrompt.length > 100) {
         console.log(`[ImageEngine] Prompt generated via Gemini (${imagePrompt.length} chars)`);
         return { image_prompt: imagePrompt };
@@ -166,7 +208,7 @@ export async function generateImagePrompt(
   // Fallback to GPT-4o
   try {
     console.log('[ImageEngine] Gemini unavailable, falling back to GPT-4o...');
-    const result = await generateImagePromptWithGPT(contentText, contentType);
+    const result = await generateImagePromptWithGPT(contentText, contentType, brand);
     if ('error' in result) {
       console.error('[ImageEngine] GPT-4o fallback also failed:', result.error);
     } else {
@@ -205,9 +247,10 @@ async function generateArtDirectorPrompt(
   apiKey: string,
   contentText: string,
   contentType: string,
+  brand: BrandConfig = DEFAULT_BRAND,
 ): Promise<string | null> {
   try {
-    const masterPrompt = buildMasterPrompt(contentText, contentType);
+    const masterPrompt = buildMasterPrompt(contentText, contentType, brand);
 
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,

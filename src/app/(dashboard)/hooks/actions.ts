@@ -92,6 +92,26 @@ export async function generateHooks(
   count: number = 10
 ): Promise<{ hooks: Hook[] } | { error: string }> {
   const anthropic = getClient();
+  const supabase = await createClient();
+
+  // Fetch identity + playbooks from DB for context
+  const [identityRes, playbooksRes] = await Promise.all([
+    supabase.from("identity").select("*").limit(1).single(),
+    supabase.from("playbooks").select("title, body_markdown").limit(10),
+  ]);
+
+  const identity = identityRes.data;
+  const tone = identity?.tone_descriptors || "Direto, pratico, provocativo";
+  const voiceUses = (identity?.voice_uses || []).join(", ") || "Frameworks praticos, experiencia real, linguagem direta";
+  const voiceAvoids = (identity?.voice_avoids || []).join(", ") || "Jargao corporativo, teoria vazia";
+  const positioning = identity?.positioning || "Especialista pratico";
+  const openingStyle = identity?.opening_style || "Comeca com impacto";
+
+  // Build knowledge context from playbooks
+  const playbooks = playbooksRes.data || [];
+  const playbookContext = playbooks.length > 0
+    ? `\nBASE DE CONHECIMENTO (use como referencia para hooks mais especificos):\n${playbooks.map(p => `- ${p.title}`).join("\n")}`
+    : "";
 
   const categoryInstruction = category
     ? `Todos os hooks devem ser da categoria "${category}".`
@@ -99,10 +119,13 @@ export async function generateHooks(
 
   const prompt = `Voce e um copywriter especialista em ganchos (hooks) para conteudo de redes sociais.
 
-CONTEXTO DA MARCA:
-- Pedro Rabelo: comunicacao direta, provocativa, anti-guru
-- Tom: sem enrolacao, confronta crencas populares, usa linguagem coloquial mas inteligente
-- Objetivo: parar o scroll, provocar curiosidade ou desconforto produtivo
+IDENTIDADE DA MARCA (do banco de dados):
+- Tom: ${tone}
+- Posicionamento: ${positioning}
+- Estilo de abertura: ${openingStyle}
+- A voz DEVE usar: ${voiceUses}
+- A voz NUNCA deve usar: ${voiceAvoids}
+${playbookContext}
 
 TAREFA:
 Gere exatamente ${count} hooks/ganchos sobre o tema: "${topic}"
@@ -126,6 +149,7 @@ REGRAS:
 - Foque em parar o scroll — provocar, intrigar, chocar
 - Nao use cliches como "neste artigo" ou "vou te ensinar"
 - Seja especifico ao tema, nao generico
+- Os hooks devem soar como o Pedro falaria — respeite o tom e a voz acima
 
 Responda APENAS com um JSON array no formato:
 [{"text": "o hook aqui", "category": "categoria"}]`;
