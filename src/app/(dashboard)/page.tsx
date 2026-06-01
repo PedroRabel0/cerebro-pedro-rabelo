@@ -3,8 +3,8 @@ export const maxDuration = 60;
 
 import UniversalInput from "@/components/UniversalInput";
 import BrainChat from "@/components/BrainChat";
+import ActivityAccordion from "@/components/ActivityAccordion";
 import { getDashboardStats, getActivityFeed } from "./actions";
-import Link from "next/link";
 import {
   Inbox,
   BookOpen,
@@ -13,57 +13,7 @@ import {
   Clock,
   Brain,
   Zap,
-  Search,
-  CheckCircle2,
-  ArrowUpRight,
 } from "lucide-react";
-
-function getActivityIcon(
-  action: string,
-  entityType: string | null
-): typeof BookOpen {
-  if (entityType === "playbook") return BookOpen;
-  if (entityType === "story") return BookMarked;
-  if (entityType === "generated_content") return Sparkles;
-  if (entityType === "reference_post") return Search;
-  if (action.toLowerCase().includes("proposta") || action.toLowerCase().includes("aprovou"))
-    return CheckCircle2;
-  if (action.toLowerCase().includes("scrape") || action.toLowerCase().includes("instagram"))
-    return Search;
-  return Zap;
-}
-
-function relativeTime(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = now - then;
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "agora";
-  if (minutes < 60) return `há ${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `há ${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "ontem";
-  if (days < 7) return `há ${days} dias`;
-  return new Date(dateStr).toLocaleDateString("pt-BR");
-}
-
-function getActivityLink(entityType: string | null): string {
-  switch (entityType) {
-    case "playbook":
-      return "/base-de-conhecimento";
-    case "story":
-      return "/base-de-conhecimento";
-    case "capture":
-      return "/insights-pedro";
-    case "reference_post":
-      return "/referencias";
-    case "generated_content":
-      return "/gerar-conteudo";
-    default:
-      return "/";
-  }
-}
 
 // TODO: Filtrar activity feed por usuario/role quando implementar
 // server-side role detection (ex: ler role do cookie/session no server component).
@@ -193,62 +143,8 @@ export default async function DashboardHome() {
         </div>
       </div>
 
-      {/* Activity Feed */}
-      <div>
-        <h2 className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-text-muted">
-          <Clock className="h-3.5 w-3.5" />
-          Atividade Recente
-        </h2>
-        {activityFeed.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-card/50 px-6 py-16 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10">
-              <Brain className="h-8 w-8 text-accent" />
-            </div>
-            <p className="text-sm font-medium text-text">
-              Nenhuma atividade ainda
-            </p>
-            <p className="mt-1 text-xs text-text-muted">
-              Alimente o cérebro acima para começar a gerar atividade.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {activityFeed.map((item, i) => {
-              const ActionIcon = getActivityIcon(
-                item.action,
-                item.entity_type
-              );
-              const link = getActivityLink(item.entity_type);
-              return (
-                <Link
-                  key={item.id}
-                  href={link}
-                  className="card-hover animate-fade-in flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3"
-                  style={{ animationDelay: `${i * 50}ms` }}
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface">
-                    <ActionIcon className="h-4 w-4 text-text-muted" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-text">
-                      {item.action}
-                    </p>
-                    {item.entity_title && (
-                      <p className="truncate text-xs text-text-muted">
-                        {item.entity_title}
-                      </p>
-                    )}
-                  </div>
-                  <span className="shrink-0 font-mono text-[10px] text-text-muted">
-                    {relativeTime(item.created_at)}
-                  </span>
-                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-text-muted" />
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {/* Activity Feed — collapsible */}
+      <ActivityAccordion entries={activityFeed} />
     </div>
   );
 }
