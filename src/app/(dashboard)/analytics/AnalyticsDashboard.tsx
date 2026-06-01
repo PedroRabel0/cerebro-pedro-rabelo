@@ -12,6 +12,12 @@ import {
   Bookmark,
   Share2,
   MessageCircle,
+  Download,
+  Camera,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Filter,
 } from "lucide-react";
 import type { ContentMetric } from "@/lib/supabase/types";
 import {
@@ -19,6 +25,8 @@ import {
   deleteMetric,
   getMetrics,
   getAnalyticsInsights,
+  importInstagramMetrics,
+  type ImportResult,
 } from "./actions";
 
 // --- Constants ---
@@ -41,6 +49,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 
 interface AnalyticsDashboardProps {
   initialMetrics: ContentMetric[];
+  handle: string;
 }
 
 // ===========================================
@@ -49,35 +58,46 @@ interface AnalyticsDashboardProps {
 
 export default function AnalyticsDashboard({
   initialMetrics,
+  handle,
 }: AnalyticsDashboardProps) {
   const [metrics, setMetrics] = useState<ContentMetric[]>(initialMetrics);
   const [showForm, setShowForm] = useState(false);
   const [insights, setInsights] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isInsightsPending, startInsightsTransition] = useTransition();
+  const [isImporting, startImportTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [filterPlatform, setFilterPlatform] = useState<string>("");
+
+  // --- Filtered metrics ---
+  const filtered = filterPlatform
+    ? metrics.filter((m) => m.platform === filterPlatform)
+    : metrics;
 
   // --- Stats ---
-
   const stats = useMemo(() => {
     if (metrics.length === 0) {
       return {
         totalPosts: 0,
         avgEngagement: "0",
         bestPlatform: "-",
-        mostSaves: "-",
+        totalLikes: 0,
+        totalComments: 0,
+        platforms: [] as string[],
       };
     }
 
     const totalPosts = metrics.length;
+    const totalLikes = metrics.reduce((sum, m) => sum + m.likes, 0);
+    const totalComments = metrics.reduce((sum, m) => sum + m.comments, 0);
 
     const avgEngagement = (
       metrics.reduce((sum, m) => sum + m.engagement_rate, 0) / metrics.length
     ).toFixed(2);
 
     // Best platform by avg engagement
-    const platformEngagement: Record<string, { total: number; count: number }> =
-      {};
+    const platformEngagement: Record<string, { total: number; count: number }> = {};
     for (const m of metrics) {
       if (!platformEngagement[m.platform]) {
         platformEngagement[m.platform] = { total: 0, count: 0 };
@@ -95,15 +115,9 @@ export default function AnalyticsDashboard({
       }
     }
 
-    // Most saves post
-    const topSaves = [...metrics].sort((a, b) => b.saves - a.saves)[0];
-    const mostSaves = topSaves
-      ? topSaves.title.length > 30
-        ? topSaves.title.slice(0, 30) + "..."
-        : topSaves.title
-      : "-";
+    const platforms = Object.keys(platformEngagement);
 
-    return { totalPosts, avgEngagement, bestPlatform, mostSaves };
+    return { totalPosts, avgEngagement, bestPlatform, totalLikes, totalComments, platforms };
   }, [metrics]);
 
   // --- Handlers ---
@@ -143,6 +157,18 @@ export default function AnalyticsDashboard({
     });
   };
 
+  const handleImport = () => {
+    setImportResult(null);
+    startImportTransition(async () => {
+      const result = await importInstagramMetrics();
+      setImportResult(result);
+      if (!result.error) {
+        const updated = await getMetrics();
+        setMetrics(updated);
+      }
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Delete confirmation modal */}
@@ -171,14 +197,89 @@ export default function AnalyticsDashboard({
       )}
 
       {/* Loading bar */}
-      {(isPending || isInsightsPending) && (
+      {(isPending || isInsightsPending || isImporting) && (
         <div className="h-1 overflow-hidden rounded-full bg-border">
           <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
         </div>
       )}
 
+      {/* === AUTO-IMPORT SECTION === */}
+      <div className="rounded-2xl border border-pink-500/20 bg-gradient-to-br from-pink-500/5 via-transparent to-transparent p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/20">
+              <Camera className="h-5 w-5 text-pink-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-text">
+                Importar do Instagram
+              </h3>
+              <p className="text-xs text-text-muted">
+                Puxa métricas automáticas de <span className="font-medium text-pink-400">@{handle}</span>
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleImport}
+            disabled={isImporting}
+            className="flex items-center gap-2 rounded-xl bg-pink-500/20 px-5 py-2.5 text-sm font-semibold text-pink-400 transition-colors hover:bg-pink-500/30 disabled:opacity-50"
+          >
+            {isImporting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Importando...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Puxar Métricas
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Import result feedback */}
+        {importResult && (
+          <div className={`mt-4 flex items-start gap-2 rounded-xl p-3 ${
+            importResult.error
+              ? "bg-red-500/10 border border-red-500/20"
+              : "bg-green-500/10 border border-green-500/20"
+          }`}>
+            {importResult.error ? (
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+            ) : (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-400" />
+            )}
+            <div className="text-xs">
+              {importResult.error ? (
+                <p className="text-red-400">
+                  Erro ao importar: {importResult.error}
+                </p>
+              ) : (
+                <>
+                  <p className="font-medium text-green-400">
+                    {importResult.posts_imported > 0
+                      ? `${importResult.posts_imported} posts importados!`
+                      : "Nenhum post novo encontrado."}
+                  </p>
+                  <p className="mt-0.5 text-text-muted">
+                    {importResult.posts_found} encontrados · {importResult.posts_imported} novos · {importResult.posts_skipped} já existiam
+                  </p>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => setImportResult(null)}
+              className="ml-auto shrink-0 text-text-muted hover:text-text transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard
           icon={<TrendingUp className="h-4 w-4 text-accent" />}
           label="Total Posts"
@@ -186,26 +287,31 @@ export default function AnalyticsDashboard({
         />
         <StatCard
           icon={<Eye className="h-4 w-4 text-blue-400" />}
-          label="Eng. Medio"
+          label="Eng. Médio"
           value={`${stats.avgEngagement}%`}
         />
         <StatCard
           icon={<Heart className="h-4 w-4 text-pink-400" />}
-          label="Melhor Plataforma"
-          value={stats.bestPlatform}
+          label="Total Likes"
+          value={formatNumber(stats.totalLikes)}
         />
         <StatCard
-          icon={<Bookmark className="h-4 w-4 text-green-400" />}
-          label="Mais Saves"
-          value={stats.mostSaves}
+          icon={<MessageCircle className="h-4 w-4 text-green-400" />}
+          label="Total Comments"
+          value={formatNumber(stats.totalComments)}
+        />
+        <StatCard
+          icon={<Bookmark className="h-4 w-4 text-purple-400" />}
+          label="Melhor Plataforma"
+          value={stats.bestPlatform}
         />
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface hover:text-text"
         >
           {showForm ? (
             <>
@@ -215,21 +321,40 @@ export default function AnalyticsDashboard({
           ) : (
             <>
               <Plus className="h-4 w-4" />
-              Adicionar Metrica
+              Manual
             </>
           )}
         </button>
         <button
           onClick={handleGetInsights}
           disabled={isInsightsPending || metrics.length === 0}
-          className="flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Sparkles className="h-4 w-4" />
           {isInsightsPending ? "Analisando..." : "Gerar Insights com IA"}
         </button>
+
+        {/* Platform filter */}
+        {stats.platforms.length > 1 && (
+          <div className="ml-auto flex items-center gap-2">
+            <Filter className="h-3.5 w-3.5 text-text-muted" />
+            <select
+              value={filterPlatform}
+              onChange={(e) => setFilterPlatform(e.target.value)}
+              className="rounded-lg border border-border bg-card px-2 py-1.5 font-mono text-xs text-text-secondary focus:border-accent focus:outline-none"
+            >
+              <option value="">Todas ({metrics.length})</option>
+              {stats.platforms.map((p) => (
+                <option key={p} value={p}>
+                  {PLATFORM_LABELS[p] || p} ({metrics.filter((m) => m.platform === p).length})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
-      {/* Add Metric Form */}
+      {/* Add Metric Form (Manual) */}
       {showForm && <MetricForm onSubmit={handleCreate} isPending={isPending} />}
 
       {/* AI Insights */}
@@ -254,19 +379,27 @@ export default function AnalyticsDashboard({
       )}
 
       {/* Metrics List */}
-      {metrics.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="rounded-xl border border-border bg-card py-16 text-center">
           <TrendingUp className="mx-auto h-8 w-8 text-text-muted" />
           <p className="mt-3 text-sm text-text-muted">
-            Nenhuma metrica registrada ainda.
+            {filterPlatform
+              ? `Nenhuma métrica de ${PLATFORM_LABELS[filterPlatform] || filterPlatform}.`
+              : "Nenhuma métrica registrada ainda."}
           </p>
           <p className="text-xs text-text-muted">
-            Adicione dados de performance dos seus conteudos.
+            {filterPlatform
+              ? "Tente outro filtro ou importe do Instagram."
+              : "Clique em \"Puxar Métricas\" para importar automaticamente."}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {metrics.map((metric) => (
+          <p className="font-mono text-[10px] text-text-muted">
+            {filtered.length} métrica{filtered.length !== 1 ? "s" : ""}
+            {filterPlatform ? ` de ${PLATFORM_LABELS[filterPlatform] || filterPlatform}` : ""}
+          </p>
+          {filtered.map((metric) => (
             <MetricCard
               key={metric.id}
               metric={metric}
@@ -325,6 +458,8 @@ function MetricCard({
   onDelete: (id: string) => void;
   isPending: boolean;
 }) {
+  const [showCaption, setShowCaption] = useState(false);
+
   const postedDate = metric.posted_at
     ? new Date(metric.posted_at).toLocaleDateString("pt-BR", {
         day: "2-digit",
@@ -358,38 +493,65 @@ function MetricCard({
           {/* Numbers grid */}
           <div className="mt-3 flex flex-wrap gap-3">
             <MetricBadge
-              icon={<Eye className="h-3 w-3" />}
-              label="Views"
-              value={formatNumber(metric.views)}
-            />
-            <MetricBadge
               icon={<Heart className="h-3 w-3" />}
               label="Likes"
               value={formatNumber(metric.likes)}
-            />
-            <MetricBadge
-              icon={<Bookmark className="h-3 w-3" />}
-              label="Saves"
-              value={formatNumber(metric.saves)}
-            />
-            <MetricBadge
-              icon={<Share2 className="h-3 w-3" />}
-              label="Shares"
-              value={formatNumber(metric.shares)}
             />
             <MetricBadge
               icon={<MessageCircle className="h-3 w-3" />}
               label="Coments"
               value={formatNumber(metric.comments)}
             />
-            <MetricBadge
-              icon={<TrendingUp className="h-3 w-3" />}
-              label="Eng."
-              value={`${metric.engagement_rate.toFixed(2)}%`}
-            />
+            {metric.saves > 0 && (
+              <MetricBadge
+                icon={<Bookmark className="h-3 w-3" />}
+                label="Saves"
+                value={formatNumber(metric.saves)}
+              />
+            )}
+            {metric.shares > 0 && (
+              <MetricBadge
+                icon={<Share2 className="h-3 w-3" />}
+                label="Shares"
+                value={formatNumber(metric.shares)}
+              />
+            )}
+            {metric.views > 0 && (
+              <MetricBadge
+                icon={<Eye className="h-3 w-3" />}
+                label="Views"
+                value={formatNumber(metric.views)}
+              />
+            )}
+            {metric.engagement_rate > 0 && (
+              <MetricBadge
+                icon={<TrendingUp className="h-3 w-3" />}
+                label="Eng."
+                value={`${metric.engagement_rate.toFixed(2)}%`}
+              />
+            )}
           </div>
 
-          <p className="mt-2 text-[10px] text-text-muted">{postedDate}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <p className="text-[10px] text-text-muted">{postedDate}</p>
+            {metric.notes && (
+              <button
+                onClick={() => setShowCaption(!showCaption)}
+                className="text-[10px] text-accent hover:text-accent-hover transition-colors"
+              >
+                {showCaption ? "Ocultar legenda" : "Ver legenda"}
+              </button>
+            )}
+          </div>
+
+          {/* Expandable caption */}
+          {showCaption && metric.notes && (
+            <div className="mt-2 rounded-lg bg-surface p-3">
+              <p className="whitespace-pre-wrap text-xs text-text-secondary leading-relaxed">
+                {metric.notes}
+              </p>
+            </div>
+          )}
         </div>
 
         <button
@@ -427,7 +589,7 @@ function MetricBadge({
 }
 
 // ===========================================
-// Add Metric Form
+// Add Metric Form (Manual)
 // ===========================================
 
 function MetricForm({
@@ -442,15 +604,18 @@ function MetricForm({
       action={onSubmit}
       className="rounded-xl border border-border bg-card p-5"
     >
-      <h3 className="mb-4 font-display text-sm font-semibold text-text">
-        Adicionar Metrica de Conteudo
+      <h3 className="mb-1 font-display text-sm font-semibold text-text">
+        Adicionar Métrica Manual
       </h3>
+      <p className="mb-4 text-[10px] text-text-muted">
+        Para LinkedIn, X ou YouTube — ou quando quiser adicionar dados extras.
+      </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Title */}
         <div className="sm:col-span-2">
           <label className="mb-1.5 block text-xs font-medium text-text-secondary">
-            Titulo do conteudo
+            Título do conteúdo
           </label>
           <input
             name="title"
@@ -481,7 +646,7 @@ function MetricForm({
         {/* Content Type */}
         <div>
           <label className="mb-1.5 block text-xs font-medium text-text-secondary">
-            Tipo de conteudo
+            Tipo de conteúdo
           </label>
           <input
             name="content_type"
@@ -500,7 +665,7 @@ function MetricForm({
             name="likes"
             type="number"
             min="0"
-            defaultValue="0"
+            placeholder="0"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
         </div>
@@ -513,7 +678,7 @@ function MetricForm({
             name="saves"
             type="number"
             min="0"
-            defaultValue="0"
+            placeholder="0"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
         </div>
@@ -526,7 +691,7 @@ function MetricForm({
             name="shares"
             type="number"
             min="0"
-            defaultValue="0"
+            placeholder="0"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
         </div>
@@ -539,7 +704,7 @@ function MetricForm({
             name="comments"
             type="number"
             min="0"
-            defaultValue="0"
+            placeholder="0"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
         </div>
@@ -552,14 +717,14 @@ function MetricForm({
             name="views"
             type="number"
             min="0"
-            defaultValue="0"
+            placeholder="0"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
         </div>
 
         <div>
           <label className="mb-1.5 block text-xs font-medium text-text-secondary">
-            Data de publicacao
+            Data de publicação
           </label>
           <input
             name="posted_at"
@@ -574,7 +739,7 @@ function MetricForm({
         disabled={isPending}
         className="mt-5 w-full rounded-lg bg-accent py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isPending ? "Salvando..." : "Salvar Metrica"}
+        {isPending ? "Salvando..." : "Salvar Métrica"}
       </button>
     </form>
   );

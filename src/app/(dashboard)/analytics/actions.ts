@@ -3,16 +3,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getClient, logCost } from "@/lib/ai/client";
+import { scrapeInstagramProfile } from "@/lib/ai/apify";
 import type { ContentMetric } from "@/lib/supabase/types";
 
 const PATH = "/analytics";
+
+// Default handle — can be changed in the future
+const PEDRO_INSTAGRAM_HANDLE = "pedro.bagy";
 
 export async function getMetrics(): Promise<ContentMetric[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("content_metrics")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("posted_at", { ascending: false });
 
   if (error) throw error;
   return data || [];
@@ -62,6 +66,129 @@ export async function deleteMetric(id: string) {
     .eq("id", id);
   if (error) throw error;
   revalidatePath(PATH);
+}
+
+// ===========================================
+// AUTO-IMPORT: Scrape Pedro's own Instagram
+// ===========================================
+
+export interface ImportResult {
+  posts_found: number;
+  posts_imported: number;
+  posts_skipped: number;
+  handle: string;
+  error?: string;
+}
+
+export async function importInstagramMetrics(): Promise<ImportResult> {
+  const handle = PEDRO_INSTAGRAM_HANDLE;
+
+  try {
+    const supabase = await createClient();
+
+    // 1. Scrape Pedro's latest 20 posts
+    console.log(`[Analytics Import] Scraping @${handle}...`);
+    const scraped = await scrapeInstagramProfile(handle, 20);
+
+    if ("error" in scraped) {
+      return {
+        posts_found: 0,
+        posts_imported: 0,
+        posts_skipped: 0,
+        handle,
+        error: scraped.error,
+      };
+    }
+
+    // 2. Get existing metrics to avoid duplicates (match by caption first 80 chars + platform)
+    const { data: existing } = await supabase
+      .from("content_metrics")
+      .select("title, posted_at")
+      .eq("platform", "instagram");
+
+    const existingTitles = new Set(
+      (existing || []).map((m) => m.title?.slice(0, 80)?.toLowerCase())
+    );
+
+    // 3. Import new posts
+    let imported = 0;
+    let skipped = 0;
+
+    for (const post of scraped) {
+      // Build title from caption (first line or first 80 chars)
+      const caption = post.caption || "";
+      const firstLine = caption.split("\n")[0]?.trim() || "";
+      const title = firstLine.length > 80
+        ? firstLine.slice(0, 77) + "..."
+        : firstLine || `Post ${post.posted_at ? new Date(post.posted_at).toLocaleDateString("pt-BR") : "sem data"}`;
+
+      // Check for duplicates
+      if (existingTitles.has(title.slice(0, 80).toLowerCase())) {
+        skipped++;
+        continue;
+      }
+
+      const likes = post.likes || 0;
+      const comments = post.comments || 0;
+      // Instagram scraper doesn't provide views/saves/shares directly
+      // Estimate engagement from likes + comments
+      const engagementRate = post.engagement_rate || 0;
+
+      const contentType = post.is_video ? "reel" : "post";
+
+      const { error: insertError } = await supabase.from("content_metrics").insert({
+        title,
+        platform: "instagram",
+        content_type: contentType,
+        likes,
+        saves: 0, // Not available from scraping
+        shares: 0, // Not available from scraping
+        comments,
+        views: 0, // Not available from scraping
+        engagement_rate: parseFloat(engagementRate.toFixed(2)),
+        posted_at: post.posted_at || new Date().toISOString(),
+        notes: caption.length > 80 ? caption.slice(0, 500) : null,
+      });
+
+      if (!insertError) {
+        imported++;
+        existingTitles.add(title.slice(0, 80).toLowerCase());
+      }
+    }
+
+    // 4. Log activity
+    await supabase.from("activity_log").insert({
+      actor: "ia",
+      action: `Auto-import: ${imported} métricas importadas de @${handle} (${skipped} já existiam)`,
+      entity_type: "content_metric",
+      entity_title: `Import @${handle}`,
+    });
+
+    console.log(`[Analytics Import] @${handle}: ${imported} imported, ${skipped} skipped of ${scraped.length} total`);
+
+    revalidatePath(PATH);
+
+    return {
+      posts_found: scraped.length,
+      posts_imported: imported,
+      posts_skipped: skipped,
+      handle,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    console.error("[Analytics Import] Error:", message);
+    return {
+      posts_found: 0,
+      posts_imported: 0,
+      posts_skipped: 0,
+      handle,
+      error: message,
+    };
+  }
+}
+
+export async function getInstagramHandle(): Promise<string> {
+  return PEDRO_INSTAGRAM_HANDLE;
 }
 
 export async function getAnalyticsInsights(): Promise<string> {

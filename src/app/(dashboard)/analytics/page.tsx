@@ -1,11 +1,14 @@
 export const dynamic = "force-dynamic";
 
-import { getMetrics } from "./actions";
+import { getMetrics, getInstagramHandle } from "./actions";
 import AnalyticsDashboard from "./AnalyticsDashboard";
 import { BarChart3 } from "lucide-react";
 
 export default async function AnalyticsPage() {
-  const metrics = await getMetrics();
+  const [metrics, handle] = await Promise.all([
+    getMetrics(),
+    getInstagramHandle(),
+  ]);
 
   return (
     <div>
@@ -19,13 +22,13 @@ export default async function AnalyticsPage() {
               Analytics
             </h1>
             <p className="mt-0.5 text-sm text-text-secondary">
-              Performance dos seus conteudos
+              Performance dos seus conteúdos — importação automática do Instagram
             </p>
           </div>
         </div>
       </div>
 
-      <AnalyticsDashboard initialMetrics={metrics} />
+      <AnalyticsDashboard initialMetrics={metrics} handle={handle} />
     </div>
   );
 }
