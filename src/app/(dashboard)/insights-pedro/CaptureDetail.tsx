@@ -43,7 +43,7 @@ const proposalTypeConfig: Record<
 function ProposalCard({ proposal }: { proposal: Proposal }) {
   const [status, setStatus] = useState(proposal.status);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true); // Open by default so user can read before approving
   const [feedback, setFeedback] = useState<"approved" | "rejected" | null>(null);
 
   const config = proposalTypeConfig[proposal.type] ?? {
@@ -118,21 +118,25 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
         {/* Title */}
         <h4 className="text-sm font-semibold text-text">{proposal.title}</h4>
 
-        {/* Content preview */}
+        {/* Full content — always visible so user can read before approving */}
         <div>
           <button
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-text-muted mb-1 hover:text-text transition"
+            className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-text-muted mb-1.5 hover:text-text transition"
           >
             Conteúdo {expanded ? "(ocultar)" : "(expandir)"}
           </button>
-          <p
-            className={`text-xs leading-relaxed text-text-muted whitespace-pre-wrap ${
-              expanded ? "" : "line-clamp-6"
-            }`}
-          >
-            {expanded ? content : preview}
-          </p>
+          {expanded ? (
+            <div className="rounded-lg bg-surface/50 border border-border/50 p-3 max-h-[400px] overflow-y-auto">
+              <p className="text-xs leading-relaxed text-text-secondary whitespace-pre-wrap">
+                {content}
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs leading-relaxed text-text-muted whitespace-pre-wrap line-clamp-3">
+              {preview}
+            </p>
+          )}
         </div>
 
         {/* Tags */}

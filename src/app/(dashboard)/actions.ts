@@ -86,6 +86,54 @@ async function handleInstagramInput(url: string, supabase: Awaited<ReturnType<ty
   return scraped;
 }
 
+export async function submitFileInput(formData: FormData) {
+  const file = formData.get("file") as File;
+  if (!file) throw new Error("Nenhum arquivo enviado");
+
+  const fileName = file.name;
+  const fileSize = file.size;
+  const fileType = file.type;
+
+  // Read file content as text
+  let textContent = "";
+
+  if (fileType === "application/pdf") {
+    // For PDFs, we extract what we can — send raw text to AI
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    // Simple PDF text extraction — extract readable strings
+    let raw = "";
+    for (let i = 0; i < bytes.length; i++) {
+      const byte = bytes[i];
+      if (byte >= 32 && byte <= 126) {
+        raw += String.fromCharCode(byte);
+      } else if (byte === 10 || byte === 13) {
+        raw += "\n";
+      }
+    }
+    // Clean up PDF artifacts — keep meaningful text runs
+    textContent = raw
+      .split("\n")
+      .filter(line => line.trim().length > 20)
+      .filter(line => !/^[%\/\[\]()<>{}]+$/.test(line.trim()))
+      .join("\n")
+      .slice(0, 15000);
+
+    if (textContent.length < 100) {
+      textContent = `[Arquivo PDF: ${fileName}, ${(fileSize / 1024).toFixed(1)}KB — conteúdo não extraível automaticamente. O PDF pode conter imagens ou texto codificado.]`;
+    }
+  } else {
+    // Text-based files: .txt, .md, .csv, .json, etc.
+    textContent = await file.text();
+  }
+
+  // Prefix with file metadata for AI context
+  const enrichedInput = `[ARQUIVO ENVIADO: ${fileName} (${(fileSize / 1024).toFixed(1)}KB, tipo: ${fileType || "desconhecido"})]\n\n${textContent}`;
+
+  // Delegate to normal processing
+  return submitUniversalInput(enrichedInput.slice(0, 20000));
+}
+
 export async function submitUniversalInput(input: string) {
   const supabase = await createClient();
 

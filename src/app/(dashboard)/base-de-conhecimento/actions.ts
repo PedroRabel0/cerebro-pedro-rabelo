@@ -59,13 +59,24 @@ export async function getPlaybook(id: string) {
 
 export async function createPlaybook(formData: FormData) {
   const supabase = await createClient();
+  const createdBy = (formData.get("created_by") as string) || "pedro";
   const { error } = await supabase.from("playbooks").insert({
     title: formData.get("title") as string,
     subtitle: (formData.get("subtitle") as string) || null,
     theme_id: (formData.get("theme_id") as string) || null,
     body_markdown: (formData.get("body_markdown") as string) || null,
+    created_by: createdBy,
   });
   if (error) throw error;
+
+  // Log activity with proper attribution
+  await supabase.from("activity_log").insert({
+    actor: createdBy as "pedro" | "henrique",
+    action: `Criou playbook: "${formData.get("title")}"`,
+    entity_type: "playbook",
+    entity_title: formData.get("title") as string,
+  });
+
   revalidatePath("/base-de-conhecimento");
 }
 
@@ -116,6 +127,7 @@ export async function getStory(id: string) {
 
 export async function createStory(formData: FormData) {
   const supabase = await createClient();
+  const createdBy = (formData.get("created_by") as string) || "pedro";
   const tagsRaw = formData.get("tags") as string;
   const tags = tagsRaw
     ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean)
@@ -128,8 +140,18 @@ export async function createStory(formData: FormData) {
     period: (formData.get("period") as string) || null,
     tags,
     lesson: (formData.get("lesson") as string) || null,
+    created_by: createdBy,
   });
   if (error) throw error;
+
+  // Log activity with proper attribution
+  await supabase.from("activity_log").insert({
+    actor: createdBy as "pedro" | "henrique",
+    action: `Criou história: "${formData.get("title")}"`,
+    entity_type: "story",
+    entity_title: formData.get("title") as string,
+  });
+
   revalidatePath("/base-de-conhecimento");
 }
 

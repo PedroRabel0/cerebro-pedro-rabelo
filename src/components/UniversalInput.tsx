@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { submitUniversalInput } from "@/app/(dashboard)/actions";
+import { submitUniversalInput, submitFileInput } from "@/app/(dashboard)/actions";
 import {
   Send,
   Loader2,
@@ -19,6 +19,8 @@ import {
   Brain,
   BookMarked,
   HelpCircle,
+  Upload,
+  File,
 } from "lucide-react";
 
 type ProcessingState = "idle" | "processing" | "done" | "error";
@@ -179,9 +181,15 @@ export default function UniversalInput() {
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [steps, setSteps] = useState<ProcessingStep[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const detectedType = input.trim() ? detectInputType(input) : null;
+  const detectedType = selectedFile
+    ? `Arquivo: ${selectedFile.name}`
+    : input.trim()
+      ? detectInputType(input)
+      : null;
 
   // Simulate step progression during processing
   useEffect(() => {
@@ -211,22 +219,46 @@ export default function UniversalInput() {
     );
   }, [currentStep, steps.length]);
 
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setInput(`Arquivo: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
+    }
+  }
+
   async function handleSubmit() {
-    if (!input.trim()) return;
+    if (!input.trim() && !selectedFile) return;
     setState("processing");
     setResult(null);
 
-    const processingSteps = getProcessingSteps(input);
+    const processingSteps = selectedFile
+      ? [
+          { label: "Lendo arquivo", status: "pending" as const },
+          { label: "Extraindo conteúdo", status: "pending" as const },
+          { label: "Analisando conteúdo com Claude AI", status: "pending" as const },
+          { label: "Gerando propostas para a Base", status: "pending" as const },
+        ]
+      : getProcessingSteps(input);
     setSteps(processingSteps);
     setCurrentStep(0);
 
     try {
-      const res = await submitUniversalInput(input.trim());
+      let res;
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        res = await submitFileInput(formData);
+      } else {
+        res = await submitUniversalInput(input.trim());
+      }
       // Mark all steps as done
       setSteps((prev) => prev.map((s) => ({ ...s, status: "done" as const })));
       setResult(res as ProcessResult);
       setState("done");
       setInput("");
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       console.error(err);
       setState("error");
@@ -245,6 +277,8 @@ export default function UniversalInput() {
     setResult(null);
     setSteps([]);
     setCurrentStep(0);
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     textareaRef.current?.focus();
   }
 
@@ -252,28 +286,70 @@ export default function UniversalInput() {
     <div className="space-y-4">
       {/* Input Area with Glow */}
       <div className={`glow-input relative rounded-2xl ${state === "processing" ? "processing-glow" : ""}`}>
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.md,.csv,.json,.pdf,.doc,.docx"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* File selected banner */}
+        {selectedFile && state === "idle" && (
+          <div className="flex items-center gap-2 rounded-t-2xl border border-b-0 border-border bg-surface/50 px-4 py-2">
+            <File className="h-3.5 w-3.5 text-accent" />
+            <span className="text-xs text-text font-medium truncate flex-1">
+              {selectedFile.name}
+            </span>
+            <span className="font-mono text-[10px] text-text-muted">
+              {(selectedFile.size / 1024).toFixed(1)}KB
+            </span>
+            <button
+              onClick={() => {
+                setSelectedFile(null);
+                setInput("");
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              className="text-text-muted hover:text-red transition-colors text-xs"
+            >
+              Remover
+            </button>
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          value={selectedFile ? "" : input}
+          onChange={(e) => { if (!selectedFile) setInput(e.target.value); }}
           onKeyDown={handleKeyDown}
-          disabled={state === "processing"}
-          placeholder="Cole aqui qualquer coisa — link do YouTube, post do Instagram, URL de artigo, texto, transcrição, ideia..."
-          rows={4}
-          className="w-full resize-none rounded-2xl border border-border bg-card px-5 py-4 pr-36 text-sm text-text placeholder:text-text-muted focus:border-accent/50 focus:outline-none disabled:opacity-50"
+          disabled={state === "processing" || !!selectedFile}
+          placeholder={selectedFile ? "Arquivo selecionado — clique Processar" : "Cole aqui qualquer coisa — link do YouTube, post do Instagram, URL de artigo, texto, transcrição, ideia..."}
+          rows={selectedFile ? 2 : 4}
+          className={`w-full resize-none border border-border bg-card px-5 py-4 pr-36 text-sm text-text placeholder:text-text-muted focus:border-accent/50 focus:outline-none disabled:opacity-50 ${
+            selectedFile && state === "idle" ? "rounded-b-2xl" : "rounded-2xl"
+          }`}
         />
-        <div className="absolute bottom-3 right-3 flex items-center gap-3">
+        <div className="absolute bottom-3 right-3 flex items-center gap-2">
           {detectedType && state === "idle" && (
             <span className="animate-fade-in rounded-full bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-medium text-accent">
               {detectedType}
             </span>
           )}
-          <span className="hidden font-mono text-[10px] text-text-muted sm:inline">
-            {input.length > 0 ? `${input.length}` : "Ctrl+Enter"}
-          </span>
+          {/* Upload button */}
+          {!selectedFile && state === "idle" && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 font-mono text-[10px] text-text-muted transition-colors hover:border-accent hover:text-accent"
+              title="Enviar arquivo (.txt, .md, .csv, .pdf)"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Arquivo</span>
+            </button>
+          )}
           <button
             onClick={handleSubmit}
-            disabled={!input.trim() || state === "processing"}
+            disabled={(!input.trim() && !selectedFile) || state === "processing"}
             className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 font-mono text-xs font-bold text-white transition-all hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/20 disabled:opacity-40 disabled:hover:shadow-none"
           >
             {state === "processing" ? (

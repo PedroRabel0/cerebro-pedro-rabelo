@@ -114,7 +114,7 @@ export async function approveProposal(proposalId: string) {
 
   if (fetchError || !proposal) throw fetchError || new Error("Proposal not found");
 
-  // 2. Create the corresponding item in the knowledge base
+  // 2. Create the corresponding item in the knowledge base (attributed to Pedro)
   if (proposal.type === "playbook") {
     const { error: insertError } = await supabase.from("playbooks").insert({
       title: proposal.title,
@@ -124,6 +124,7 @@ export async function approveProposal(proposalId: string) {
       has_story: false,
       has_origin: false,
       has_counterexample: false,
+      created_by: "pedro",
     });
     if (insertError) throw insertError;
   } else if (proposal.type === "story") {
@@ -131,6 +132,7 @@ export async function approveProposal(proposalId: string) {
       title: proposal.title,
       body_markdown: proposal.content_markdown,
       tags: proposal.suggested_tags || [],
+      created_by: "pedro",
     });
     if (insertError) throw insertError;
   }
@@ -143,9 +145,9 @@ export async function approveProposal(proposalId: string) {
     .eq("id", proposalId);
   if (updateError) throw updateError;
 
-  // 4. Log activity
+  // 4. Log activity (attributed to Pedro — his knowledge base)
   await supabase.from("activity_log").insert({
-    actor: "henrique",
+    actor: "pedro",
     action: `Aprovou proposta de ${proposal.type}: "${proposal.title}"`,
     entity_type: "proposal",
     entity_id: proposalId,
