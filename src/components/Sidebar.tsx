@@ -20,6 +20,11 @@ import {
   Repeat2,
   Anchor,
   CalendarDays,
+  BarChart3,
+  TrendingUp,
+  MessageCircle,
+  Mail,
+  AudioLines,
 } from "lucide-react";
 import { useUserRole, type UserRole } from "@/lib/hooks/useUserRole";
 
@@ -85,6 +90,36 @@ const navItems: {
     label: "Calendário",
     Icon: CalendarDays,
     description: "Agendar publicações",
+  },
+  {
+    href: "/analytics",
+    label: "Analytics",
+    Icon: BarChart3,
+    description: "Performance dos conteúdos",
+  },
+  {
+    href: "/tendencias",
+    label: "Tendências",
+    Icon: TrendingUp,
+    description: "Detectar trends",
+  },
+  {
+    href: "/respostas",
+    label: "Pedro Clone",
+    Icon: MessageCircle,
+    description: "Respostas automáticas",
+  },
+  {
+    href: "/newsletter",
+    label: "Newsletter",
+    Icon: Mail,
+    description: "Gerar newsletters",
+  },
+  {
+    href: "/evolucao-voz",
+    label: "Voz",
+    Icon: AudioLines,
+    description: "Evolução da identidade",
   },
 ];
 

@@ -203,6 +203,83 @@ export interface ContentFormat {
 }
 
 export type SourceType = "base_only" | "references_only" | "both" | "free_text";
+// --- Content Metrics (Analytics) ---
+export interface ContentMetric {
+  id: string;
+  content_id: string | null;
+  title: string;
+  platform: string;
+  content_type: string | null;
+  likes: number;
+  saves: number;
+  shares: number;
+  comments: number;
+  views: number;
+  engagement_rate: number;
+  posted_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Trends ---
+export type TrendStatus = "pending" | "analyzed";
+
+export interface Trend {
+  id: string;
+  title: string;
+  url: string | null;
+  description: string | null;
+  source_text: string | null;
+  analysis: string | null;
+  suggested_angles: { angle: string; why: string }[];
+  status: TrendStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- FAQ Responses (Pedro Clone) ---
+export interface FaqResponse {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+  source: "manual" | "generated";
+  used_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Newsletters ---
+export type NewsletterStatus = "draft" | "approved" | "sent";
+
+export interface Newsletter {
+  id: string;
+  title: string;
+  subject: string;
+  body_markdown: string;
+  status: NewsletterStatus;
+  week_label: string | null;
+  topics: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Voice Snapshots ---
+export interface VoiceSnapshot {
+  id: string;
+  snapshot_date: string;
+  tone_descriptors: string | null;
+  voice_uses: string[];
+  voice_avoids: string[];
+  positioning: string | null;
+  opening_style: string | null;
+  closing_style: string | null;
+  analysis: string | null;
+  comparison_with_previous: string | null;
+  created_at: string;
+}
+
 export type ContentStatus = "draft" | "approved" | "published";
 
 export interface GeneratedContent {
