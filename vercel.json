@@ -15,10 +15,6 @@
     {
       "path": "/api/cron/tendencias",
       "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/noticias",
-      "schedule": "0 7 * * *"
     }
   ]
 }

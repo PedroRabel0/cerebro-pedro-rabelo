@@ -23,7 +23,6 @@ import {
   MessageCircle,
   Mail,
   AudioLines,
-  Newspaper,
 } from "lucide-react";
 import { useUserRole, type UserRole } from "@/lib/hooks/useUserRole";
 
@@ -107,12 +106,6 @@ const navItems: {
     label: "Voz",
     Icon: AudioLines,
     description: "Evolução da identidade",
-  },
-  {
-    href: "/noticias",
-    label: "Notícias",
-    Icon: Newspaper,
-    description: "Conhecimentos gerais e trends",
   },
 ];
 
