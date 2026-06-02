@@ -130,11 +130,15 @@ export async function submitFileInput(formData: FormData) {
   // Prefix with file metadata for AI context
   const enrichedInput = `[ARQUIVO ENVIADO: ${fileName} (${(fileSize / 1024).toFixed(1)}KB, tipo: ${fileType || "desconhecido"})]\n\n${textContent}`;
 
-  // Delegate to normal processing
-  return submitUniversalInput(enrichedInput.slice(0, 20000));
+  // Delegate to normal processing, pass origin from formData
+  const origin = (formData.get("origin") as string) || "pedro";
+  return submitUniversalInput(enrichedInput.slice(0, 20000), origin as "pedro" | "outros");
 }
 
-export async function submitUniversalInput(input: string) {
+export async function submitUniversalInput(
+  input: string,
+  origin: "pedro" | "outros" = "pedro"
+) {
   const supabase = await createClient();
 
   // Detect source type from URL
@@ -185,6 +189,7 @@ export async function submitUniversalInput(input: string) {
       source_url: isUrl ? input.trim() : null,
       raw_content: input,
       status: "pending",
+      context: origin === "outros" ? "origem:outros" : "origem:pedro",
     })
     .select("id")
     .single();
@@ -283,6 +288,7 @@ export async function submitUniversalInput(input: string) {
       status: "processed" as const,
       result,
       instagramData,
+      origin,
     };
   } catch (aiError) {
     console.error("[Universal] Processing error:", aiError);

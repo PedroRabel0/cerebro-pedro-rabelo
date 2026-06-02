@@ -242,6 +242,7 @@ export default function UniversalInput() {
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(null);
   const [resumedFromNav, setResumedFromNav] = useState(false);
+  const [contentOrigin, setContentOrigin] = useState<"pedro" | "outros">("pedro");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const processingRef = useRef(false);
@@ -325,11 +326,12 @@ export default function UniversalInput() {
       if (selectedFile) {
         const formData = new FormData();
         formData.append("file", selectedFile);
+        formData.append("origin", contentOrigin);
         setCurrentStep(1);
         res = await submitFileInput(formData);
       } else {
         setCurrentStep(1);
-        res = await submitUniversalInput(input.trim());
+        res = await submitUniversalInput(input.trim(), contentOrigin);
       }
       // Clear processing state — done successfully
       try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
@@ -368,6 +370,35 @@ export default function UniversalInput() {
 
   return (
     <div className="space-y-4">
+      {/* Origin selector — Pedro or Outros */}
+      {state === "idle" && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="font-mono text-[11px] text-text-muted">Esse conteúdo é:</span>
+          <button
+            type="button"
+            onClick={() => setContentOrigin("pedro")}
+            className={`rounded-lg px-3 py-1.5 font-mono text-[11px] font-medium transition ${
+              contentOrigin === "pedro"
+                ? "bg-accent/15 text-accent border border-accent/30"
+                : "bg-surface text-text-muted border border-border hover:text-text"
+            }`}
+          >
+            Do Pedro
+          </button>
+          <button
+            type="button"
+            onClick={() => setContentOrigin("outros")}
+            className={`rounded-lg px-3 py-1.5 font-mono text-[11px] font-medium transition ${
+              contentOrigin === "outros"
+                ? "bg-blue/15 text-blue border border-blue/30"
+                : "bg-surface text-text-muted border border-border hover:text-text"
+            }`}
+          >
+            De outros
+          </button>
+        </div>
+      )}
+
       {/* Input Area with Glow */}
       <div className={`glow-input relative rounded-2xl ${state === "processing" ? "processing-glow" : ""}`}>
         {/* Hidden file input */}

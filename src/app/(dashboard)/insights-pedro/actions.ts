@@ -102,7 +102,10 @@ export async function updateProposalStatus(
   revalidatePath(PATH);
 }
 
-export async function approveProposal(proposalId: string) {
+export async function approveProposal(
+  proposalId: string,
+  origin: "pedro" | "outros" = "pedro"
+) {
   const supabase = await createClient();
 
   // 1. Read the proposal
@@ -114,7 +117,9 @@ export async function approveProposal(proposalId: string) {
 
   if (fetchError || !proposal) throw fetchError || new Error("Proposal not found");
 
-  // 2. Create the corresponding item in the knowledge base (attributed to Pedro)
+  // 2. Create the corresponding item in the knowledge base
+  const createdBy = origin === "pedro" ? "pedro" : "outros";
+
   if (proposal.type === "playbook") {
     const { error: insertError } = await supabase.from("playbooks").insert({
       title: proposal.title,
@@ -124,7 +129,7 @@ export async function approveProposal(proposalId: string) {
       has_story: false,
       has_origin: false,
       has_counterexample: false,
-      created_by: "pedro",
+      created_by: createdBy,
     });
     if (insertError) throw insertError;
   } else if (proposal.type === "story") {
@@ -132,11 +137,10 @@ export async function approveProposal(proposalId: string) {
       title: proposal.title,
       body_markdown: proposal.content_markdown,
       tags: proposal.suggested_tags || [],
-      created_by: "pedro",
+      created_by: createdBy,
     });
     if (insertError) throw insertError;
   }
-  // For "question" type, we just mark as approved (no separate table)
 
   // 3. Update proposal status
   const { error: updateError } = await supabase
@@ -145,10 +149,11 @@ export async function approveProposal(proposalId: string) {
     .eq("id", proposalId);
   if (updateError) throw updateError;
 
-  // 4. Log activity (attributed to Pedro — his knowledge base)
+  // 4. Log activity
+  const originLabel = origin === "pedro" ? "Pedro" : "Outros";
   await supabase.from("activity_log").insert({
     actor: "pedro",
-    action: `Aprovou proposta de ${proposal.type}: "${proposal.title}"`,
+    action: `Aprovou proposta de ${proposal.type} como ${originLabel}: "${proposal.title}"`,
     entity_type: "proposal",
     entity_id: proposalId,
     entity_title: proposal.title,

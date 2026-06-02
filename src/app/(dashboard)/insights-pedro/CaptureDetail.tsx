@@ -43,8 +43,9 @@ const proposalTypeConfig: Record<
 function ProposalCard({ proposal }: { proposal: Proposal }) {
   const [status, setStatus] = useState(proposal.status);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(true); // Open by default so user can read before approving
+  const [expanded, setExpanded] = useState(true);
   const [feedback, setFeedback] = useState<"approved" | "rejected" | null>(null);
+  const [origin, setOrigin] = useState<"pedro" | "outros">("pedro");
 
   const config = proposalTypeConfig[proposal.type] ?? {
     label: proposal.type,
@@ -59,7 +60,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
   async function handleApprove() {
     setLoading(true);
     try {
-      await approveProposal(proposal.id);
+      await approveProposal(proposal.id, origin);
       setStatus("approved");
       setFeedback("approved");
     } catch (err) {
@@ -154,29 +155,59 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
         )}
       </div>
 
-      {/* Actions */}
+      {/* Actions — origin selector + approve/reject */}
       {status === "pending" && (
-        <div className="flex gap-2 border-t border-border px-4 py-2.5 bg-surface/30">
-          <button
-            disabled={loading}
-            onClick={handleApprove}
-            className="flex items-center gap-1.5 rounded-xl bg-green/10 px-4 py-2 font-mono text-[11px] font-bold text-green transition hover:bg-green/20 disabled:opacity-50"
-          >
-            {loading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="h-3.5 w-3.5" />
-            )}
-            Aprovar
-          </button>
-          <button
-            disabled={loading}
-            onClick={handleReject}
-            className="flex items-center gap-1 rounded-xl px-3 py-2 font-mono text-[10px] font-semibold text-text-muted transition hover:bg-red/10 hover:text-red disabled:opacity-50"
-          >
-            <XCircle className="h-3 w-3" />
-            Rejeitar
-          </button>
+        <div className="border-t border-border px-4 py-3 bg-surface/30 space-y-3">
+          {/* Origin selector */}
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[11px] text-text-muted">Origem:</span>
+            <button
+              type="button"
+              onClick={() => setOrigin("pedro")}
+              className={`rounded-lg px-2.5 py-1 font-mono text-[11px] font-medium transition ${
+                origin === "pedro"
+                  ? "bg-accent/15 text-accent border border-accent/30"
+                  : "bg-surface text-text-muted border border-border hover:text-text"
+              }`}
+            >
+              Do Pedro
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrigin("outros")}
+              className={`rounded-lg px-2.5 py-1 font-mono text-[11px] font-medium transition ${
+                origin === "outros"
+                  ? "bg-blue/15 text-blue border border-blue/30"
+                  : "bg-surface text-text-muted border border-border hover:text-text"
+              }`}
+            >
+              De outros
+            </button>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-2">
+            <button
+              disabled={loading}
+              onClick={handleApprove}
+              className="flex items-center gap-1.5 rounded-xl bg-green/10 px-4 py-2 font-mono text-[11px] font-bold text-green transition hover:bg-green/20 disabled:opacity-50"
+            >
+              {loading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              )}
+              Aprovar como {origin === "pedro" ? "Pedro" : "Outros"}
+            </button>
+            <button
+              disabled={loading}
+              onClick={handleReject}
+              className="flex items-center gap-1 rounded-xl px-3 py-2 font-mono text-[11px] font-semibold text-text-muted transition hover:bg-red/10 hover:text-red disabled:opacity-50"
+            >
+              <XCircle className="h-3 w-3" />
+              Rejeitar
+            </button>
+          </div>
         </div>
       )}
 
