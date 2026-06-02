@@ -109,42 +109,56 @@ export async function submitFileInput(formData: FormData) {
 
     // Handle by file type
     if (fileType === "application/pdf" || ext === "pdf") {
-      // PDF: extract readable text strings
+      // PDF: extract readable text, filtering out binary/metadata junk
       try {
         const buffer = await file.arrayBuffer();
         const bytes = new Uint8Array(buffer);
         const decoder = new TextDecoder("utf-8", { fatal: false });
         const rawStr = decoder.decode(bytes);
 
-        // Extract text between BT/ET markers (PDF text objects) or plain readable runs
         const textRuns: string[] = [];
 
-        // Method 1: Extract parenthesized strings (PDF text)
-        const parenMatches = rawStr.match(/\(([^)]{3,})\)/g);
+        // Method 1: Extract parenthesized strings (PDF text objects)
+        const parenMatches = rawStr.match(/\(([^)]{5,})\)/g);
         if (parenMatches) {
           for (const m of parenMatches) {
             const inner = m.slice(1, -1)
               .replace(/\\n/g, "\n")
               .replace(/\\r/g, "")
               .replace(/\\\\/g, "\\")
-              .replace(/\\([()])/g, "$1");
-            if (inner.length > 3 && /[a-zA-ZáàãâéèêíóòõôúçÁÀÃÂÉÈÊÍÓÒÕÔÚÇ]/.test(inner)) {
-              textRuns.push(inner);
+              .replace(/\\([()])/g, "$1")
+              .replace(/\0/g, "");
+            // Only keep strings that look like real text (have multiple words)
+            const wordCount = inner.trim().split(/\s+/).length;
+            if (inner.length > 8 && wordCount >= 2 && /[a-zA-ZáàãâéèêíóòõôúçÁÀÃÂÉÈÊÍÓÒÕÔÚÇ]{2,}/.test(inner)) {
+              textRuns.push(inner.trim());
             }
           }
         }
 
-        // Method 2: Also try extracting long readable runs
-        const readableRuns = rawStr.match(/[a-zA-ZáàãâéèêíóòõôúçÁÀÃÂÉÈÊÍÓÒÕÔÚÇ0-9\s,.;:!?()"-]{20,}/g);
+        // Method 2: Extract long readable runs (sentences/paragraphs)
+        const readableRuns = rawStr.match(/[a-zA-ZáàãâéèêíóòõôúçÁÀÃÂÉÈÊÍÓÒÕÔÚÇ0-9\s,.;:!?()"-]{30,}/g);
         if (readableRuns) {
           for (const r of readableRuns) {
-            if (!textRuns.some(t => t.includes(r.trim().slice(0, 20)))) {
-              textRuns.push(r.trim());
+            const trimmed = r.trim();
+            const words = trimmed.split(/\s+/).length;
+            // Only keep if it has at least 4 words (real sentence, not font names)
+            if (words >= 4 && !textRuns.some(t => t.includes(trimmed.slice(0, 30)))) {
+              textRuns.push(trimmed);
             }
           }
         }
 
-        textContent = textRuns.join("\n").slice(0, 60000);
+        // Filter out common PDF junk patterns
+        const cleanRuns = textRuns.filter(run => {
+          // Skip font declarations, encoding tables, metadata
+          if (/^(\/[A-Z]|<<|>>|endobj|endstream|stream|xref|trailer)/i.test(run)) return false;
+          if (/^[A-Z]{1,3}\d+\s/.test(run) && run.length < 20) return false; // PDF operators
+          if (/^(Type|Font|Encoding|BaseFont|Subtype)/i.test(run)) return false;
+          return true;
+        });
+
+        textContent = cleanRuns.join("\n").slice(0, 60000);
 
         if (textContent.length < 50) {
           return {
