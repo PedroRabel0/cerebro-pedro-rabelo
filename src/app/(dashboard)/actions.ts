@@ -147,13 +147,21 @@ export async function submitFileInput(formData: FormData) {
         textContent = textRuns.join("\n").slice(0, 60000);
 
         if (textContent.length < 50) {
-          textContent = `[PDF com conteudo nao-textual: ${fileName}. O arquivo pode conter imagens, scans ou texto codificado que nao pode ser extraido automaticamente. Tamanho: ${(fileSize / 1024).toFixed(1)}KB]`;
+          return {
+            captureId: "",
+            status: "saved_without_ai" as const,
+            error: `O PDF "${fileName}" não contém texto extraível. Pode ser um PDF de imagens/scan. Copie o texto do PDF manualmente e cole no campo de texto.`,
+          };
         } else {
           console.log(`[FileInput] PDF text extracted: ${textContent.length} chars`);
         }
       } catch (pdfErr) {
         console.error("[FileInput] PDF extraction error:", pdfErr);
-        textContent = `[Erro ao ler PDF: ${fileName}. Tente copiar o texto do PDF e colar diretamente.]`;
+        return {
+          captureId: "",
+          status: "saved_without_ai" as const,
+          error: `Erro ao ler "${fileName}". Tente copiar o texto do PDF e colar diretamente no campo de texto.`,
+        };
       }
 
     } else if (ext === "docx") {
@@ -173,11 +181,19 @@ export async function submitFileInput(formData: FormData) {
             .slice(0, 60000);
           console.log(`[FileInput] DOCX text extracted: ${textContent.length} chars`);
         } else {
-          textContent = `[Arquivo DOCX: ${fileName}. Nao foi possivel extrair texto. Tente salvar como .txt e enviar novamente.]`;
+          return {
+            captureId: "",
+            status: "saved_without_ai" as const,
+            error: `Não foi possível extrair texto do arquivo "${fileName}". Tente salvar como .txt e enviar novamente.`,
+          };
         }
       } catch (docxErr) {
         console.error("[FileInput] DOCX extraction error:", docxErr);
-        textContent = `[Erro ao ler DOCX: ${fileName}. Tente salvar como .txt e enviar novamente.]`;
+        return {
+          captureId: "",
+          status: "saved_without_ai" as const,
+          error: `Erro ao ler "${fileName}". Tente salvar como .txt e enviar novamente.`,
+        };
       }
 
     } else {

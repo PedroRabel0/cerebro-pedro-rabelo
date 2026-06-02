@@ -55,21 +55,59 @@ export function logCost(model: string, inputTokens: number, outputTokens: number
 }
 
 export function parseJSON<T>(text: string): T | null {
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim();
+  // Try 1: Extract from ```json ... ``` blocks (greedy — handles large responses)
+  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]+?)```/);
+  const candidate = jsonMatch ? jsonMatch[1].trim() : text.trim();
+
+  // Try 2: Direct parse
   try {
-    return JSON.parse(jsonStr) as T;
+    return JSON.parse(candidate) as T;
   } catch {
-    const objectMatch = jsonStr.match(/\{[\s\S]*\}/);
-    const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
-    const match = objectMatch || arrayMatch;
-    if (match) {
-      try {
-        return JSON.parse(match[0]) as T;
-      } catch {
-        return null;
+    // noop
+  }
+
+  // Try 3: Find the outermost { ... } or [ ... ] in the full text
+  // Use a bracket-counting approach for reliability with large JSON
+  const startIdx = text.indexOf('{');
+  if (startIdx !== -1) {
+    let depth = 0;
+    let endIdx = -1;
+    for (let i = startIdx; i < text.length; i++) {
+      if (text[i] === '{') depth++;
+      else if (text[i] === '}') {
+        depth--;
+        if (depth === 0) { endIdx = i; break; }
       }
     }
-    return null;
+    if (endIdx !== -1) {
+      try {
+        return JSON.parse(text.slice(startIdx, endIdx + 1)) as T;
+      } catch {
+        // noop
+      }
+    }
   }
+
+  // Try 4: Array
+  const arrStart = text.indexOf('[');
+  if (arrStart !== -1) {
+    let depth = 0;
+    let endIdx = -1;
+    for (let i = arrStart; i < text.length; i++) {
+      if (text[i] === '[') depth++;
+      else if (text[i] === ']') {
+        depth--;
+        if (depth === 0) { endIdx = i; break; }
+      }
+    }
+    if (endIdx !== -1) {
+      try {
+        return JSON.parse(text.slice(arrStart, endIdx + 1)) as T;
+      } catch {
+        // noop
+      }
+    }
+  }
+
+  return null;
 }
