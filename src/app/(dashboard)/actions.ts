@@ -132,7 +132,7 @@ export async function submitFileInput(formData: FormData) {
 
   // Delegate to normal processing, pass origin from formData
   const origin = (formData.get("origin") as string) || "pedro";
-  return submitUniversalInput(enrichedInput.slice(0, 20000), origin as "pedro" | "outros");
+  return submitUniversalInput(enrichedInput.slice(0, 60000), origin as "pedro" | "outros");
 }
 
 export async function submitUniversalInput(
