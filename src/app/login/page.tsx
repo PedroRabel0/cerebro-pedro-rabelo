@@ -33,16 +33,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
-      <div className="w-full max-w-sm animate-slide-in">
+    <div className="relative flex min-h-screen items-center justify-center bg-bg px-4 overflow-hidden">
+      {/* Ambient orbs */}
+      <div className="ambient-orb ambient-orb-accent" />
+      <div className="ambient-orb ambient-orb-violet" />
+
+      <div className="relative w-full max-w-sm animate-slide-in">
         <div className="mb-8 text-center">
-          <div className="logo-gradient mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl">
+          <div className="logo-gradient animate-float mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl">
             <Brain className="h-7 w-7 text-white" />
           </div>
-          <h1 className="font-display text-3xl font-bold text-text">
+          <h1 className="font-display text-3xl font-bold text-gradient">
             Segundo Cérebro
           </h1>
-          <p className="mt-2 font-mono text-[11px] uppercase tracking-widest text-accent">
+          <p className="mt-2 font-mono text-[11px] uppercase tracking-widest text-text-muted">
             do Pedro
           </p>
         </div>

@@ -145,8 +145,8 @@ export default function BrainChat() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="flex items-center gap-2">
+      {/* Input with glow */}
+      <form onSubmit={handleSubmit} className="glow-input flex items-center gap-2">
         <input
           type="text"
           value={input}

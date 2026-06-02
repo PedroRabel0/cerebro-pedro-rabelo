@@ -58,31 +58,31 @@ export default async function DashboardHome() {
   ];
 
   return (
-    <div className="space-y-10">
+    <div className="relative space-y-10">
       {/* Header */}
       <div>
         <span className="page-accent-line" />
-        <div className="flex items-center gap-3">
-          <div className="logo-gradient flex h-10 w-10 items-center justify-center rounded-2xl">
+        <div className="flex items-center gap-4">
+          <div className="logo-gradient flex h-11 w-11 items-center justify-center rounded-2xl">
             <Brain className="h-5 w-5 text-white" />
           </div>
           <div>
             <h1 className="font-display text-2xl font-bold text-text sm:text-3xl">
               Cérebro do Pedro
             </h1>
-            <p className="text-sm text-text-secondary">
-              Seu cérebro contém{" "}
-              <span className="font-medium text-text">
-                {stats.playbooks} playbooks
-              </span>
-              ,{" "}
-              <span className="font-medium text-text">
-                {stats.stories} histórias
+            <p className="mt-0.5 text-sm text-text-secondary">
+              <span className="font-medium text-accent">
+                {stats.playbooks}
               </span>{" "}
-              e{" "}
-              <span className="font-medium text-text">
-                {stats.contents} referências
-              </span>
+              playbooks ·{" "}
+              <span className="font-medium text-green">
+                {stats.stories}
+              </span>{" "}
+              histórias ·{" "}
+              <span className="font-medium text-violet">
+                {stats.contents}
+              </span>{" "}
+              referências
             </p>
           </div>
         </div>

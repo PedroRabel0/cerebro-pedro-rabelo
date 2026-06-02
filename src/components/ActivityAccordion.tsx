@@ -77,24 +77,24 @@ export default function ActivityAccordion({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div className="glass-card rounded-2xl overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-5 py-3.5 transition-colors hover:bg-surface/50"
+        className="flex w-full items-center justify-between px-5 py-3.5 transition-colors hover:bg-surface/30"
       >
         <div className="flex items-center gap-2">
           <Clock className="h-3.5 w-3.5 text-text-muted" />
-          <span className="font-mono text-xs uppercase tracking-wider text-text-muted">
+          <span className="font-mono text-[11px] uppercase tracking-wider text-text-muted">
             Atividade Recente
           </span>
           {entries.length > 0 && (
-            <span className="rounded-full bg-surface px-2 py-0.5 font-mono text-[10px] text-text-muted">
+            <span className="rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[11px] text-accent">
               {entries.length}
             </span>
           )}
         </div>
         <ChevronDown
-          className={`h-4 w-4 text-text-muted transition-transform duration-200 ${
+          className={`h-4 w-4 text-text-muted transition-transform duration-300 ${
             open ? "rotate-180" : ""
           }`}
         />
@@ -142,7 +142,7 @@ export default function ActivityAccordion({
                         </p>
                       )}
                     </div>
-                    <span className="shrink-0 font-mono text-[10px] text-text-muted">
+                    <span className="shrink-0 font-mono text-[11px] text-text-muted">
                       {relativeTime(item.created_at)}
                     </span>
                     <ArrowUpRight className="h-3 w-3 shrink-0 text-text-muted" />
