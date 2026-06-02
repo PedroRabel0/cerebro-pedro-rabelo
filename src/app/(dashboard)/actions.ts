@@ -100,9 +100,9 @@ export async function submitFileInput(formData: FormData) {
 
     console.log(`[FileInput] Processing: ${fileName} (${(fileSize / 1024).toFixed(1)}KB, type: ${fileType}, ext: ${ext})`);
 
-    // Reject files too large (5MB limit)
-    if (fileSize > 5 * 1024 * 1024) {
-      return { captureId: "", status: "saved_without_ai" as const, error: "Arquivo muito grande. Limite: 5MB." };
+    // Reject files too large (10MB limit — matches next.config bodySizeLimit)
+    if (fileSize > 10 * 1024 * 1024) {
+      return { captureId: "", status: "saved_without_ai" as const, error: "Arquivo muito grande. Limite: 10MB." };
     }
 
     let textContent = "";
@@ -219,8 +219,17 @@ export async function submitFileInput(formData: FormData) {
 
     console.log(`[FileInput] Final text: ${textContent.length} chars from ${fileName}`);
 
+    // Sanitize: remove null bytes and control chars that crash PostgreSQL
+    textContent = textContent
+      .replace(/\0/g, "")                    // Remove null bytes
+      .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, " ")  // Replace control chars with space
+      .replace(/\s{3,}/g, "\n\n")            // Collapse excessive whitespace
+      .trim();
+
     // Prefix with file metadata for AI context
     const enrichedInput = `[ARQUIVO: ${fileName} (${(fileSize / 1024).toFixed(1)}KB)]\n\n${textContent}`;
+
+    console.log(`[FileInput] Sanitized text: ${enrichedInput.length} chars`);
 
     // Delegate to normal processing
     const origin = (formData.get("origin") as string) || "pedro";
@@ -285,7 +294,7 @@ export async function submitUniversalInput(
       title,
       source_type: sourceType,
       source_url: isUrl ? input.trim() : null,
-      raw_content: input,
+      raw_content: input.replace(/\0/g, "").slice(0, 60000),
       status: "pending",
       context: origin === "outros" ? "origem:outros" : "origem:pedro",
     })
