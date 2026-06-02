@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+﻿export const revalidate = 30;
 
 import { getProfiles, getKnowledge, detectWeeklyPatterns } from "./actions";
 import Tabs from "./Tabs";

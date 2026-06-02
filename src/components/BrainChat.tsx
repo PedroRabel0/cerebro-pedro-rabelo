@@ -9,11 +9,42 @@ interface Message {
   content: string;
 }
 
+const STORAGE_KEY = "brain-chat-history";
+
+function loadMessages(): Message[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveMessages(msgs: Message[]) {
+  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(msgs)); } catch {}
+}
+
 export default function BrainChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const initialized = useRef(false);
+
+  // Load chat history from sessionStorage on mount
+  useEffect(() => {
+    if (!initialized.current) {
+      const saved = loadMessages();
+      if (saved.length > 0) setMessages(saved);
+      initialized.current = true;
+    }
+  }, []);
+
+  // Save to sessionStorage whenever messages change
+  useEffect(() => {
+    if (initialized.current && messages.length > 0) {
+      saveMessages(messages);
+    }
+  }, [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

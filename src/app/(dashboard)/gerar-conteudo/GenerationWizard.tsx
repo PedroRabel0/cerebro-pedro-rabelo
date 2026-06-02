@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
 import type { ContentType } from "@/lib/supabase/types";
 import { createWizardContent, updateContentStatus } from "./actions";
 import SlideDesigner from "@/components/SlideDesigner";
@@ -1055,6 +1055,8 @@ export default function GenerationWizard({
   const [results, setResults] = useState<GenerationResult[]>([]);
   const [error, setError] = useState("");
   const [activeDetailTab, setActiveDetailTab] = useState(0);
+  const [isPending, startTransition] = useTransition();
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const stepIdx = STEPS.indexOf(step);
 
@@ -1118,36 +1120,43 @@ export default function GenerationWizard({
     setGenerating(true);
     setError("");
     setResults([]);
+    setElapsedSeconds(0);
 
-    try {
-      const payload = {
-        source: state.source,
-        topicMode: state.topicMode,
-        playbookId: state.selectedPlaybookId || undefined,
-        storyId: state.selectedStoryId || undefined,
-        freeTopic: state.freeTopic || undefined,
-        recorte: state.recorte || undefined,
-        pullStory: state.pullStory,
-        pullStoryId: state.selectedStoryForPull || undefined,
-        audience: state.audience || undefined,
-        extraContext: state.extraContext || undefined,
-        contentTypes: state.selectedTypes,
-        typeDetails: state.typeDetails,
-      };
+    // Start timer so user sees progress
+    const timer = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
 
-      const res = await createWizardContent(payload);
+    startTransition(async () => {
+      try {
+        const payload = {
+          source: state.source,
+          topicMode: state.topicMode,
+          playbookId: state.selectedPlaybookId || undefined,
+          storyId: state.selectedStoryId || undefined,
+          freeTopic: state.freeTopic || undefined,
+          recorte: state.recorte || undefined,
+          pullStory: state.pullStory,
+          pullStoryId: state.selectedStoryForPull || undefined,
+          audience: state.audience || undefined,
+          extraContext: state.extraContext || undefined,
+          contentTypes: state.selectedTypes,
+          typeDetails: state.typeDetails,
+        };
 
-      if ("error" in res) {
-        setError(res.error);
-      } else {
-        setResults(res.results);
-        setStep("result");
+        const res = await createWizardContent(payload);
+
+        if ("error" in res) {
+          setError(res.error);
+        } else {
+          setResults(res.results);
+          setStep("result");
+        }
+      } catch {
+        setError("Erro inesperado ao gerar conteudo.");
+      } finally {
+        clearInterval(timer);
+        setGenerating(false);
       }
-    } catch {
-      setError("Erro inesperado ao gerar conteudo.");
-    } finally {
-      setGenerating(false);
-    }
+    });
   }
 
   async function handleRegenerate(contentType: ContentType) {
@@ -1469,17 +1478,26 @@ export default function GenerationWizard({
         </div>
       )}
 
-      {/* Generating animation */}
+      {/* Generating animation with timer */}
       {generating && (
-        <div className="animate-pulse rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-transparent p-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10">
+        <div className="animate-slide-in rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-violet/5 p-6 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/10 to-violet/10">
             <Sparkles className="h-6 w-6 text-accent animate-pulse" />
           </div>
           <p className="text-sm font-medium text-text">
-            Analisando base de conhecimento...
+            {elapsedSeconds < 5
+              ? "Analisando base de conhecimento..."
+              : elapsedSeconds < 15
+                ? "Montando prompt com seus playbooks e historias..."
+                : elapsedSeconds < 30
+                  ? "Gerando conteudo com Claude AI..."
+                  : "Quase la — finalizando a geracao..."}
           </p>
           <p className="mt-1 text-xs text-text-muted">
-            Gerando {state.selectedTypes.length} tipo{state.selectedTypes.length !== 1 ? "s" : ""} de conteudo com base nos seus playbooks e historias.
+            {state.selectedTypes.length} tipo{state.selectedTypes.length !== 1 ? "s" : ""} de conteudo · {elapsedSeconds}s
+          </p>
+          <p className="mt-2 text-[11px] text-text-muted">
+            Voce pode navegar — a geracao continua no servidor.
           </p>
         </div>
       )}

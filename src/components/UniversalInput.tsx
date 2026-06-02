@@ -232,6 +232,8 @@ function ElapsedTime() {
   );
 }
 
+const PROCESSING_KEY = "universal-input-processing";
+
 export default function UniversalInput() {
   const [input, setInput] = useState("");
   const [state, setState] = useState<ProcessingState>("idle");
@@ -239,8 +241,31 @@ export default function UniversalInput() {
   const [steps, setSteps] = useState<ProcessingStep[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(null);
+  const [resumedFromNav, setResumedFromNav] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const processingRef = useRef(false);
+
+  // On mount: check if we were processing before navigating away
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(PROCESSING_KEY);
+      if (saved) {
+        const data = JSON.parse(saved);
+        // If less than 5 minutes old, show "processing continues" banner
+        if (Date.now() - data.startedAt < 5 * 60 * 1000) {
+          setResumedFromNav(true);
+          setState("processing");
+          setSteps([
+            { label: "Enviando input", status: "done" },
+            { label: "Processando com Claude AI (continua no servidor)", status: "active" },
+          ]);
+          setCurrentStep(1);
+        }
+        sessionStorage.removeItem(PROCESSING_KEY);
+      }
+    } catch {}
+  }, []);
 
   const detectedType = selectedFile
     ? `Arquivo: ${selectedFile.name}`
@@ -271,8 +296,18 @@ export default function UniversalInput() {
     if (!input.trim() && !selectedFile) return;
     setState("processing");
     setResult(null);
+    setResumedFromNav(false);
+    processingRef.current = true;
 
-    // Only 2 real steps: Enviando → Processando com IA (server does the rest)
+    // Save processing state so it survives navigation
+    try {
+      sessionStorage.setItem(PROCESSING_KEY, JSON.stringify({
+        startedAt: Date.now(),
+        type: selectedFile ? "file" : "text",
+        label: selectedFile ? selectedFile.name : input.trim().slice(0, 60),
+      }));
+    } catch {}
+
     const processingSteps = selectedFile
       ? [
           { label: "Enviando arquivo", status: "active" as const },
@@ -286,20 +321,20 @@ export default function UniversalInput() {
     setCurrentStep(0);
 
     try {
-      // Step 1 is active (sending)
       let res;
       if (selectedFile) {
         const formData = new FormData();
         formData.append("file", selectedFile);
-        // Move to step 2 right before the server call
         setCurrentStep(1);
         res = await submitFileInput(formData);
       } else {
-        // Move to step 2 right before the server call
         setCurrentStep(1);
         res = await submitUniversalInput(input.trim());
       }
-      // Mark all steps as done
+      // Clear processing state — done successfully
+      try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
+      processingRef.current = false;
+
       setSteps((prev) => prev.map((s) => ({ ...s, status: "done" as const })));
       setResult(res as ProcessResult);
       setState("done");
@@ -307,6 +342,8 @@ export default function UniversalInput() {
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
+      try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
+      processingRef.current = false;
       console.error(err);
       setState("error");
     }
@@ -415,8 +452,31 @@ export default function UniversalInput() {
         </div>
       </div>
 
+      {/* Resumed from navigation banner */}
+      {resumedFromNav && state === "processing" && (
+        <div className="animate-slide-in rounded-2xl border border-amber/20 bg-amber/5 p-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-4 w-4 animate-spin text-amber" />
+            <div>
+              <p className="text-sm font-medium text-text">
+                Processamento em andamento
+              </p>
+              <p className="text-xs text-text-muted">
+                Você saiu da aba, mas o servidor continua processando. O resultado aparecerá em <strong>Insights</strong> quando terminar.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => { setState("idle"); setResumedFromNav(false); setSteps([]); }}
+            className="mt-3 rounded-lg border border-border px-3 py-1.5 font-mono text-[11px] text-text-muted transition hover:bg-surface hover:text-text"
+          >
+            Ok, entendi
+          </button>
+        </div>
+      )}
+
       {/* Processing Steps */}
-      {state === "processing" && steps.length > 0 && (
+      {state === "processing" && steps.length > 0 && !resumedFromNav && (
         <div className="animate-slide-in rounded-2xl border border-border bg-card p-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
