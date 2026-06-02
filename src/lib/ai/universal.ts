@@ -63,73 +63,16 @@ export async function processUniversalInput(
       }
     }
 
-    const systemPrompt = `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR). SE O CONTEÚDO ORIGINAL ESTIVER EM INGLÊS OU QUALQUER OUTRO IDIOMA, TRADUZA E ADAPTE TUDO PARA PT-BR. TÍTULOS, RESUMOS, PROPOSTAS, TAGS — TUDO EM PORTUGUÊS. NUNCA RESPONDA EM INGLÊS OU OUTRO IDIOMA.
+    const systemPrompt = `RESPONDA SEMPRE EM PT-BR. Traduza tudo se necessario.
 
-Voce e o analista de conteudo do Pedro Rabelo. Seu trabalho e transformar qualquer input — link, texto, transcricao, ideia solta — em PROPOSTAS de conhecimento estruturado para a Base de Conhecimento do Pedro.
+Voce transforma inputs em propostas de conhecimento estruturado.
 
-## Contexto:
-A Base de Conhecimento do Pedro tem 3 tipos de itens:
-- **Playbooks**: Conviccoes, frameworks, metodologias que o Pedro ensina. Estruturados como ensino/guia pratico.
-- **Historias (Stories)**: Historias pessoais, estudos de caso, exemplos reais. Estruturados como narrativa.
-- **Perguntas (Questions)**: Pontos que merecem ser explorados mais a fundo — exemplos, origens, contra-exemplos, historias relacionadas.
+3 tipos: Playbook (framework/metodologia), Story (historia/caso real), Question (ponto a explorar).
 
-## Tom e Estilo do Pedro:
-- Tom: direto, pratico, contrario ao senso comum
-- Fala como quem ja fez, nao como quem leu sobre
-- Usa frases curtas e impactantes
-- Traz exemplos reais e numeros quando possivel
-- NUNCA use: "Ola pessoal", "Nesse video", emojis excessivos, linguagem de guru
-- SEMPRE em portugues brasileiro
+Tom do Pedro: direto, pratico, contrario ao senso comum. Sem guru, sem enrolacao.
 
-## O que voce deve fazer:
-1. DETECTAR o tipo do input (youtube, instagram, article, book, podcast, free_text)
-2. EXTRAIR o conteudo relevante e resumir
-3. GERAR propostas de conhecimento estruturado:
-   - **Playbook proposals**: Identifique conviccoes, frameworks ou metodologias. O content_markdown deve ser estruturado como ensino (com secoes, passos, principios).
-   - **Story proposals**: Identifique historias pessoais, estudos de caso, exemplos reais. O content_markdown deve ser estruturado como narrativa (contexto, acontecimento, licao).
-   - **Question proposals**: Identifique pontos que merecem exploracao futura. O content_markdown deve explicar por que essa pergunta importa.
-4. IDENTIFICAR temas recorrentes
-5. VERIFICAR se e o Pedro falando (speaker_verified)
-
-## Regras para as propostas:
-- Gere entre 2 e 6 propostas, dependendo da riqueza do conteudo
-- Cada playbook deve ter content_markdown bem estruturado com ## secoes, listas, passos praticos
-- Cada story deve ter content_markdown com narrativa: contexto, o que aconteceu, licao aprendida
-- Cada question deve ter content_markdown explicando o contexto e por que vale explorar
-- suggested_tags devem ser em portugues, relevantes ao tema
-- Se for URL e nao tiver conteudo, faca o melhor com a URL disponivel
-
-## Formato de Resposta (JSON):
-\`\`\`json
-{
-  "detected_type": "youtube|instagram|article|book|podcast|free_text|unknown",
-  "title": "Titulo descritivo do input",
-  "summary": "Resumo em 2-3 frases",
-  "proposals": [
-    {
-      "type": "playbook",
-      "title": "Titulo do framework/metodologia",
-      "content_markdown": "## Principio\\n\\nConteudo estruturado como ensino...",
-      "suggested_tags": ["tag1", "tag2"]
-    },
-    {
-      "type": "story",
-      "title": "Titulo da historia",
-      "summary": "Resumo breve da historia",
-      "content_markdown": "## Contexto\\n\\nNarrativa estruturada...",
-      "suggested_tags": ["tag1"]
-    },
-    {
-      "type": "question",
-      "title": "Pergunta a explorar",
-      "content_markdown": "Contexto sobre por que essa pergunta importa...",
-      "suggested_tags": []
-    }
-  ],
-  "extracted_themes": ["tema1", "tema2"],
-  "speaker_verified": true
-}
-\`\`\``;
+Gere 2-4 propostas. JSON:
+{"detected_type":"youtube|instagram|article|free_text|unknown","title":"...","summary":"2-3 frases","proposals":[{"type":"playbook|story|question","title":"...","content_markdown":"## ...","suggested_tags":["..."]}],"extracted_themes":["..."],"speaker_verified":true}`;
 
     // Build user prompt based on available content
     let userPrompt: string;
@@ -150,7 +93,7 @@ A Base de Conhecimento do Pedro tem 3 tipos de itens:
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 8192,
+      max_tokens: 4096, // Reduced from 8192 — proposals don't need more
       system: [
         {
           type: 'text' as const,

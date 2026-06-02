@@ -196,41 +196,43 @@ export async function submitUniversalInput(
 
   if (captureError) throw captureError;
 
-  // 2. Log activity
-  await supabase.from("activity_log").insert({
+  // 2. Log activity (fire-and-forget — don't wait)
+  supabase.from("activity_log").insert({
     actor: "ia",
-    action: `Novo input recebido: ${sourceType}${isInstagram ? " (Instagram — scraping com Apify)" : ""}`,
+    action: `Novo input recebido: ${sourceType}${isInstagram ? " (Instagram)" : ""}`,
     entity_type: "capture",
     entity_id: capture.id,
     entity_title: isUrl ? input.trim() : input.slice(0, 60),
-  });
+  }).then(() => {});
 
-  // 3. Instagram-specific: scrape with Apify + DNA analysis
+  // 3. Instagram scraping + AI processing — run in PARALLEL when possible
   let instagramData = null;
+  let aiInput = input;
+
   if (isInstagram) {
+    // For Instagram: scrape first (we need caption for AI), then process AI
     try {
       instagramData = await handleInstagramInput(input.trim(), supabase);
+      if (instagramData?.caption) {
+        aiInput = `URL: ${input.trim()}\n\nLegenda do post:\n${instagramData.caption}\n\nMétricas: ${instagramData.likes} likes, ${instagramData.comments} comentários`;
+      }
+      // Log scrape result (fire-and-forget)
       if (instagramData) {
-        await supabase.from("activity_log").insert({
+        supabase.from("activity_log").insert({
           actor: "ia",
           action: `Instagram scrapado: ${instagramData.likes} likes, ${instagramData.comments} comments`,
           entity_type: "reference_post",
           entity_id: capture.id,
           entity_title: instagramData.caption?.slice(0, 60) || input.trim(),
-        });
+        }).then(() => {});
       }
     } catch (err) {
       console.error("[Instagram] Scrape error:", err);
     }
   }
 
-  // 4. AI Processing (Claude)
+  // 4. AI Processing (Claude) — the main bottleneck
   try {
-    // If Instagram, enrich the input with scraped data
-    const aiInput = instagramData?.caption
-      ? `URL: ${input.trim()}\n\nLegenda do post:\n${instagramData.caption}\n\nMétricas: ${instagramData.likes} likes, ${instagramData.comments} comentários`
-      : input;
-
     const result = await processUniversalInput(aiInput);
 
     if ("error" in result) {
@@ -239,49 +241,46 @@ export async function submitUniversalInput(
       return { captureId: capture.id, status: "saved_without_ai" as const, instagramData };
     }
 
-    // Update capture with AI results
-    await supabase
-      .from("captures")
-      .update({
-        title: result.title,
-        context: result.summary,
-        status: "processed",
-        speaker_verified: result.speaker_verified,
-      })
-      .eq("id", capture.id);
-
-    // Save proposals (playbook/story/question for the knowledge base)
-    if (result.proposals.length > 0) {
-      const proposalRows = result.proposals.map((p) => ({
-        capture_id: capture.id,
-        type: p.type as "playbook" | "story" | "question",
-        title: p.title,
-        content_markdown: p.content_markdown,
-        suggested_tags: p.suggested_tags || [],
-        status: "pending",
-      }));
-
-      if (proposalRows.length > 0) {
+    // Save all DB operations in PARALLEL (not sequential)
+    await Promise.all([
+      (async () => {
         await supabase
-          .from("proposals")
-          .insert(proposalRows)
-          .select("id, type");
-      }
-    }
-
-    // Log success
-    await supabase.from("activity_log").insert({
-      actor: "ia",
-      action: `Processou input e gerou ${result.proposals.length} proposta(s)${isInstagram ? " + referência Instagram" : ""}`,
-      entity_type: "capture",
-      entity_id: capture.id,
-      entity_title: result.title,
-    });
+          .from("captures")
+          .update({
+            title: result.title,
+            context: result.summary,
+            status: "processed",
+            speaker_verified: result.speaker_verified,
+          })
+          .eq("id", capture.id);
+      })(),
+      (async () => {
+        if (result.proposals.length > 0) {
+          const proposalRows = result.proposals.map((p) => ({
+            capture_id: capture.id,
+            type: p.type as "playbook" | "story" | "question",
+            title: p.title,
+            content_markdown: p.content_markdown,
+            suggested_tags: p.suggested_tags || [],
+            status: "pending",
+          }));
+          await supabase.from("proposals").insert(proposalRows);
+        }
+      })(),
+      (async () => {
+        await supabase.from("activity_log").insert({
+          actor: "ia",
+          action: `Processou input e gerou ${result.proposals.length} proposta(s)`,
+          entity_type: "capture",
+          entity_id: capture.id,
+          entity_title: result.title,
+        });
+      })(),
+    ]);
 
     revalidatePath("/");
     revalidatePath("/insights-pedro");
     revalidatePath("/base-de-conhecimento");
-    revalidatePath("/referencias");
 
     return {
       captureId: capture.id,
