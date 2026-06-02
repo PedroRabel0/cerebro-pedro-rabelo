@@ -243,6 +243,7 @@ export default function UniversalInput() {
   const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(null);
   const [resumedFromNav, setResumedFromNav] = useState(false);
   const [contentOrigin, setContentOrigin] = useState<"pedro" | "outros">("pedro");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const processingRef = useRef(false);
@@ -333,9 +334,18 @@ export default function UniversalInput() {
         setCurrentStep(1);
         res = await submitUniversalInput(input.trim(), contentOrigin);
       }
-      // Clear processing state — done successfully
+
+      // Clear processing state
       try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
       processingRef.current = false;
+
+      // Check for file-level errors
+      const resAny = res as Record<string, unknown>;
+      if (resAny.error && typeof resAny.error === "string") {
+        setErrorMessage(resAny.error as string);
+        setState("error");
+        return;
+      }
 
       setSteps((prev) => prev.map((s) => ({ ...s, status: "done" as const })));
       setResult(res as ProcessResult);
@@ -347,6 +357,7 @@ export default function UniversalInput() {
       try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
       processingRef.current = false;
       console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : "Erro inesperado ao processar.");
       setState("error");
     }
   }
@@ -671,13 +682,13 @@ export default function UniversalInput() {
                 Erro ao processar
               </p>
               <p className="text-xs text-text-muted">
-                Verifique sua conexão e tente novamente.
+                {errorMessage || "Verifique sua conexão e tente novamente."}
               </p>
             </div>
           </div>
           <button
-            onClick={handleReset}
-            className="mt-3 rounded-lg bg-card px-3 py-1.5 font-mono text-[10px] text-text-muted transition hover:text-text"
+            onClick={() => { handleReset(); setErrorMessage(null); }}
+            className="mt-3 rounded-lg bg-card px-3 py-1.5 font-mono text-[11px] text-text-muted transition hover:text-text"
           >
             Tentar novamente
           </button>

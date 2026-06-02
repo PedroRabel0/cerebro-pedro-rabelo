@@ -87,52 +87,134 @@ async function handleInstagramInput(url: string, supabase: Awaited<ReturnType<ty
 }
 
 export async function submitFileInput(formData: FormData) {
-  const file = formData.get("file") as File;
-  if (!file) throw new Error("Nenhum arquivo enviado");
+  try {
+    const file = formData.get("file") as File;
+    if (!file) {
+      return { captureId: "", status: "saved_without_ai" as const, error: "Nenhum arquivo enviado" };
+    }
 
-  const fileName = file.name;
-  const fileSize = file.size;
-  const fileType = file.type;
+    const fileName = file.name;
+    const fileSize = file.size;
+    const fileType = file.type;
+    const ext = fileName.split(".").pop()?.toLowerCase() || "";
 
-  // Read file content as text
-  let textContent = "";
+    console.log(`[FileInput] Processing: ${fileName} (${(fileSize / 1024).toFixed(1)}KB, type: ${fileType}, ext: ${ext})`);
 
-  if (fileType === "application/pdf") {
-    // For PDFs, we extract what we can — send raw text to AI
-    const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    // Simple PDF text extraction — extract readable strings
-    let raw = "";
-    for (let i = 0; i < bytes.length; i++) {
-      const byte = bytes[i];
-      if (byte >= 32 && byte <= 126) {
-        raw += String.fromCharCode(byte);
-      } else if (byte === 10 || byte === 13) {
-        raw += "\n";
+    // Reject files too large (5MB limit)
+    if (fileSize > 5 * 1024 * 1024) {
+      return { captureId: "", status: "saved_without_ai" as const, error: "Arquivo muito grande. Limite: 5MB." };
+    }
+
+    let textContent = "";
+
+    // Handle by file type
+    if (fileType === "application/pdf" || ext === "pdf") {
+      // PDF: extract readable text strings
+      try {
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        const decoder = new TextDecoder("utf-8", { fatal: false });
+        const rawStr = decoder.decode(bytes);
+
+        // Extract text between BT/ET markers (PDF text objects) or plain readable runs
+        const textRuns: string[] = [];
+
+        // Method 1: Extract parenthesized strings (PDF text)
+        const parenMatches = rawStr.match(/\(([^)]{3,})\)/g);
+        if (parenMatches) {
+          for (const m of parenMatches) {
+            const inner = m.slice(1, -1)
+              .replace(/\\n/g, "\n")
+              .replace(/\\r/g, "")
+              .replace(/\\\\/g, "\\")
+              .replace(/\\([()])/g, "$1");
+            if (inner.length > 3 && /[a-zA-ZáàãâéèêíóòõôúçÁÀÃÂÉÈÊÍÓÒÕÔÚÇ]/.test(inner)) {
+              textRuns.push(inner);
+            }
+          }
+        }
+
+        // Method 2: Also try extracting long readable runs
+        const readableRuns = rawStr.match(/[a-zA-ZáàãâéèêíóòõôúçÁÀÃÂÉÈÊÍÓÒÕÔÚÇ0-9\s,.;:!?()"-]{20,}/g);
+        if (readableRuns) {
+          for (const r of readableRuns) {
+            if (!textRuns.some(t => t.includes(r.trim().slice(0, 20)))) {
+              textRuns.push(r.trim());
+            }
+          }
+        }
+
+        textContent = textRuns.join("\n").slice(0, 60000);
+
+        if (textContent.length < 50) {
+          textContent = `[PDF com conteudo nao-textual: ${fileName}. O arquivo pode conter imagens, scans ou texto codificado que nao pode ser extraido automaticamente. Tamanho: ${(fileSize / 1024).toFixed(1)}KB]`;
+        } else {
+          console.log(`[FileInput] PDF text extracted: ${textContent.length} chars`);
+        }
+      } catch (pdfErr) {
+        console.error("[FileInput] PDF extraction error:", pdfErr);
+        textContent = `[Erro ao ler PDF: ${fileName}. Tente copiar o texto do PDF e colar diretamente.]`;
+      }
+
+    } else if (ext === "docx") {
+      // DOCX is a ZIP file — extract document.xml text
+      try {
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        const decoder = new TextDecoder("utf-8", { fatal: false });
+        const rawStr = decoder.decode(bytes);
+
+        // Extract text between XML tags (rough but works for body text)
+        const xmlText = rawStr.match(/<w:t[^>]*>([^<]+)<\/w:t>/g);
+        if (xmlText && xmlText.length > 0) {
+          textContent = xmlText
+            .map(t => t.replace(/<[^>]+>/g, ""))
+            .join(" ")
+            .slice(0, 60000);
+          console.log(`[FileInput] DOCX text extracted: ${textContent.length} chars`);
+        } else {
+          textContent = `[Arquivo DOCX: ${fileName}. Nao foi possivel extrair texto. Tente salvar como .txt e enviar novamente.]`;
+        }
+      } catch (docxErr) {
+        console.error("[FileInput] DOCX extraction error:", docxErr);
+        textContent = `[Erro ao ler DOCX: ${fileName}. Tente salvar como .txt e enviar novamente.]`;
+      }
+
+    } else {
+      // Text-based files: .txt, .md, .csv, .json, .srt, .vtt, etc.
+      try {
+        textContent = await file.text();
+      } catch {
+        // Fallback: try reading as ArrayBuffer and decode
+        try {
+          const buffer = await file.arrayBuffer();
+          const decoder = new TextDecoder("utf-8", { fatal: false });
+          textContent = decoder.decode(buffer);
+        } catch (encErr) {
+          console.error("[FileInput] Text extraction error:", encErr);
+          return { captureId: "", status: "saved_without_ai" as const, error: `Nao foi possivel ler o arquivo ${fileName}. Formato nao suportado.` };
+        }
       }
     }
-    // Clean up PDF artifacts — keep meaningful text runs
-    textContent = raw
-      .split("\n")
-      .filter(line => line.trim().length > 20)
-      .filter(line => !/^[%\/\[\]()<>{}]+$/.test(line.trim()))
-      .join("\n")
-      .slice(0, 15000);
 
-    if (textContent.length < 100) {
-      textContent = `[Arquivo PDF: ${fileName}, ${(fileSize / 1024).toFixed(1)}KB — conteúdo não extraível automaticamente. O PDF pode conter imagens ou texto codificado.]`;
+    if (!textContent || textContent.trim().length < 10) {
+      return { captureId: "", status: "saved_without_ai" as const, error: `Arquivo ${fileName} parece vazio ou nao contém texto legivel.` };
     }
-  } else {
-    // Text-based files: .txt, .md, .csv, .json, etc.
-    textContent = await file.text();
+
+    console.log(`[FileInput] Final text: ${textContent.length} chars from ${fileName}`);
+
+    // Prefix with file metadata for AI context
+    const enrichedInput = `[ARQUIVO: ${fileName} (${(fileSize / 1024).toFixed(1)}KB)]\n\n${textContent}`;
+
+    // Delegate to normal processing
+    const origin = (formData.get("origin") as string) || "pedro";
+    return submitUniversalInput(enrichedInput.slice(0, 60000), origin as "pedro" | "outros");
+
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    console.error("[FileInput] Unexpected error:", message);
+    return { captureId: "", status: "saved_without_ai" as const, error: `Falha ao processar arquivo: ${message}` };
   }
-
-  // Prefix with file metadata for AI context
-  const enrichedInput = `[ARQUIVO ENVIADO: ${fileName} (${(fileSize / 1024).toFixed(1)}KB, tipo: ${fileType || "desconhecido"})]\n\n${textContent}`;
-
-  // Delegate to normal processing, pass origin from formData
-  const origin = (formData.get("origin") as string) || "pedro";
-  return submitUniversalInput(enrichedInput.slice(0, 60000), origin as "pedro" | "outros");
 }
 
 export async function submitUniversalInput(
