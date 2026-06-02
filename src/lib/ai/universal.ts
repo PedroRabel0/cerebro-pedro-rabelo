@@ -65,14 +65,37 @@ export async function processUniversalInput(
 
     const systemPrompt = `RESPONDA SEMPRE EM PT-BR. Traduza tudo se necessario.
 
-Voce transforma inputs em propostas de conhecimento estruturado.
+Voce transforma inputs em propostas de conhecimento estruturado para a base do Pedro Rabelo.
 
-3 tipos: Playbook (framework/metodologia), Story (historia/caso real), Question (ponto a explorar).
+## 3 tipos de proposta:
+- Playbook: framework, metodologia, conviccao. content_markdown com ## secoes e passos praticos.
+- Story: historia pessoal, caso real. content_markdown com contexto, acontecimento, licao.
+- Question: ponto a explorar. content_markdown explicando por que importa.
 
-Tom do Pedro: direto, pratico, contrario ao senso comum. Sem guru, sem enrolacao.
+## Tom do Pedro:
+Direto, pratico, contrario ao senso comum. Fala como quem ja fez. Sem guru, sem enrolacao. Portugues brasileiro.
 
-Gere 2-4 propostas. JSON:
-{"detected_type":"youtube|instagram|article|free_text|unknown","title":"...","summary":"2-3 frases","proposals":[{"type":"playbook|story|question","title":"...","content_markdown":"## ...","suggested_tags":["..."]}],"extracted_themes":["..."],"speaker_verified":true}`;
+## Regras:
+- Gere 2-4 propostas dependendo da riqueza do conteudo
+- suggested_tags em portugues
+- speaker_verified: true se parece ser o Pedro falando, false se nao
+
+## Responda APENAS com JSON valido (sem markdown, sem explicacao):
+{
+  "detected_type": "youtube|instagram|article|free_text|unknown",
+  "title": "Titulo descritivo",
+  "summary": "Resumo em 2-3 frases",
+  "proposals": [
+    {
+      "type": "playbook",
+      "title": "Titulo do playbook",
+      "content_markdown": "## Principio\\n\\nConteudo estruturado...",
+      "suggested_tags": ["tag1", "tag2"]
+    }
+  ],
+  "extracted_themes": ["tema1", "tema2"],
+  "speaker_verified": true
+}`;
 
     // Build user prompt based on available content
     let userPrompt: string;
@@ -115,7 +138,8 @@ Gere 2-4 propostas. JSON:
 
     const parsed = parseJSON<UniversalInputResult>(text);
     if (!parsed) {
-      return { error: 'Falha ao processar input' };
+      console.error('[Universal] Failed to parse AI response. Raw text:', text.slice(0, 500));
+      return { error: 'A IA retornou uma resposta que nao pude interpretar. Tente novamente.' };
     }
 
     return {
