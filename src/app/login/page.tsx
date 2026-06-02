@@ -34,27 +34,27 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm animate-slide-in">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent">
-            <Brain className="h-6 w-6 text-white" />
+          <div className="logo-gradient mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl">
+            <Brain className="h-7 w-7 text-white" />
           </div>
           <h1 className="font-display text-3xl font-bold text-text">
             Segundo Cérebro
           </h1>
-          <p className="mt-2 font-mono text-xs uppercase tracking-widest text-text-muted">
+          <p className="mt-2 font-mono text-[11px] uppercase tracking-widest text-accent">
             do Pedro
           </p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="space-y-4 rounded-2xl border border-border bg-card p-6"
+          className="glass-card space-y-5 rounded-2xl p-7"
         >
           <div>
             <label
               htmlFor="email"
-              className="block font-mono text-xs uppercase tracking-wider text-text-secondary"
+              className="block font-mono text-[11px] uppercase tracking-wider text-text-secondary"
             >
               Email
             </label>
@@ -65,7 +65,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="mt-1 block w-full rounded-xl border border-border bg-surface px-3 py-2 text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="mt-1.5 block w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
               placeholder="seu@email.com"
             />
           </div>
@@ -73,7 +73,7 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="password"
-              className="block font-mono text-xs uppercase tracking-wider text-text-secondary"
+              className="block font-mono text-[11px] uppercase tracking-wider text-text-secondary"
             >
               Senha
             </label>
@@ -85,13 +85,13 @@ export default function LoginPage() {
               required
               minLength={6}
               autoComplete="current-password"
-              className="mt-1 block w-full rounded-xl border border-border bg-surface px-3 py-2 text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="mt-1.5 block w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <p role="alert" className="flex items-center gap-2 text-sm text-red">
+            <p role="alert" className="flex items-center gap-2 rounded-lg bg-red/10 px-3 py-2 text-xs text-red">
               <span aria-hidden="true">!</span>
               {error}
             </p>
@@ -100,7 +100,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-accent px-4 py-2 font-mono text-sm font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50"
+            className="btn-primary w-full rounded-xl px-4 py-2.5 font-mono text-sm font-semibold text-white disabled:opacity-50"
           >
             {loading ? "Carregando..." : "Entrar"}
           </button>

@@ -13,7 +13,6 @@ import {
   Brain,
   Menu,
   X,
-  Wifi,
   Settings,
   LogOut,
   User,
@@ -26,86 +25,50 @@ import {
 } from "lucide-react";
 import { useUserRole, type UserRole } from "@/lib/hooks/useUserRole";
 
-const navItems: {
+interface NavItem {
   href: string;
   label: string;
   Icon: typeof Brain;
-  description: string;
   roles?: UserRole[];
-}[] = [
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
   {
-    href: "/",
-    label: "Cérebro",
-    Icon: Brain,
-    description: "Chat com o cérebro",
+    title: "CORE",
+    items: [
+      { href: "/", label: "Cérebro", Icon: Brain },
+      { href: "/base-de-conhecimento", label: "Conhecimento", Icon: BookOpen },
+      { href: "/gerar-conteudo", label: "Geração", Icon: Sparkles },
+    ],
   },
   {
-    href: "/base-de-conhecimento",
-    label: "Conhecimento",
-    Icon: BookOpen,
-    description: "Base, upload e alimentar",
+    title: "ANÁLISE",
+    items: [
+      { href: "/insights-pedro", label: "Insights", Icon: Lightbulb },
+      { href: "/tendencias", label: "Tendências", Icon: TrendingUp },
+      { href: "/analytics", label: "Analytics", Icon: BarChart3 },
+    ],
   },
   {
-    href: "/referencias",
-    label: "Referências",
-    Icon: Search,
-    description: "Perfis e posts",
-    roles: ["pedro"],
+    title: "FERRAMENTAS",
+    items: [
+      { href: "/respostas", label: "Pedro Clone", Icon: MessageCircle },
+      { href: "/newsletter", label: "Newsletter", Icon: Mail },
+      { href: "/calendario", label: "Calendário", Icon: CalendarDays },
+      { href: "/evolucao-voz", label: "Voz", Icon: AudioLines },
+    ],
   },
   {
-    href: "/identidade",
-    label: "Identidade",
-    Icon: Target,
-    description: "Voz e tom",
-    roles: ["pedro"],
-  },
-  {
-    href: "/insights-pedro",
-    label: "Insights",
-    Icon: Lightbulb,
-    description: "Capturas e propostas",
-  },
-  {
-    href: "/gerar-conteudo",
-    label: "Geração",
-    Icon: Sparkles,
-    description: "Conteúdo, hooks e repurpose",
-  },
-  {
-    href: "/calendario",
-    label: "Calendário",
-    Icon: CalendarDays,
-    description: "Agendar publicações",
-  },
-  {
-    href: "/analytics",
-    label: "Analytics",
-    Icon: BarChart3,
-    description: "Performance dos conteúdos",
-  },
-  {
-    href: "/tendencias",
-    label: "Tendências",
-    Icon: TrendingUp,
-    description: "Detectar trends",
-  },
-  {
-    href: "/respostas",
-    label: "Pedro Clone",
-    Icon: MessageCircle,
-    description: "Respostas automáticas",
-  },
-  {
-    href: "/newsletter",
-    label: "Newsletter",
-    Icon: Mail,
-    description: "Gerar newsletters",
-  },
-  {
-    href: "/evolucao-voz",
-    label: "Voz",
-    Icon: AudioLines,
-    description: "Evolução da identidade",
+    title: "ADMIN",
+    items: [
+      { href: "/referencias", label: "Referências", Icon: Search, roles: ["pedro"] },
+      { href: "/identidade", label: "Identidade", Icon: Target, roles: ["pedro"] },
+    ],
   },
 ];
 
@@ -132,11 +95,6 @@ export default function Sidebar() {
     });
   }, []);
 
-  // Filtrar itens de navegacao conforme role do usuario
-  const visibleNavItems = navItems.filter(
-    (item) => !item.roles || (role && item.roles.includes(role))
-  );
-
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -144,109 +102,115 @@ export default function Sidebar() {
     router.refresh();
   }
 
+  function isActive(href: string) {
+    return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  }
+
   const sidebarContent = (
     <>
       {/* Logo */}
-      <div className="flex h-16 items-center gap-3 border-b border-border px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-hover shadow-lg shadow-accent/20">
-          <Brain className="h-5 w-5 text-white" />
+      <div className="flex h-14 items-center gap-3 border-b border-border px-4">
+        <div className="logo-gradient flex h-8 w-8 items-center justify-center rounded-lg">
+          <Brain className="h-4 w-4 text-white" />
         </div>
         <div>
           <h1 className="font-display text-sm font-bold text-text">
             Segundo Cérebro
           </h1>
-          <p className="font-mono text-[10px] text-text-muted">Pedro Rabelo</p>
+          <p className="font-mono text-[11px] text-text-muted">Pedro Rabelo</p>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {visibleNavItems.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+      {/* Navigation sections */}
+      <nav className="flex-1 overflow-y-auto px-3 py-3">
+        {navSections.map((section, sIdx) => {
+          // Filter items by role
+          const visibleItems = section.items.filter(
+            (item) => !item.roles || (role && item.roles.includes(role))
+          );
+          if (visibleItems.length === 0) return null;
+
           return (
+            <div key={section.title} className={sIdx > 0 ? "mt-4" : ""}>
+              {/* Section header */}
+              <p className="mb-1.5 px-3 font-mono text-[11px] font-medium uppercase tracking-wider text-text-muted/60">
+                {section.title}
+              </p>
+
+              {/* Items */}
+              <div className="space-y-0.5">
+                {visibleItems.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={`nav-item-hover group flex items-center gap-2.5 rounded-lg px-3 py-2 transition-all duration-200 ${
+                        active
+                          ? "nav-item-active text-accent"
+                          : "text-text-secondary hover:text-text"
+                      }`}
+                    >
+                      <item.Icon
+                        className={`h-[16px] w-[16px] transition-colors ${
+                          active
+                            ? "text-accent"
+                            : "text-text-muted group-hover:text-text-secondary"
+                        }`}
+                      />
+                      <span className={`text-[13px] font-medium ${active ? "text-accent" : ""}`}>
+                        {item.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Settings — Pedro only */}
+        {isPedro && (
+          <div className="mt-4">
+            <div className="mx-3 border-t border-border/50" />
             <Link
-              key={item.href}
-              href={item.href}
+              href="/configuracoes"
               onClick={() => setMobileOpen(false)}
-              className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ${
-                isActive
-                  ? "bg-accent/10 text-accent shadow-sm shadow-accent/5"
-                  : "text-text-secondary hover:bg-card-hover hover:text-text"
+              className={`nav-item-hover group mt-2 flex items-center gap-2.5 rounded-lg px-3 py-2 transition-all duration-200 ${
+                pathname.startsWith("/configuracoes")
+                  ? "nav-item-active text-accent"
+                  : "text-text-secondary hover:text-text"
               }`}
             >
-              <item.Icon
-                className={`h-[18px] w-[18px] transition-colors ${
-                  isActive
+              <Settings
+                className={`h-[16px] w-[16px] transition-colors ${
+                  pathname.startsWith("/configuracoes")
                     ? "text-accent"
                     : "text-text-muted group-hover:text-text-secondary"
                 }`}
               />
-              <div>
-                <span
-                  className={`block text-sm font-medium ${
-                    isActive ? "text-accent" : ""
-                  }`}
-                >
-                  {item.label}
-                </span>
-                <span className="block text-[11px] text-text-muted">
-                  {item.description}
-                </span>
-              </div>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Settings link — apenas para Pedro */}
-      {isPedro && (
-        <div className="px-3 pb-2">
-          <Link
-            href="/configuracoes"
-            onClick={() => setMobileOpen(false)}
-            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ${
-              pathname.startsWith("/configuracoes")
-                ? "bg-accent/10 text-accent shadow-sm shadow-accent/5"
-                : "text-text-secondary hover:bg-card-hover hover:text-text"
-            }`}
-          >
-            <Settings
-              className={`h-[18px] w-[18px] transition-colors ${
-                pathname.startsWith("/configuracoes")
-                  ? "text-accent"
-                  : "text-text-muted group-hover:text-text-secondary"
-              }`}
-            />
-            <div>
-              <span
-                className={`block text-sm font-medium ${
-                  pathname.startsWith("/configuracoes") ? "text-accent" : ""
-                }`}
-              >
+              <span className={`text-[13px] font-medium ${
+                pathname.startsWith("/configuracoes") ? "text-accent" : ""
+              }`}>
                 Configurações
               </span>
-              <span className="block text-[11px] text-text-muted">
-                Custos e preferências
-              </span>
-            </div>
-          </Link>
-        </div>
-      )}
+            </Link>
+          </div>
+        )}
+      </nav>
 
-      {/* Usuário logado */}
+      {/* User */}
       <div className="border-t border-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10">
-            <User className="h-3.5 w-3.5 text-accent" />
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-accent/20 to-violet/20">
+            <User className="h-3 w-3 text-accent" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-text truncate">
               {getUserName(userEmail)}
             </p>
-            <p className="text-[10px] text-text-muted truncate">
+            <p className="text-[11px] text-text-muted truncate">
               {userEmail ?? "..."}
             </p>
           </div>
@@ -257,26 +221,6 @@ export default function Sidebar() {
           >
             <LogOut className="h-3.5 w-3.5" />
           </button>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="border-t border-border px-5 py-4">
-        <div className="flex items-center gap-2">
-          <Wifi className="h-3 w-3 text-green" />
-          <span className="font-mono text-[10px] text-text-muted">
-            IA Conectada
-          </span>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1">
-          {["Claude", "Gemini", "GPT", "Apify"].map((ai) => (
-            <span
-              key={ai}
-              className="rounded-md bg-surface px-1.5 py-0.5 font-mono text-[9px] text-text-muted"
-            >
-              {ai}
-            </span>
-          ))}
         </div>
       </div>
     </>
@@ -303,13 +247,13 @@ export default function Sidebar() {
 
       {/* Mobile sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card transition-transform duration-300 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border bg-card transition-transform duration-300 md:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <button
           onClick={() => setMobileOpen(false)}
-          className="absolute right-3 top-4 rounded-lg p-1 text-text-muted hover:text-text"
+          className="absolute right-3 top-3 rounded-lg p-1 text-text-muted hover:text-text"
           aria-label="Fechar menu"
         >
           <X className="h-5 w-5" />
@@ -318,7 +262,7 @@ export default function Sidebar() {
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-card md:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-card md:flex">
         {sidebarContent}
       </aside>
     </>

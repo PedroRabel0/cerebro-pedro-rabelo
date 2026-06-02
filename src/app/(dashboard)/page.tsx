@@ -25,45 +25,46 @@ export default async function DashboardHome() {
       value: stats.captures,
       Icon: Inbox,
       color: "text-blue",
-      bg: "bg-blue/10",
+      gradient: "stat-blue",
     },
     {
       label: "Playbooks",
       value: stats.playbooks,
       Icon: BookOpen,
       color: "text-purple",
-      bg: "bg-purple/10",
+      gradient: "stat-purple",
     },
     {
       label: "Histórias",
       value: stats.stories,
       Icon: BookMarked,
       color: "text-green",
-      bg: "bg-green/10",
+      gradient: "stat-green",
     },
     {
       label: "Conteúdos",
       value: stats.contents,
       Icon: Sparkles,
       color: "text-accent",
-      bg: "bg-accent/10",
+      gradient: "stat-accent",
     },
     {
       label: "Pendentes",
       value: stats.pendingProposals,
       Icon: Clock,
       color: "text-red",
-      bg: "bg-red/10",
+      gradient: "stat-red",
     },
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* Header */}
       <div>
+        <span className="page-accent-line" />
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 to-purple/20">
-            <Brain className="h-5 w-5 text-accent" />
+          <div className="logo-gradient flex h-10 w-10 items-center justify-center rounded-2xl">
+            <Brain className="h-5 w-5 text-white" />
           </div>
           <div>
             <h1 className="font-display text-2xl font-bold text-text sm:text-3xl">
@@ -87,10 +88,10 @@ export default async function DashboardHome() {
         </div>
       </div>
 
-      {/* Brain Chat — the main interaction */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-text-muted">
-          <Brain className="h-3.5 w-3.5" />
+      {/* Brain Chat — glass card */}
+      <div className="glass-card rounded-2xl p-6">
+        <h2 className="mb-4 flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-wider text-text-muted">
+          <Brain className="h-3.5 w-3.5 text-violet" />
           Perguntar ao Cérebro
         </h2>
         <BrainChat />
@@ -98,28 +99,26 @@ export default async function DashboardHome() {
 
       {/* Brain Health Stats */}
       <div>
-        <h2 className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-text-muted">
-          <Sparkles className="h-3.5 w-3.5" />
+        <h2 className="mb-4 flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-wider text-text-muted">
+          <Sparkles className="h-3.5 w-3.5 text-accent" />
           Saúde do Cérebro
         </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           {statItems.map((stat, i) => (
             <div
               key={stat.label}
-              className="card-hover animate-fade-in rounded-2xl border border-border bg-card px-4 py-3"
+              className={`card-hover animate-fade-in rounded-2xl border border-border bg-card p-4 ${stat.gradient}`}
               style={{ animationDelay: `${i * 80}ms` }}
             >
               <div className="flex items-center gap-3">
-                <div
-                  className={`flex h-9 w-9 items-center justify-center rounded-xl ${stat.bg}`}
-                >
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface/50">
                   <stat.Icon className={`h-4 w-4 ${stat.color}`} />
                 </div>
                 <div>
-                  <span className="block font-mono text-xl font-bold text-text">
+                  <span className="block font-display text-xl font-bold text-text">
                     {stat.value}
                   </span>
-                  <span className="block font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                  <span className="block font-mono text-[11px] uppercase tracking-wider text-text-muted">
                     {stat.label}
                   </span>
                 </div>
