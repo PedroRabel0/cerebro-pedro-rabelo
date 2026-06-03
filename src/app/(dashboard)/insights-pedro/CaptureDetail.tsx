@@ -40,7 +40,13 @@ const proposalTypeConfig: Record<
   },
 };
 
-function ProposalCard({ proposal }: { proposal: Proposal }) {
+function ProposalCard({
+  proposal,
+  onStatusChange,
+}: {
+  proposal: Proposal;
+  onStatusChange: (id: string, newStatus: "approved" | "rejected") => void;
+}) {
   const [status, setStatus] = useState(proposal.status);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(true);
@@ -63,6 +69,8 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
       await approveProposal(proposal.id, origin);
       setStatus("approved");
       setFeedback("approved");
+      // Notify parent to remove from pending list after brief delay (show feedback first)
+      setTimeout(() => onStatusChange(proposal.id, "approved"), 1500);
     } catch (err) {
       console.error("Approve failed:", err);
     }
@@ -75,6 +83,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
       await rejectProposal(proposal.id);
       setStatus("rejected");
       setFeedback("rejected");
+      setTimeout(() => onStatusChange(proposal.id, "rejected"), 1500);
     } catch (err) {
       console.error("Reject failed:", err);
     }
@@ -273,6 +282,13 @@ export default function CaptureDetail({ captureId }: { captureId: string }) {
     );
   }
 
+  // Callback: when a proposal is approved/rejected, update local state
+  function handleStatusChange(id: string, newStatus: "approved" | "rejected") {
+    setProposals((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p))
+    );
+  }
+
   // Split into pending vs processed
   const pendingProposals = proposals.filter((p) => p.status === "pending");
   const processedProposals = proposals.filter((p) => p.status !== "pending");
@@ -294,7 +310,7 @@ export default function CaptureDetail({ captureId }: { captureId: string }) {
         </h4>
       )}
       {pendingProposals.map((p) => (
-        <ProposalCard key={p.id} proposal={p} />
+        <ProposalCard key={p.id} proposal={p} onStatusChange={handleStatusChange} />
       ))}
 
       {/* Summary of processed proposals (approved/rejected) */}
