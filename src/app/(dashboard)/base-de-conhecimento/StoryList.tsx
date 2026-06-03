@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Story } from "@/lib/supabase/types";
-import { createStory, updateStory, deleteStory } from "./actions";
+import { createStory, updateStory, deleteStory, toggleStoryOrigin } from "./actions";
 import { BookMarked } from "lucide-react";
 
 const PERIODS = [
@@ -224,6 +224,16 @@ export default function StoryList({ stories }: { stories: Story[] }) {
                     </div>
                   </button>
                   <div className="ml-3 flex shrink-0 gap-1">
+                    <button
+                      onClick={async () => {
+                        const newOrigin = (!s.created_by || s.created_by === "pedro") ? "outros" : "pedro";
+                        await toggleStoryOrigin(s.id, newOrigin);
+                      }}
+                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-purple transition hover:bg-purple/10"
+                      title={(!s.created_by || s.created_by === "pedro") ? "Mover para Outros" : "Mover para Pedro"}
+                    >
+                      {(!s.created_by || s.created_by === "pedro") ? "→ Outros" : "→ Pedro"}
+                    </button>
                     <button
                       onClick={() => setEditing(s)}
                       className="rounded-lg px-2 py-1 font-mono text-[10px] text-blue transition hover:bg-card"

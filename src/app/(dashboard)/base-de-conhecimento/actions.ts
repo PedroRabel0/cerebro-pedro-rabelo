@@ -95,6 +95,16 @@ export async function updatePlaybook(id: string, formData: FormData) {
   revalidatePath("/base-de-conhecimento");
 }
 
+export async function togglePlaybookOrigin(id: string, newOrigin: "pedro" | "outros") {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("playbooks")
+    .update({ created_by: newOrigin })
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath("/base-de-conhecimento");
+}
+
 export async function deletePlaybook(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("playbooks").delete().eq("id", id);
@@ -172,6 +182,16 @@ export async function updateStory(id: string, formData: FormData) {
       tags,
       lesson: (formData.get("lesson") as string) || null,
     })
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath("/base-de-conhecimento");
+}
+
+export async function toggleStoryOrigin(id: string, newOrigin: "pedro" | "outros") {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("stories")
+    .update({ created_by: newOrigin })
     .eq("id", id);
   if (error) throw error;
   revalidatePath("/base-de-conhecimento");

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Playbook, Theme } from "@/lib/supabase/types";
-import { createPlaybook, updatePlaybook, deletePlaybook } from "./actions";
+import { createPlaybook, updatePlaybook, deletePlaybook, togglePlaybookOrigin } from "./actions";
 import BookQuestionsPanel from "./BookQuestionsPanel";
 import DiffView from "./DiffView";
 import { useUserRole } from "@/lib/hooks/useUserRole";
@@ -267,6 +267,17 @@ export default function PlaybookList({
                     <CompletenessBar score={p.completeness_score} />
                   </button>
                   <div className="ml-3 flex shrink-0 gap-1">
+                    {/* Toggle origin: Pedro ↔ Outros */}
+                    <button
+                      onClick={async () => {
+                        const newOrigin = (!p.created_by || p.created_by === "pedro") ? "outros" : "pedro";
+                        await togglePlaybookOrigin(p.id, newOrigin);
+                      }}
+                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-purple transition hover:bg-purple/10"
+                      title={(!p.created_by || p.created_by === "pedro") ? "Mover para Outros" : "Mover para Pedro"}
+                    >
+                      {(!p.created_by || p.created_by === "pedro") ? "→ Outros" : "→ Pedro"}
+                    </button>
                     {p.version_previous && (
                       <button
                         onClick={() =>
@@ -283,14 +294,12 @@ export default function PlaybookList({
                     >
                       Editar
                     </button>
-                    {isPedro && (
-                      <button
-                        onClick={() => setDeleteTarget({ id: p.id, title: p.title })}
-                        className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
-                      >
-                        Apagar
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setDeleteTarget({ id: p.id, title: p.title })}
+                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-card"
+                    >
+                      Apagar
+                    </button>
                   </div>
                 </div>
 
