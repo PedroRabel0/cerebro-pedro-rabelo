@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useTransition } from "react";
-import { Brain, Send, User, Plus, Trash2, MessageSquare, Menu, X } from "lucide-react";
+import { Brain, Send, User, Plus, Trash2, MessageSquare, PanelLeftClose, PanelLeft, Sparkles, Zap } from "lucide-react";
 import {
   getChats,
   createChat,
@@ -43,41 +43,31 @@ export default function BrainChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isPending, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load chats on mount
   useEffect(() => {
     startTransition(async () => {
       try {
         const data = await getChats();
         setChats(data);
-      } catch {
-        // ignore
-      }
+      } catch {}
     });
   }, []);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Load messages when active chat changes
   useEffect(() => {
-    if (!activeChatId) {
-      setMessages([]);
-      return;
-    }
+    if (!activeChatId) { setMessages([]); return; }
     startTransition(async () => {
       try {
         const data = await getChatMessages(activeChatId);
         setMessages(data);
-      } catch {
-        setMessages([]);
-      }
+      } catch { setMessages([]); }
     });
   }, [activeChatId]);
 
@@ -85,19 +75,11 @@ export default function BrainChat() {
     startTransition(async () => {
       try {
         const { id } = await createChat();
-        const newChat: Chat = {
-          id,
-          title: "Nova conversa",
-          updated_at: new Date().toISOString(),
-        };
-        setChats((prev) => [newChat, ...prev]);
+        setChats((prev) => [{ id, title: "Nova conversa", updated_at: new Date().toISOString() }, ...prev]);
         setActiveChatId(id);
         setMessages([]);
-        setSidebarOpen(false);
         inputRef.current?.focus();
-      } catch {
-        // ignore
-      }
+      } catch {}
     });
   }
 
@@ -106,20 +88,9 @@ export default function BrainChat() {
       try {
         await deleteChat(chatId);
         setChats((prev) => prev.filter((c) => c.id !== chatId));
-        if (activeChatId === chatId) {
-          setActiveChatId(null);
-          setMessages([]);
-        }
-      } catch {
-        // ignore
-      }
+        if (activeChatId === chatId) { setActiveChatId(null); setMessages([]); }
+      } catch {}
     });
-  }
-
-  function handleSelectChat(chatId: string) {
-    setActiveChatId(chatId);
-    setSidebarOpen(false);
-    inputRef.current?.focus();
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -127,309 +98,355 @@ export default function BrainChat() {
     const question = input.trim();
     if (!question || loading) return;
 
-    // Auto-create chat if none selected
     let chatId = activeChatId;
     if (!chatId) {
       try {
         const { id } = await createChat();
-        const newChat: Chat = {
-          id,
-          title: "Nova conversa",
-          updated_at: new Date().toISOString(),
-        };
-        setChats((prev) => [newChat, ...prev]);
+        setChats((prev) => [{ id, title: "Nova conversa", updated_at: new Date().toISOString() }, ...prev]);
         setActiveChatId(id);
         chatId = id;
-      } catch {
-        return;
-      }
+      } catch { return; }
     }
 
     setInput("");
     setLoading(true);
+    if (inputRef.current) inputRef.current.style.height = "auto";
 
-    // Optimistic user message
-    const optimisticUserMsg: Message = {
-      id: `temp-${Date.now()}`,
-      role: "user",
-      content: question,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, optimisticUserMsg]);
+    setMessages((prev) => [...prev, {
+      id: `temp-${Date.now()}`, role: "user", content: question, created_at: new Date().toISOString(),
+    }]);
 
     try {
       const { response } = await sendChatMessage(chatId, question);
-
-      // Add brain response
-      const brainMsg: Message = {
-        id: `temp-${Date.now()}-brain`,
-        role: "brain",
-        content: response,
-        created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, brainMsg]);
-
-      // Update chat title in list
-      setChats((prev) =>
-        prev.map((c) =>
-          c.id === chatId
-            ? {
-                ...c,
-                title:
-                  c.title === "Nova conversa"
-                    ? question.slice(0, 50)
-                    : c.title,
-                updated_at: new Date().toISOString(),
-              }
-            : c
-        )
-      );
+      setMessages((prev) => [...prev, {
+        id: `temp-${Date.now()}-brain`, role: "brain", content: response, created_at: new Date().toISOString(),
+      }]);
+      setChats((prev) => prev.map((c) =>
+        c.id === chatId
+          ? { ...c, title: c.title === "Nova conversa" ? question.slice(0, 50) : c.title, updated_at: new Date().toISOString() }
+          : c
+      ));
     } catch {
-      const errorMsg: Message = {
-        id: `temp-${Date.now()}-error`,
-        role: "brain",
-        content:
-          "Desculpa, tive um problema ao processar sua pergunta. Tenta de novo.",
-        created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+      setMessages((prev) => [...prev, {
+        id: `temp-${Date.now()}-err`, role: "brain", content: "Desculpa, tive um problema. Tenta de novo.", created_at: new Date().toISOString(),
+      }]);
     } finally {
       setLoading(false);
     }
   }
 
-  function handleSuggestion(text: string) {
-    setInput(text);
-    inputRef.current?.focus();
+  function handleTextareaInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setInput(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 150) + "px";
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
   }
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-bg">
-      {/* Mobile sidebar toggle */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="absolute left-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-lg bg-surface/80 text-text-muted hover:text-accent md:hidden"
-        aria-label="Abrir lista de conversas"
-      >
-        {sidebarOpen ? (
-          <X className="h-4 w-4" />
-        ) : (
-          <Menu className="h-4 w-4" />
-        )}
-      </button>
+    <div className="flex h-full w-full overflow-hidden">
+      {/* ===== LEFT: Chat History ===== */}
+      <div className={`${sidebarOpen ? "w-72" : "w-0"} shrink-0 overflow-hidden border-r border-border/50 bg-card/50 transition-all duration-300 md:block hidden`}>
+        <div className="flex h-full w-72 flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="logo-gradient flex h-6 w-6 items-center justify-center rounded-lg">
+                <Brain className="h-3 w-3 text-white" />
+              </div>
+              <span className="font-display text-sm font-bold text-text">Conversas</span>
+            </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="rounded-lg p-1 text-text-muted hover:bg-surface hover:text-text transition-colors"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          </div>
 
-      {/* Left panel: Chat list */}
-      <div
-        className={`${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } absolute inset-y-0 left-0 z-10 w-64 border-r border-border bg-bg/95 backdrop-blur-sm transition-transform md:relative md:translate-x-0`}
-      >
-        <div className="flex h-full flex-col p-3">
-          {/* New chat button */}
-          <button
-            onClick={handleNewChat}
-            disabled={isPending}
-            className="btn-primary mb-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-            Nova conversa
-          </button>
+          {/* New chat */}
+          <div className="p-3">
+            <button
+              onClick={handleNewChat}
+              disabled={isPending}
+              className="flex w-full items-center gap-2 rounded-xl border border-accent/20 bg-accent/5 px-3 py-2.5 text-[13px] font-medium text-accent transition-all hover:bg-accent/10 hover:border-accent/30 disabled:opacity-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nova conversa
+            </button>
+          </div>
 
           {/* Chat list */}
-          <div className="flex-1 space-y-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto px-3 pb-3">
             {chats.length === 0 && (
-              <p className="px-3 py-4 text-center text-[12px] text-text-muted">
-                Nenhuma conversa ainda
-              </p>
-            )}
-            {chats.map((chat) => (
-              <div
-                key={chat.id}
-                className={`group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-colors ${
-                  activeChatId === chat.id
-                    ? "bg-accent/10 text-accent"
-                    : "text-text-secondary hover:bg-surface/50 hover:text-text"
-                }`}
-                onClick={() => handleSelectChat(chat.id)}
-              >
-                <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] leading-tight">
-                    {chat.title}
-                  </p>
-                  <p className="font-mono text-[11px] text-text-muted">
-                    {relativeTime(chat.updated_at)}
-                  </p>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteChat(chat.id);
-                  }}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded opacity-0 transition-opacity hover:bg-red/10 hover:text-red group-hover:opacity-100"
-                  aria-label="Excluir conversa"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
+              <div className="flex flex-col items-center py-8 text-center">
+                <MessageSquare className="h-5 w-5 text-text-muted/30 mb-2" />
+                <p className="text-[12px] text-text-muted">Nenhuma conversa</p>
               </div>
-            ))}
+            )}
+            <div className="space-y-0.5">
+              {chats.map((chat) => (
+                <div
+                  key={chat.id}
+                  onClick={() => { setActiveChatId(chat.id); inputRef.current?.focus(); }}
+                  className={`group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-all ${
+                    activeChatId === chat.id
+                      ? "nav-item-active text-accent"
+                      : "text-text-secondary hover:bg-surface/40 hover:text-text"
+                  }`}
+                >
+                  <MessageSquare className={`h-3 w-3 shrink-0 ${activeChatId === chat.id ? "text-accent" : "text-text-muted/40"}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] leading-tight">{chat.title}</p>
+                    <p className="font-mono text-[11px] text-text-muted/60">{relativeTime(chat.updated_at)}</p>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteChat(chat.id); }}
+                    className="shrink-0 rounded p-1 text-text-muted/30 opacity-0 transition-all hover:bg-red/10 hover:text-red group-hover:opacity-100"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile overlay backdrop */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-[5] bg-black/30 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Right panel: Active chat */}
+      {/* ===== RIGHT: Chat Area ===== */}
       <div className="relative flex flex-1 flex-col">
-        {/* Messages area */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
-          {/* No chat selected */}
-          {!activeChatId && messages.length === 0 && !loading && (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/10 to-violet/10">
-                <Brain className="h-6 w-6 text-violet" />
-              </div>
-              <p className="text-sm text-text-secondary">
-                Selecione ou crie uma conversa
-              </p>
-              <button
-                onClick={handleNewChat}
-                className="btn-primary mt-4 rounded-xl px-5 py-2 text-sm text-white"
-              >
-                Nova conversa
-              </button>
-            </div>
-          )}
-
-          {/* Chat selected but empty */}
-          {activeChatId && messages.length === 0 && !loading && (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/10 to-violet/10">
-                <Brain className="h-6 w-6 text-violet" />
-              </div>
-              <p className="mb-4 text-sm text-text-secondary">
-                Pergunte qualquer coisa sobre os playbooks, historias e
-                referencias do Pedro.
-              </p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {[
-                  "Resuma meus playbooks",
-                  "Me de uma ideia de post",
-                  "Quais temas estao incompletos?",
-                ].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => handleSuggestion(suggestion)}
-                    className="rounded-full border border-border bg-surface/50 px-3 py-1.5 font-mono text-[11px] text-text-muted transition-colors hover:border-accent/30 hover:text-accent"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Messages */}
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`animate-slide-in mb-3 flex items-start gap-2.5 ${
-                msg.role === "user" ? "flex-row-reverse" : "flex-row"
-              }`}
+        {/* Top bar */}
+        <div className="flex items-center gap-3 border-b border-border/30 px-4 py-2.5 md:px-6">
+          {/* Toggle sidebar button */}
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="hidden md:flex rounded-lg p-1.5 text-text-muted hover:bg-surface hover:text-text transition-colors"
             >
-              {msg.role === "brain" && (
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet/20 to-accent/20">
-                  <Brain className="h-3.5 w-3.5 text-violet" />
-                </div>
-              )}
-              {msg.role === "user" && (
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/15">
-                  <User className="h-3.5 w-3.5 text-accent" />
-                </div>
-              )}
-              <div
-                className={
-                  msg.role === "user"
-                    ? "btn-primary ml-auto max-w-[80%] rounded-2xl rounded-br-md px-4 py-3 text-sm text-white"
-                    : "brain-message mr-auto max-w-[80%] rounded-2xl rounded-bl-md px-4 py-3 text-sm text-text"
-                }
-              >
-                {msg.content.split("\n").map((line, j) => (
-                  <p key={j} className={j > 0 ? "mt-1.5" : ""}>
-                    {line || " "}
-                  </p>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          {/* Loading indicator */}
-          {loading && (
-            <div className="mb-3 flex items-start gap-2.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet/20 to-accent/20">
-                <Brain className="h-3.5 w-3.5 animate-pulse text-violet" />
-              </div>
-              <div className="brain-message mr-auto rounded-2xl rounded-bl-md px-4 py-3 text-sm text-text-muted">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="animate-pulse">Pensando</span>
-                  <span className="inline-flex gap-0.5">
-                    <span
-                      className="inline-block h-1 w-1 animate-bounce rounded-full bg-violet/50"
-                      style={{ animationDelay: "0ms" }}
-                    />
-                    <span
-                      className="inline-block h-1 w-1 animate-bounce rounded-full bg-violet/50"
-                      style={{ animationDelay: "150ms" }}
-                    />
-                    <span
-                      className="inline-block h-1 w-1 animate-bounce rounded-full bg-violet/50"
-                      style={{ animationDelay: "300ms" }}
-                    />
-                  </span>
-                </span>
-              </div>
-            </div>
+              <PanelLeft className="h-4 w-4" />
+            </button>
           )}
+          {/* Mobile menu */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="md:hidden rounded-lg p-1.5 text-text-muted hover:text-text"
+          >
+            <PanelLeft className="h-4 w-4" />
+          </button>
 
-          <div ref={bottomRef} />
+          <div className="flex items-center gap-2 flex-1">
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-violet/15 to-accent/15">
+              <Zap className="h-3 w-3 text-violet" />
+            </div>
+            <span className="font-mono text-[11px] uppercase tracking-wider text-text-muted">
+              {activeChatId ? (chats.find(c => c.id === activeChatId)?.title || "Conversa") : "Cerebro IA"}
+            </span>
+          </div>
+
+          {activeChatId && (
+            <span className="font-mono text-[11px] text-text-muted/50">
+              {messages.length} msg
+            </span>
+          )}
         </div>
 
-        {/* Input area */}
-        <div className="border-t border-border bg-bg/50 px-4 py-3 md:px-6">
-          <form
-            onSubmit={handleSubmit}
-            className="glow-input flex items-center gap-2"
-          >
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={
-                activeChatId
-                  ? "O que o Pedro pensa sobre..."
-                  : "Crie ou selecione uma conversa..."
-              }
-              disabled={loading}
-              className="flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              title="Enviar (Enter)"
-              className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white disabled:opacity-40"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </form>
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-3xl px-4 py-6 md:px-8">
+            {/* Empty: no chat */}
+            {!activeChatId && messages.length === 0 && !loading && (
+              <div className="flex h-full min-h-[400px] flex-col items-center justify-center text-center">
+                <div className="animate-float mb-6 flex h-16 w-16 items-center justify-center rounded-2xl logo-gradient">
+                  <Brain className="h-8 w-8 text-white" />
+                </div>
+                <h2 className="font-display text-xl font-bold text-text mb-2">
+                  Segundo Cerebro
+                </h2>
+                <p className="text-sm text-text-secondary max-w-sm mb-6">
+                  Pergunte sobre playbooks, historias, referencias. O cerebro sabe tudo que foi alimentado.
+                </p>
+                <button
+                  onClick={handleNewChat}
+                  className="btn-primary rounded-xl px-6 py-2.5 text-sm font-medium text-white"
+                >
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Iniciar conversa
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* Empty: chat selected but no messages */}
+            {activeChatId && messages.length === 0 && !loading && (
+              <div className="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/10 to-violet/10">
+                  <Brain className="h-6 w-6 text-violet" />
+                </div>
+                <p className="text-sm text-text-secondary mb-5">
+                  O que voce quer saber?
+                </p>
+                <div className="flex flex-wrap justify-center gap-2 max-w-md">
+                  {[
+                    "Resuma meus playbooks",
+                    "Me de uma ideia de post",
+                    "Quais temas estao incompletos?",
+                    "O que o Pedro pensa sobre lideranca?",
+                  ].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => { setInput(s); inputRef.current?.focus(); }}
+                      className="rounded-full border border-border/50 bg-surface/30 px-3.5 py-2 text-[12px] text-text-muted transition-all hover:border-accent/30 hover:text-accent hover:bg-accent/5"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Messages */}
+            <div className="space-y-5">
+              {messages.map((msg) => (
+                <div key={msg.id} className={`animate-fade-in flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                  {/* Avatar */}
+                  <div className={`shrink-0 mt-1 flex h-8 w-8 items-center justify-center rounded-xl ${
+                    msg.role === "user"
+                      ? "bg-accent/15"
+                      : "bg-gradient-to-br from-violet/20 to-accent/10"
+                  }`}>
+                    {msg.role === "user"
+                      ? <User className="h-3.5 w-3.5 text-accent" />
+                      : <Brain className="h-3.5 w-3.5 text-violet" />
+                    }
+                  </div>
+
+                  {/* Bubble */}
+                  <div className={`max-w-[75%] ${msg.role === "user" ? "ml-auto" : "mr-auto"}`}>
+                    {/* Label */}
+                    <p className={`mb-1 font-mono text-[11px] ${msg.role === "user" ? "text-right text-accent/60" : "text-violet/60"}`}>
+                      {msg.role === "user" ? "Voce" : "Cerebro"}
+                    </p>
+                    {/* Content */}
+                    <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                      msg.role === "user"
+                        ? "bg-accent/10 text-text border border-accent/10 rounded-tr-md"
+                        : "glass-card text-text rounded-tl-md"
+                    }`}>
+                      {msg.content.split("\n").map((line, j) => (
+                        <p key={j} className={j > 0 ? "mt-1.5" : ""}>{line || " "}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Loading */}
+              {loading && (
+                <div className="animate-fade-in flex gap-3">
+                  <div className="shrink-0 mt-1 flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet/20 to-accent/10">
+                    <Brain className="h-3.5 w-3.5 animate-pulse text-violet" />
+                  </div>
+                  <div>
+                    <p className="mb-1 font-mono text-[11px] text-violet/60">Cerebro</p>
+                    <div className="glass-card rounded-2xl rounded-tl-md px-4 py-3">
+                      <span className="inline-flex items-center gap-2 text-sm text-text-muted">
+                        <span className="animate-pulse">Pensando</span>
+                        <span className="inline-flex gap-0.5">
+                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-violet/40" style={{ animationDelay: "0ms" }} />
+                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-violet/40" style={{ animationDelay: "150ms" }} />
+                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-violet/40" style={{ animationDelay: "300ms" }} />
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div ref={bottomRef} />
+          </div>
+        </div>
+
+        {/* ===== Input area ===== */}
+        <div className="border-t border-border/30 bg-bg/80 backdrop-blur-sm">
+          <div className="mx-auto max-w-3xl px-4 py-3 md:px-8">
+            <form onSubmit={handleSubmit} className="relative">
+              <div className="glow-input flex items-end gap-2 rounded-2xl border border-border/50 bg-surface/50 px-4 py-2.5 transition-colors focus-within:border-accent/30">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleTextareaInput}
+                  onKeyDown={handleKeyDown}
+                  placeholder={activeChatId ? "Pergunte ao Cerebro..." : "Crie uma conversa para comecar..."}
+                  disabled={loading}
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent text-sm text-text placeholder:text-text-muted/50 focus:outline-none disabled:opacity-50"
+                  style={{ maxHeight: "150px" }}
+                />
+                <button
+                  type="submit"
+                  disabled={loading || !input.trim()}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent text-white transition-all hover:bg-accent-hover disabled:opacity-30 disabled:bg-surface disabled:text-text-muted"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <p className="mt-1.5 text-center font-mono text-[11px] text-text-muted/40">
+                Enter para enviar · Shift+Enter para nova linha
+              </p>
+            </form>
+          </div>
         </div>
       </div>
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden" onClick={() => setSidebarOpen(false)} />
+          <div className="fixed inset-y-0 left-0 z-50 w-72 border-r border-border bg-card md:hidden">
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="logo-gradient flex h-6 w-6 items-center justify-center rounded-lg">
+                    <Brain className="h-3 w-3 text-white" />
+                  </div>
+                  <span className="font-display text-sm font-bold text-text">Conversas</span>
+                </div>
+                <button onClick={() => setSidebarOpen(false)} className="rounded-lg p-1 text-text-muted hover:text-text">
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="p-3">
+                <button onClick={handleNewChat} disabled={isPending} className="flex w-full items-center gap-2 rounded-xl border border-accent/20 bg-accent/5 px-3 py-2.5 text-[13px] font-medium text-accent hover:bg-accent/10 disabled:opacity-50">
+                  <Plus className="h-3.5 w-3.5" /> Nova conversa
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5">
+                {chats.map((chat) => (
+                  <div key={chat.id} onClick={() => { setActiveChatId(chat.id); setSidebarOpen(false); }}
+                    className={`group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-all ${activeChatId === chat.id ? "nav-item-active text-accent" : "text-text-secondary hover:bg-surface/40"}`}>
+                    <MessageSquare className={`h-3 w-3 shrink-0 ${activeChatId === chat.id ? "text-accent" : "text-text-muted/40"}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px]">{chat.title}</p>
+                      <p className="font-mono text-[11px] text-text-muted/60">{relativeTime(chat.updated_at)}</p>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteChat(chat.id); }}
+                      className="shrink-0 rounded p-1 text-text-muted/30 opacity-0 hover:bg-red/10 hover:text-red group-hover:opacity-100">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
