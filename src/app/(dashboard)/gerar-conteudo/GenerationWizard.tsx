@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useTransition } from "react";
 import type { ContentType } from "@/lib/supabase/types";
-import { createWizardContent, updateContentStatus } from "./actions";
+import { createWizardContent, updateContentStatus, generateImageForContent } from "./actions";
 import SlideDesigner from "@/components/SlideDesigner";
 import {
   Sparkles,
@@ -939,6 +939,9 @@ function ResultCard({
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(result.content);
   const [copied, setCopied] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   async function handleCopy() {
     await navigator.clipboard.writeText(text);
@@ -990,6 +993,36 @@ function ResultCard({
         <ImagePromptDisplay prompt={result.imagePrompt} />
       )}
 
+      {/* Generated image preview */}
+      {generatedImageUrl && (
+        <div className="mt-3 rounded-xl border border-violet/20 bg-violet/5 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-violet">
+              Imagem gerada
+            </span>
+            <a
+              href={generatedImageUrl}
+              download={`${result.contentType}-image.webp`}
+              className="flex items-center gap-1 rounded-lg bg-violet/10 px-2.5 py-1 font-mono text-[11px] text-violet transition hover:bg-violet/20"
+            >
+              Baixar
+            </a>
+          </div>
+          <img
+            src={generatedImageUrl}
+            alt="Imagem gerada por IA"
+            className="w-full max-w-md rounded-lg border border-border"
+          />
+        </div>
+      )}
+
+      {/* Image generation error */}
+      {imageError && (
+        <div className="mt-3 rounded-xl border border-red/20 bg-red/5 px-3 py-2 text-xs text-red">
+          {imageError}
+        </div>
+      )}
+
       {/* SlideDesigner for carousels */}
       {result.contentType === "instagram_carousel" && (
         <div className="mt-4">
@@ -1009,6 +1042,29 @@ function ResultCard({
             <RotateCcw className="h-3 w-3" />
           )}
           Regenerar
+        </button>
+
+        <button
+          onClick={async () => {
+            setGeneratingImage(true);
+            setImageError(null);
+            const res = await generateImageForContent(result.id, text, result.contentType);
+            if ("error" in res) {
+              setImageError(res.error);
+            } else {
+              setGeneratedImageUrl(res.imageUrl);
+            }
+            setGeneratingImage(false);
+          }}
+          disabled={generatingImage}
+          className="flex items-center gap-1.5 rounded-xl border border-violet/30 bg-violet/10 px-3 py-1.5 font-mono text-xs text-violet transition hover:bg-violet/20 disabled:opacity-50"
+        >
+          {generatingImage ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <ImageIcon className="h-3 w-3" />
+          )}
+          {generatingImage ? "Gerando..." : "Gerar Imagem"}
         </button>
 
         <div className="ml-auto flex flex-wrap gap-1">

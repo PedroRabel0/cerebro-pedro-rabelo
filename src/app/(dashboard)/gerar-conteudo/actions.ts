@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
 import { generateImagePrompt } from "@/lib/ai/gemini";
+import { generateImage } from "@/lib/ai/image-gen";
 import type { ContentType } from "@/lib/supabase/types";
 
 const PATH = "/gerar-conteudo";
@@ -874,4 +875,82 @@ export async function updateContentText(id: string, text: string) {
     .eq("id", id);
   if (error) throw error;
   revalidatePath(PATH);
+}
+
+/**
+ * Generate an image for a content piece using GPT-image-1.
+ * First generates the prompt (via Gemini/GPT-4o), then generates the actual image.
+ * Saves image as base64 data URL to the content's image_url field.
+ */
+export async function generateImageForContent(
+  contentId: string,
+  contentText: string,
+  contentType: string,
+): Promise<{ imageUrl: string; imagePrompt: string } | { error: string }> {
+  const supabase = await createClient();
+
+  try {
+    // Step 1: Generate the image prompt
+    console.log(`[ImageForContent] Generating prompt for ${contentType}...`);
+    const promptResult = await generateImagePrompt(contentText, contentType);
+
+    let imagePrompt: string;
+    if ("error" in promptResult) {
+      // If prompt generation fails, use a simple fallback
+      imagePrompt = `Professional Instagram infographic slide, 1080x1080px, dark background, clean design about: ${contentText.slice(0, 200)}`;
+      console.log(`[ImageForContent] Prompt gen failed, using fallback`);
+    } else {
+      imagePrompt = promptResult.image_prompt;
+    }
+
+    // Step 2: Generate the actual image
+    console.log(`[ImageForContent] Generating image (${imagePrompt.length} char prompt)...`);
+
+    // Choose size based on content type
+    const sizeMap: Record<string, '1024x1024' | '1536x1024' | '1024x1536'> = {
+      instagram_carousel: '1024x1024',
+      instagram_static: '1024x1024',
+      instagram_reel: '1024x1536',
+      linkedin_post: '1024x1024',
+      youtube_long: '1536x1024',
+      youtube_short: '1024x1536',
+      x_thread: '1536x1024',
+      x_tweet: '1536x1024',
+    };
+
+    const imageResult = await generateImage(imagePrompt, {
+      size: sizeMap[contentType] || '1024x1024',
+      quality: 'medium',
+      format: 'webp',
+    });
+
+    if ("error" in imageResult) {
+      // Save prompt even if image fails
+      await supabase.from("generated_contents").update({
+        image_prompt: imagePrompt,
+        image_model: 'gpt-image-1-failed',
+      }).eq("id", contentId);
+      revalidatePath(PATH);
+
+      return { error: imageResult.error };
+    }
+
+    // Step 3: Save to DB
+    const imageUrl = `data:image/${imageResult.format};base64,${imageResult.base64}`;
+
+    await supabase.from("generated_contents").update({
+      image_url: imageUrl,
+      image_prompt: imagePrompt,
+      image_model: 'gpt-image-1',
+    }).eq("id", contentId);
+
+    revalidatePath(PATH);
+    console.log(`[ImageForContent] Image saved for content ${contentId}`);
+
+    return { imageUrl, imagePrompt };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    console.error("[ImageForContent] Error:", message);
+    return { error: `Falha ao gerar imagem: ${message}` };
+  }
 }
