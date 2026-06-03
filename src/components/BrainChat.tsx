@@ -377,7 +377,7 @@ export default function BrainChat() {
         <div className="border-t border-border/30 bg-bg/80 backdrop-blur-sm">
           <div className="mx-auto max-w-3xl px-4 py-3 md:px-8">
             <form onSubmit={handleSubmit} className="relative">
-              <div className="glow-input flex items-end gap-2 rounded-2xl border border-border/50 bg-surface/50 px-4 py-2.5 transition-colors focus-within:border-accent/30">
+              <div className="flex items-end gap-2 rounded-2xl border border-border/50 bg-surface/50 px-4 py-2.5 transition-colors focus-within:border-border-light">
                 <textarea
                   ref={inputRef}
                   value={input}
