@@ -386,7 +386,7 @@ export default function BrainChat() {
                   placeholder={activeChatId ? "Pergunte ao Cerebro..." : "Crie uma conversa para comecar..."}
                   disabled={loading}
                   rows={1}
-                  className="flex-1 resize-none bg-transparent text-sm text-text placeholder:text-text-muted/50 focus:outline-none disabled:opacity-50"
+                  className="flex-1 resize-none bg-transparent text-sm text-text placeholder:text-text-muted/50 focus:outline-none focus-visible:outline-none disabled:opacity-50"
                   style={{ maxHeight: "150px" }}
                 />
                 <button
