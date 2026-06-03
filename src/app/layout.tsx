@@ -22,6 +22,9 @@ export const metadata: Metadata = {
   title: "Segundo Cérebro do Pedro",
   description: "Sistema de gestão de conhecimento e geração de conteúdo com IA",
   robots: { index: false, follow: false },
+  icons: {
+    icon: "/favicon.svg",
+  },
   openGraph: {
     title: "Segundo Cérebro do Pedro",
     description: "Plataforma de gestão de conhecimento e geração de conteúdo com IA",

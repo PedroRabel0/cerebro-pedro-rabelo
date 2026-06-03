@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   // Security: block in production unless correct secret is provided
   const url = new URL(request.url);
   const secret = url.searchParams.get("secret");
-  if (secret !== process.env.ADMIN_SECRET && process.env.NODE_ENV === "production") {
+  if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

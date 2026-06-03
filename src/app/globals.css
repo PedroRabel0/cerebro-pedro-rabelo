@@ -111,18 +111,6 @@ h2 { letter-spacing: -0.02em; }
 h3 { letter-spacing: -0.01em; }
 
 /* ========================================
-   Glass card system
-   ======================================== */
-.glass-card {
-  background: rgba(18, 18, 26, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(139, 92, 246, 0.06);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.02),
-    0 4px 24px rgba(0, 0, 0, 0.4);
-}
-
-/* ========================================
    Page header accent line
    ======================================== */
 .page-accent-line {

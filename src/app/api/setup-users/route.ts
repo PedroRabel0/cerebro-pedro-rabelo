@@ -1,37 +1,47 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
+// Credentials from environment variables — NEVER hardcode
 const USERS = [
   {
-    email: "pedro@cerebro.app",
-    password: "Pedro2026!",
+    email: process.env.PEDRO_EMAIL || "pedro@cerebro.app",
+    password: process.env.PEDRO_PASSWORD || "",
     name: "Pedro Rabelo",
     role: "pedro",
   },
   {
-    email: "henrique@cerebro.app",
-    password: "Henri2026!",
+    email: process.env.HENRIQUE_EMAIL || "henrique@cerebro.app",
+    password: process.env.HENRIQUE_PASSWORD || "",
     name: "Henrique",
     role: "henrique",
   },
 ];
 
 export async function GET(request: Request) {
-  // Security: block in production unless correct secret is provided
+  // Security: require ADMIN_SECRET in all environments
   const url = new URL(request.url);
   const secret = url.searchParams.get("secret");
-  if (secret !== process.env.ADMIN_SECRET && process.env.NODE_ENV === "production") {
+  if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = await createClient();
-  const results: { email: string; password: string; status: string }[] = [];
+  // Validate that passwords are configured
+  for (const user of USERS) {
+    if (!user.password) {
+      return NextResponse.json(
+        { error: `Password not configured for ${user.email}. Set env vars PEDRO_PASSWORD and HENRIQUE_PASSWORD.` },
+        { status: 400 }
+      );
+    }
+  }
 
-  // Buscar usuarios existentes para poder atualizar metadata
+  const supabase = await createClient();
+  const results: { email: string; status: string }[] = [];
+
   const { data: existingUsers } = await supabase.auth.admin.listUsers();
 
   for (const user of USERS) {
-    const { data, error } = await supabase.auth.admin.createUser({
+    const { error } = await supabase.auth.admin.createUser({
       email: user.email,
       password: user.password,
       email_confirm: true,
@@ -43,7 +53,6 @@ export async function GET(request: Request) {
         error.message.includes("already been registered") ||
         error.message.includes("already exists")
       ) {
-        // Usuario ja existe — atualizar metadata com role
         const existing = existingUsers?.users?.find(
           (u) => u.email === user.email
         );
@@ -52,37 +61,27 @@ export async function GET(request: Request) {
             await supabase.auth.admin.updateUserById(existing.id, {
               user_metadata: { name: user.name, role: user.role },
             });
-          if (updateError) {
-            results.push({
-              email: user.email,
-              password: user.password,
-              status: `ja existe, erro ao atualizar role: ${updateError.message}`,
-            });
-          } else {
-            results.push({
-              email: user.email,
-              password: user.password,
-              status: `ja existe, role atualizado para "${user.role}"`,
-            });
-          }
+          results.push({
+            email: user.email,
+            status: updateError
+              ? `ja existe, erro ao atualizar: ${updateError.message}`
+              : `ja existe, role atualizado para "${user.role}"`,
+          });
         } else {
           results.push({
             email: user.email,
-            password: user.password,
-            status: "ja existe (nao encontrado na lista para atualizar)",
+            status: "ja existe",
           });
         }
       } else {
         results.push({
           email: user.email,
-          password: user.password,
           status: `erro: ${error.message}`,
         });
       }
     } else {
       results.push({
         email: user.email,
-        password: user.password,
         status: `criado com sucesso, role: "${user.role}"`,
       });
     }

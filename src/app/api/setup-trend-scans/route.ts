@@ -4,7 +4,7 @@ export async function GET(request: Request) {
   // Check for admin secret
   const url = new URL(request.url);
   const secret = url.searchParams.get('secret');
-  if (secret !== process.env.ADMIN_SECRET && secret !== 'setup2024') {
+  if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
