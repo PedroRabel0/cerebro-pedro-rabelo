@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import {
   generateResponses,
   createResponse,
@@ -81,12 +81,37 @@ export default function ResponsesBank({
       )
     : responses;
 
+  // On mount: check if we were generating before navigating away
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("pedro-clone-generating");
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (Date.now() - data.startedAt < 5 * 60 * 1000) {
+          setGenError("Voce saiu da aba durante a geracao. As respostas foram salvas no banco — recarregue a pagina para ve-las.");
+        }
+        sessionStorage.removeItem("pedro-clone-generating");
+      }
+    } catch {}
+  }, []);
+
   async function handleGenerate() {
     if (!topic.trim()) return;
     setGenError(null);
 
+    // Save state so it survives navigation
+    try {
+      sessionStorage.setItem("pedro-clone-generating", JSON.stringify({
+        startedAt: Date.now(),
+        topic: topic.trim(),
+      }));
+    } catch {}
+
     startGenerating(async () => {
       const result = await generateResponses(topic.trim(), genCount);
+
+      // Clear processing state
+      try { sessionStorage.removeItem("pedro-clone-generating"); } catch {}
 
       if ("error" in result) {
         setGenError(result.error);
@@ -206,7 +231,17 @@ export default function ResponsesBank({
         </div>
 
         {genError && (
-          <p className="mt-3 text-sm text-red-400">{genError}</p>
+          <div className="mt-3 flex items-center gap-3 rounded-lg border border-amber/20 bg-amber/5 px-3 py-2">
+            <p className="text-sm text-amber flex-1">{genError}</p>
+            {genError.includes("recarregue") && (
+              <button
+                onClick={() => window.location.reload()}
+                className="shrink-0 rounded-lg bg-accent px-3 py-1 text-xs font-medium text-white hover:bg-accent-hover"
+              >
+                Recarregar
+              </button>
+            )}
+          </div>
         )}
       </div>
 
