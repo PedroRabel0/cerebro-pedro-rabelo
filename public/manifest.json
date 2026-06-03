@@ -1,0 +1,16 @@
+{
+  "name": "Segundo Cerebro do Pedro",
+  "short_name": "Cerebro",
+  "description": "Plataforma de gestao de conhecimento e geracao de conteudo com IA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

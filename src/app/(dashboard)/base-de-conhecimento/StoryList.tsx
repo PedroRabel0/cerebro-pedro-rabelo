@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import type { Story } from "@/lib/supabase/types";
@@ -131,7 +131,7 @@ export default function StoryList({ stories }: { stories: Story[] }) {
     <div>
       {/* Delete confirmation modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="animate-slide-in mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
             <p className="text-sm text-text">
               Apagar a história <strong>&quot;{deleteTarget.title}&quot;</strong>? Esta ação não pode ser desfeita.

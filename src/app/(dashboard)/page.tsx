@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+import Link from "next/link";
 import BrainChat from "@/components/BrainChat";
 import ActivityAccordion from "@/components/ActivityAccordion";
 import { getDashboardStats, getActivityFeed } from "./actions";
@@ -26,6 +27,7 @@ export default async function DashboardHome() {
       Icon: Inbox,
       color: "text-blue",
       gradient: "stat-blue",
+      href: "/insights-pedro",
     },
     {
       label: "Playbooks",
@@ -33,6 +35,7 @@ export default async function DashboardHome() {
       Icon: BookOpen,
       color: "text-purple",
       gradient: "stat-purple",
+      href: "/base-de-conhecimento",
     },
     {
       label: "Histórias",
@@ -40,6 +43,7 @@ export default async function DashboardHome() {
       Icon: BookMarked,
       color: "text-green",
       gradient: "stat-green",
+      href: "/base-de-conhecimento",
     },
     {
       label: "Conteúdos",
@@ -47,6 +51,7 @@ export default async function DashboardHome() {
       Icon: Sparkles,
       color: "text-accent",
       gradient: "stat-accent",
+      href: "/gerar-conteudo",
     },
     {
       label: "Pendentes",
@@ -54,6 +59,7 @@ export default async function DashboardHome() {
       Icon: Clock,
       color: "text-red",
       gradient: "stat-red",
+      href: "/insights-pedro",
     },
   ];
 
@@ -88,6 +94,32 @@ export default async function DashboardHome() {
         </div>
       </div>
 
+      {/* Onboarding — only when base is empty */}
+      {stats.playbooks === 0 && stats.stories === 0 && stats.captures === 0 && (
+        <div className="animate-slide-in glass-card rounded-2xl p-6">
+          <h2 className="font-display text-lg font-bold text-text mb-2">
+            Bem-vindo ao Segundo Cérebro!
+          </h2>
+          <p className="text-sm text-text-secondary mb-4">
+            Comece alimentando a base para o cérebro ficar inteligente:
+          </p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <a href="/base-de-conhecimento" className="card-hover rounded-xl border border-border bg-card p-4 block">
+              <span className="font-display text-sm font-bold text-accent">1. Alimentar a base</span>
+              <p className="mt-1 text-xs text-text-muted">Cole transcrições, links ou suba arquivos</p>
+            </a>
+            <a href="/identidade" className="card-hover rounded-xl border border-border bg-card p-4 block">
+              <span className="font-display text-sm font-bold text-violet">2. Configurar identidade</span>
+              <p className="mt-1 text-xs text-text-muted">Defina tom, voz e cores do Pedro</p>
+            </a>
+            <a href="/gerar-conteudo" className="card-hover rounded-xl border border-border bg-card p-4 block">
+              <span className="font-display text-sm font-bold text-green">3. Gerar conteúdo</span>
+              <p className="mt-1 text-xs text-text-muted">Crie o primeiro post com IA</p>
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Brain Chat — glass card */}
       <div className="glass-card rounded-2xl p-6">
         <h2 className="mb-4 flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-wider text-text-muted">
@@ -105,9 +137,10 @@ export default async function DashboardHome() {
         </h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           {statItems.map((stat, i) => (
-            <div
+            <Link
               key={stat.label}
-              className={`card-hover animate-fade-in rounded-2xl border border-border bg-card p-4 ${stat.gradient}`}
+              href={stat.href}
+              className={`card-hover animate-fade-in rounded-2xl border border-border bg-card p-4 block ${stat.gradient}`}
               style={{ animationDelay: `${i * 80}ms` }}
             >
               <div className="flex items-center gap-3">
@@ -123,7 +156,7 @@ export default async function DashboardHome() {
                   </span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition, useRef, type KeyboardEvent } from "react";
 import { upsertIdentity, resetToPedroDefaults } from "./actions";
@@ -207,7 +207,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Reset confirmation modal */}
       {showResetConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="animate-slide-in mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
             <p className="text-sm text-text">
               Resetar toda a identidade para os dados padrão do Pedro? Suas alterações serão perdidas.

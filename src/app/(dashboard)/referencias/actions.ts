@@ -5,35 +5,9 @@ import { revalidatePath } from "next/cache";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";
 import { analyzeDNA } from "@/lib/ai";
 import type { InstagramPostData } from "@/lib/ai/apify";
-import Anthropic from "@anthropic-ai/sdk";
+import { getClient, parseJSON } from "@/lib/ai/client";
 
 const PATH = "/referencias";
-
-// --- Helpers ---
-
-function getAIClient(): Anthropic {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-}
-
-function parseJSON<T>(text: string): T | null {
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim();
-  try {
-    return JSON.parse(jsonStr) as T;
-  } catch {
-    const objectMatch = jsonStr.match(/\{[\s\S]*\}/);
-    const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
-    const match = objectMatch || arrayMatch;
-    if (match) {
-      try {
-        return JSON.parse(match[0]) as T;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
-}
 
 /**
  * Scrape, analyze DNA, save posts, and generate content suggestions for a profile.
@@ -160,7 +134,7 @@ async function generateContentSuggestions(
   posts: Array<{ caption: string; dna: Record<string, string> }>,
   supabase: Awaited<ReturnType<typeof createClient>>,
 ) {
-  const client = getAIClient();
+  const client = getClient();
 
   const postsContext = posts
     .map(
@@ -638,7 +612,7 @@ export async function detectWeeklyPatterns(): Promise<WeeklyPattern[]> {
   const topPatterns = rawPatterns.slice(0, 8);
 
   // Use Claude Haiku to summarize into actionable insights
-  const client = getAIClient();
+  const client = getClient();
 
   const patternsText = topPatterns
     .map(
@@ -722,7 +696,7 @@ export async function analyzeProfileForPedro(
       return { error: "Nenhum post encontrado para analisar" };
     }
 
-    const client = getAIClient();
+    const client = getClient();
 
     // Build context with top posts and DNA breakdown
     const topPosts = posts.slice(0, 10);

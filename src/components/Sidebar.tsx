@@ -138,34 +138,36 @@ export default function Sidebar() {
               </p>
 
               {/* Items */}
-              <div className="space-y-0.5">
+              <ul className="space-y-0.5" role="list">
                 {visibleItems.map((item) => {
                   const active = isActive(item.href);
                   return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setMobileOpen(false)}
-                      className={`nav-item-hover group flex items-center gap-2.5 rounded-lg px-3 py-2 transition-all duration-200 ${
-                        active
-                          ? "nav-item-active text-accent"
-                          : "text-text-secondary hover:text-text"
-                      }`}
-                    >
-                      <item.Icon
-                        className={`h-[16px] w-[16px] transition-colors ${
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={() => setMobileOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className={`nav-item-hover group flex items-center gap-2.5 rounded-lg px-3 py-2 transition-all duration-200 ${
                           active
-                            ? "text-accent"
-                            : "text-text-muted group-hover:text-text-secondary"
+                            ? "nav-item-active text-accent"
+                            : "text-text-secondary hover:text-text"
                         }`}
-                      />
-                      <span className={`text-[13px] font-medium ${active ? "text-accent" : ""}`}>
-                        {item.label}
-                      </span>
-                    </Link>
+                      >
+                        <item.Icon
+                          className={`h-[16px] w-[16px] transition-colors ${
+                            active
+                              ? "text-accent"
+                              : "text-text-muted group-hover:text-text-secondary"
+                          }`}
+                        />
+                        <span className={`text-[13px] font-medium ${active ? "text-accent" : ""}`}>
+                          {item.label}
+                        </span>
+                      </Link>
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
             </div>
           );
         })}

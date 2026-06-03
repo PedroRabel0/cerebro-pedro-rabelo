@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { captureSnapshot, deleteSnapshot, getSnapshots } from "./actions";
@@ -80,7 +80,7 @@ export default function VoiceTimeline({
 
       {/* Delete confirmation modal */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="animate-slide-in mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
             <p className="text-sm text-text">
               Deletar este snapshot de voz? Esta ação não pode ser desfeita.
