@@ -1,10 +1,11 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes for batch processing
 
 import { createClient } from "@/lib/supabase/server";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";
 import { analyzeDNA } from "@/lib/ai";
 
+import { log } from '@/lib/logger';
 export async function GET(request: Request) {
   // Verify cron secret or Vercel cron header
   const authHeader = request.headers.get("authorization");
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     .eq("active", true);
 
   if (profilesError) {
-    console.error("[Cron Antena] Failed to fetch profiles:", profilesError);
+    log.error("[Cron Antena] Failed to fetch profiles:" + " " + String(profilesError));
     return Response.json(
       { error: "Falha ao buscar perfis", details: profilesError.message },
       { status: 500 }
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
         continue;
       }
 
-      console.log(`[Cron Antena] Scraping @${profile.handle}...`);
+      log.info(`[Cron Antena] Scraping @${profile.handle}...`);
 
       // 2a. Scrape latest 15 posts
       const scraped = await scrapeInstagramProfile(profile.handle, 15);
@@ -169,13 +170,13 @@ export async function GET(request: Request) {
         entity_title: profile.display_name,
       });
 
-      console.log(
+      log.info(
         `[Cron Antena] @${profile.handle}: ${newPosts.length} new / ${scraped.length} total`
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       profileResult.error = message;
-      console.error(`[Cron Antena] Error processing @${profile.handle}:`, message);
+      log.error(`[Cron Antena] Error processing @${profile.handle}:` + " " + String(message));
     }
 
     results.push(profileResult);
@@ -186,7 +187,7 @@ export async function GET(request: Request) {
   const totalAnalyzed = results.reduce((sum, r) => sum + r.posts_analyzed, 0);
   const errors = results.filter((r) => r.error);
 
-  console.log(
+  log.info(
     `[Cron Antena] Done in ${elapsed}s — ${profiles.length} profiles, ${totalNew} new posts, ${totalAnalyzed} analyzed, ${errors.length} errors`
   );
 

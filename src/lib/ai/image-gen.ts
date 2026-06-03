@@ -1,10 +1,11 @@
-/**
+﻿/**
  * Image Generation via OpenAI GPT-image-1
  * Generates images directly from prompts using the same model as Genspark.
  */
 
 import { logApiCost } from '@/lib/ai/client';
 
+import { log } from '@/lib/logger';
 export interface GeneratedImage {
   base64: string;
   format: string;
@@ -31,7 +32,7 @@ export async function generateImage(
   const format = options?.format || 'png';
 
   try {
-    console.log(`[ImageGen] Generating with gpt-image-1 (${size}, ${quality})...`);
+    log.info(`[ImageGen] Generating with gpt-image-1 (${size}, ${quality})...`);
 
     const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
@@ -52,7 +53,7 @@ export async function generateImage(
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      console.error(`[ImageGen] API error ${response.status}:`, errorText.slice(0, 300));
+      log.error(`[ImageGen] API error ${response.status}:` + " " + String(errorText.slice(0, 300)));
 
       // Check for common errors
       if (response.status === 401) return { error: 'API key invalida. Verifique OPENAI_API_KEY.' };
@@ -70,7 +71,7 @@ export async function generateImage(
     const data = await response.json();
 
     if (!data.data || data.data.length === 0 || !data.data[0].b64_json) {
-      console.error('[ImageGen] No image data in response');
+      log.error('[ImageGen] No image data in response');
       return { error: 'A API nao retornou imagem. Tente novamente.' };
     }
 
@@ -86,7 +87,7 @@ export async function generateImage(
       quantity: 1,
     });
 
-    console.log(`[ImageGen] Image generated successfully (${format}, ${size})`);
+    log.info(`[ImageGen] Image generated successfully (${format}, ${size})`);
 
     return {
       base64: data.data[0].b64_json,
@@ -95,7 +96,7 @@ export async function generateImage(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro desconhecido';
-    console.error('[ImageGen] Error:', message);
+    log.error('[ImageGen] Error:' + " " + String(message));
     return { error: `Falha ao gerar imagem: ${message}` };
   }
 }

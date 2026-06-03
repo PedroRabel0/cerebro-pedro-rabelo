@@ -1,5 +1,7 @@
-"use server";
+﻿"use server";
 
+
+import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
@@ -147,11 +149,11 @@ export async function createGeneratedContent(formData: FormData) {
             .eq("id", inserted.id);
         }
       } catch (imgError) {
-        console.error("[AI] Image prompt generation error:", imgError);
+        log.error("[AI] Image prompt generation error:" + " " + String(imgError));
       }
     }
   } catch (aiError) {
-    console.error("[AI] generateContent failed:", aiError);
+    log.error("[AI] generateContent failed:" + " " + String(aiError));
   }
 
   revalidatePath(PATH);
@@ -332,7 +334,7 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR sobre o topico acima. Use as info
           .eq("id", inserted.id);
       }
     } catch (imgError) {
-      console.error("[AI] Image prompt error:", imgError);
+      log.error("[AI] Image prompt error:" + " " + String(imgError));
     }
 
     revalidatePath(PATH);
@@ -343,7 +345,7 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR sobre o topico acima. Use as info
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    console.error("[QuickContent] Error:", message);
+    log.error("[QuickContent] Error:" + " " + String(message));
     return { error: `Falha ao gerar conteudo: ${message}` };
   }
 }
@@ -812,7 +814,7 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR. Use as informacoes dos playbooks
             .eq("id", inserted.id);
         }
       } catch (e) {
-        console.error("[AI] Image prompt error:", e);
+        log.error("[AI] Image prompt error:" + " " + String(e));
       }
 
       results.push({
@@ -829,7 +831,7 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR. Use as informacoes dos playbooks
     return { results };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    console.error("[WizardContent] Error:", message);
+    log.error("[WizardContent] Error:" + " " + String(message));
     return { error: `Falha ao gerar conteudo: ${message}` };
   }
 }
@@ -891,20 +893,20 @@ export async function generateImageForContent(
 
   try {
     // Step 1: Generate the image prompt
-    console.log(`[ImageForContent] Generating prompt for ${contentType}...`);
+    log.info(`[ImageForContent] Generating prompt for ${contentType}...`);
     const promptResult = await generateImagePrompt(contentText, contentType);
 
     let imagePrompt: string;
     if ("error" in promptResult) {
       // If prompt generation fails, use a simple fallback
       imagePrompt = `Professional Instagram infographic slide, 1080x1080px, dark background, clean design about: ${contentText.slice(0, 200)}`;
-      console.log(`[ImageForContent] Prompt gen failed, using fallback`);
+      log.info(`[ImageForContent] Prompt gen failed, using fallback`);
     } else {
       imagePrompt = promptResult.image_prompt;
     }
 
     // Step 2: Generate the actual image
-    console.log(`[ImageForContent] Generating image (${imagePrompt.length} char prompt)...`);
+    log.info(`[ImageForContent] Generating image (${imagePrompt.length} char prompt)...`);
 
     // Choose size based on content type
     const sizeMap: Record<string, '1024x1024' | '1536x1024' | '1024x1536'> = {
@@ -945,12 +947,12 @@ export async function generateImageForContent(
     }).eq("id", contentId);
 
     revalidatePath(PATH);
-    console.log(`[ImageForContent] Image saved for content ${contentId}`);
+    log.info(`[ImageForContent] Image saved for content ${contentId}`);
 
     return { imageUrl, imagePrompt };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    console.error("[ImageForContent] Error:", message);
+    log.error("[ImageForContent] Error:" + " " + String(message));
     return { error: `Falha ao gerar imagem: ${message}` };
   }
 }

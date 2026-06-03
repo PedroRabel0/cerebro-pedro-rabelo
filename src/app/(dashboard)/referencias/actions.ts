@@ -1,5 +1,7 @@
-"use server";
+﻿"use server";
 
+
+import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";
@@ -18,11 +20,11 @@ async function scrapeAndAnalyzeProfile(profileId: string, handle: string, displa
     const supabase = await createClient();
 
     // 1. Scrape latest 9 posts
-    console.log(`[AutoScrape] Scraping @${handle}...`);
+    log.info(`[AutoScrape] Scraping @${handle}...`);
     const scraped = await scrapeInstagramProfile(handle, 9);
 
     if ("error" in scraped) {
-      console.error(`[AutoScrape] Failed for @${handle}:`, scraped.error);
+      log.error(`[AutoScrape] Failed for @${handle}:` + " " + String(scraped.error));
       await supabase.from("activity_log").insert({
         actor: "ia",
         action: `Falha ao scraper perfil @${handle}: ${scraped.error}`,
@@ -33,7 +35,7 @@ async function scrapeAndAnalyzeProfile(profileId: string, handle: string, displa
       return;
     }
 
-    console.log(`[AutoScrape] Got ${scraped.length} posts for @${handle}`);
+    log.info(`[AutoScrape] Got ${scraped.length} posts for @${handle}`);
 
     // 2. Save all posts FIRST (fast), then analyze DNA
     const savedPostIds: string[] = [];
@@ -89,7 +91,7 @@ async function scrapeAndAnalyzeProfile(profileId: string, handle: string, displa
           savedPosts.push({ caption: post.caption, dna });
         }
       } catch (err) {
-        console.error(`[AutoScrape] DNA error for post ${postId}:`, err);
+        log.error(`[AutoScrape] DNA error for post ${postId}:` + " " + String(err));
       }
     }
 
@@ -113,14 +115,14 @@ async function scrapeAndAnalyzeProfile(profileId: string, handle: string, displa
       try {
         await generateContentSuggestions(profileId, handle, displayName, savedPosts, supabase);
       } catch (err) {
-        console.error(`[AutoScrape] Suggestion generation failed for @${handle}:`, err);
+        log.error(`[AutoScrape] Suggestion generation failed for @${handle}:` + " " + String(err));
       }
     }
 
     revalidatePath(PATH);
-    console.log(`[AutoScrape] Done for @${handle}`);
+    log.info(`[AutoScrape] Done for @${handle}`);
   } catch (err) {
-    console.error(`[AutoScrape] Unexpected error for @${handle}:`, err);
+    log.error(`[AutoScrape] Unexpected error for @${handle}:` + " " + String(err));
   }
 }
 
@@ -196,7 +198,7 @@ Baseado nos padrões de DNA destes ${posts.length} posts, gere 3 sugestões de c
 
   const suggestions = parseJSON<SuggestionPost[]>(text);
   if (!suggestions || !Array.isArray(suggestions)) {
-    console.error("[AutoScrape] Failed to parse suggestions");
+    log.error("[AutoScrape] Failed to parse suggestions");
     return;
   }
 
@@ -245,7 +247,7 @@ Baseado nos padrões de DNA destes ${posts.length} posts, gere 3 sugestões de c
     entity_title: `Auto-análise: @${handle}`,
   });
 
-  console.log(`[AutoScrape] Generated ${proposalRows.length} suggestions from @${handle}`);
+  log.info(`[AutoScrape] Generated ${proposalRows.length} suggestions from @${handle}`);
 }
 
 // --- Reference Profiles ---
@@ -283,7 +285,7 @@ export async function createProfile(formData: FormData) {
   // Auto-scrape Instagram profiles in background (fire-and-forget)
   if (platform === "instagram" && profile) {
     scrapeAndAnalyzeProfile(profile.id, handle, displayName).catch((err) =>
-      console.error("[AutoScrape] Background error:", err),
+      log.error("[AutoScrape] Background error:" + " " + String(err)),
     );
   }
 }
@@ -308,7 +310,7 @@ export async function rescrapeProfile(profileId: string) {
 
   // Fire-and-forget background scraping
   scrapeAndAnalyzeProfile(profileId, profile.handle, profile.display_name).catch((err) =>
-    console.error("[Rescrape] Background error:", err),
+    log.error("[Rescrape] Background error:" + " " + String(err)),
   );
 }
 
@@ -338,7 +340,7 @@ export async function scrapeProfileNow(
     }
 
     // 2. Scrape latest 12 posts (fast, within Vercel timeout)
-    console.log(`[ScrapeNow] Scraping @${profile.handle}...`);
+    log.info(`[ScrapeNow] Scraping @${profile.handle}...`);
     const scraped = await scrapeInstagramProfile(profile.handle, 12);
 
     if ("error" in scraped) {
@@ -403,7 +405,7 @@ export async function scrapeProfileNow(
       entity_title: profile.display_name,
     });
 
-    console.log(
+    log.info(
       `[ScrapeNow] @${profile.handle}: ${newPosts.length} new / ${postsFound} total`,
     );
 
@@ -411,13 +413,13 @@ export async function scrapeProfileNow(
 
     // 8. Analyze DNA in background (fire-and-forget) — won't block the response
     analyzeDNAInBackground(newPosts, savedPostIds).catch((err) =>
-      console.error("[ScrapeNow] Background DNA analysis error:", err),
+      log.error("[ScrapeNow] Background DNA analysis error:" + " " + String(err)),
     );
 
     return { posts_found: postsFound, posts_new: newPosts.length };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    console.error(`[ScrapeNow] Error:`, message);
+    log.error(`[ScrapeNow] Error:` + " " + String(message));
     return { error: message };
   }
 }
@@ -455,12 +457,12 @@ async function analyzeDNAInBackground(
           .eq("id", postId);
       }
     } catch (err) {
-      console.error(`[DNA Background] Error for post ${postId}:`, err);
+      log.error(`[DNA Background] Error for post ${postId}:` + " " + String(err));
     }
   }
 
   revalidatePath(PATH);
-  console.log(`[DNA Background] Finished analyzing ${posts.length} posts`);
+  log.info(`[DNA Background] Finished analyzing ${posts.length} posts`);
 }
 
 export async function deleteProfile(id: string) {
@@ -792,7 +794,7 @@ Com base nisso, o que o Pedro pode aprender e aplicar?`,
     return { analysis: text };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    console.error("[AnalyzeProfile] Error:", message);
+    log.error("[AnalyzeProfile] Error:" + " " + String(message));
     return { error: message };
   }
 }

@@ -1,5 +1,7 @@
-"use server";
+﻿"use server";
 
+
+import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { processCapture } from "@/lib/ai";
@@ -63,7 +65,7 @@ export async function createCapture(formData: FormData) {
     }
   } catch (aiError) {
     // AI failure is non-fatal — the capture remains saved without proposals
-    console.error("[AI] processCapture failed:", aiError);
+    log.error("[AI] processCapture failed:" + " " + String(aiError));
   }
 
   revalidatePath(PATH);

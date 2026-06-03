@@ -1,5 +1,7 @@
-"use server";
+﻿"use server";
 
+
+import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { analyzeCompleteness, generateBookQuestions } from "@/lib/ai";
@@ -236,7 +238,7 @@ export async function analyzePlaybookCompleteness(id: string) {
     revalidatePath("/base-de-conhecimento");
     return result;
   } catch (aiError) {
-    console.error("[AI] analyzeCompleteness failed:", aiError);
+    log.error("[AI] analyzeCompleteness failed:" + " " + String(aiError));
     throw new Error("Falha ao analisar completude do playbook");
   }
 }

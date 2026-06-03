@@ -1,5 +1,7 @@
-"use server";
+﻿"use server";
 
+
+import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";
@@ -203,7 +205,7 @@ export async function addReferenceProfile(
   // Auto-scrape Instagram profiles (fire-and-forget)
   if (platform === "instagram" && profile) {
     scrapeAndSavePosts(profile.id, cleanHandle).catch((err) =>
-      console.error("[Tendencias] Background scrape error:", err)
+      log.error("[Tendencias] Background scrape error:" + " " + String(err))
     );
   }
 
@@ -358,7 +360,7 @@ export async function runRadarScan(): Promise<ScanResult> {
       const result = await scrapeAndSavePosts(profile.id, profile.handle);
       totalNewPosts += result.posts_new;
     } catch (err) {
-      console.error(`[Radar] Failed to scrape @${profile.handle}:`, err);
+      log.error(`[Radar] Failed to scrape @${profile.handle}:` + " " + String(err));
     }
   }
 
@@ -541,7 +543,7 @@ Gere de 5 a 8 recomendacoes de conteudo. Todas em pt-br. Foque em insights PRATI
         }
       }
     } catch (err) {
-      console.error("[Radar] AI analysis error:", err);
+      log.error("[Radar] AI analysis error:" + " " + String(err));
       crossInsights = "Erro ao gerar analise com IA. Tente novamente.";
     }
   }

@@ -1,10 +1,11 @@
-// --- YouTube Transcript Extraction Utility ---
+﻿// --- YouTube Transcript Extraction Utility ---
 // Uses youtube-transcript library as primary method (reliable server-side)
 // Falls back to InnerTube API and page scraping
 
 import { YoutubeTranscript } from 'youtube-transcript';
 import { logApiCost } from '@/lib/ai/client';
 
+import { log } from '@/lib/logger';
 export interface YouTubeExtraction {
   video_id: string;
   title: string;
@@ -134,13 +135,13 @@ async function fetchTranscript(videoId: string): Promise<string | null> {
 
   for (let retry = 0; retry < 2; retry++) {
     if (retry > 0) {
-      console.log(`[YouTube] Retry ${retry} after delay...`);
+      log.info(`[YouTube] Retry ${retry} after delay...`);
       await delay(2000);
     }
 
     for (const attempt of attempts) {
       try {
-        console.log(`[YouTube] Trying transcript (${attempt.label}) for ${videoId}`);
+        log.info(`[YouTube] Trying transcript (${attempt.label}) for ${videoId}`);
 
         const segments = await YoutubeTranscript.fetchTranscript(videoId,
           attempt.lang ? { lang: attempt.lang } : undefined
@@ -149,14 +150,14 @@ async function fetchTranscript(videoId: string): Promise<string | null> {
         if (segments && segments.length > 0) {
           const text = segments.map(s => s.text).join(' ');
           if (text.length > 50) {
-            console.log(`[YouTube] Transcript found (${attempt.label}): ${text.length} chars, ${segments.length} segments`);
+            log.info(`[YouTube] Transcript found (${attempt.label}): ${text.length} chars, ${segments.length} segments`);
             return text;
           }
         }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         const isLangError = msg.includes('No transcripts are available in');
-        console.log(`[YouTube] Transcript (${attempt.label}) failed: ${msg.substring(0, 150)}`);
+        log.info(`[YouTube] Transcript (${attempt.label}) failed: ${msg.substring(0, 150)}`);
 
         // If it's a language-specific error, try next language immediately
         if (isLangError) continue;
@@ -168,16 +169,16 @@ async function fetchTranscript(videoId: string): Promise<string | null> {
   }
 
   // Fallback 1: try Supadata API
-  console.log(`[YouTube] Trying Supadata fallback for ${videoId}...`);
+  log.info(`[YouTube] Trying Supadata fallback for ${videoId}...`);
   const supadataResult = await fetchTranscriptSupadata(videoId);
   if (supadataResult) return supadataResult;
 
   // Fallback 2: try Gemini video analysis
-  console.log(`[YouTube] Trying Gemini video analysis for ${videoId}...`);
+  log.info(`[YouTube] Trying Gemini video analysis for ${videoId}...`);
   const geminiResult = await analyzeVideoWithGemini(videoId);
   if (geminiResult) return geminiResult;
 
-  console.log(`[YouTube] No transcript available for ${videoId}`);
+  log.info(`[YouTube] No transcript available for ${videoId}`);
   return null;
 }
 
@@ -189,7 +190,7 @@ async function fetchTranscriptSupadata(videoId: string): Promise<string | null> 
   try {
     const apiKey = process.env.SUPADATA_API_KEY;
     if (!apiKey) {
-      console.log('[YouTube/Supadata] No API key configured');
+      log.info('[YouTube/Supadata] No API key configured');
       return null;
     }
 
@@ -201,13 +202,13 @@ async function fetchTranscriptSupadata(videoId: string): Promise<string | null> 
     });
 
     if (!response.ok) {
-      console.log(`[YouTube/Supadata] Failed: ${response.status} ${response.statusText}`);
+      log.info(`[YouTube/Supadata] Failed: ${response.status} ${response.statusText}`);
       return null;
     }
 
     const data = await response.json() as { content?: string; lang?: string };
     if (data.content && data.content.length > 50) {
-      console.log(`[YouTube/Supadata] Transcript found: ${data.content.length} chars (lang: ${data.lang || 'unknown'})`);
+      log.info(`[YouTube/Supadata] Transcript found: ${data.content.length} chars (lang: ${data.lang || 'unknown'})`);
       logApiCost('supadata', 'transcript', 0.001, { unit: 'request', quantity: 1 });
       return data.content;
     }
@@ -215,7 +216,7 @@ async function fetchTranscriptSupadata(videoId: string): Promise<string | null> 
     return null;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.log(`[YouTube/Supadata] Error: ${msg.substring(0, 150)}`);
+    log.info(`[YouTube/Supadata] Error: ${msg.substring(0, 150)}`);
     return null;
   }
 }
@@ -229,7 +230,7 @@ async function analyzeVideoWithGemini(videoId: string): Promise<string | null> {
   try {
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
     if (!apiKey) {
-      console.log('[YouTube/Gemini] No API key configured');
+      log.info('[YouTube/Gemini] No API key configured');
       return null;
     }
 
@@ -277,7 +278,7 @@ Responda TUDO em português brasileiro, mesmo que o vídeo seja em outro idioma.
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      console.log(`[YouTube/Gemini] Failed: ${response.status} - ${errorText.substring(0, 200)}`);
+      log.info(`[YouTube/Gemini] Failed: ${response.status} - ${errorText.substring(0, 200)}`);
       return null;
     }
 
@@ -286,7 +287,7 @@ Responda TUDO em português brasileiro, mesmo que o vídeo seja em outro idioma.
 
     for (const part of parts) {
       if (part.text && part.text.length > 100) {
-        console.log(`[YouTube/Gemini] Video analysis successful: ${part.text.length} chars`);
+        log.info(`[YouTube/Gemini] Video analysis successful: ${part.text.length} chars`);
         // Gemini Flash video analysis cost (~1000 input, ~2000 output tokens)
         const videoCost = (1000 / 1_000_000) * 0.10 + (2000 / 1_000_000) * 0.40;
         logApiCost('gemini', 'gemini-2.0-flash', videoCost, {
@@ -297,11 +298,11 @@ Responda TUDO em português brasileiro, mesmo que o vídeo seja em outro idioma.
       }
     }
 
-    console.log('[YouTube/Gemini] No useful content in response');
+    log.info('[YouTube/Gemini] No useful content in response');
     return null;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.log(`[YouTube/Gemini] Error: ${msg.substring(0, 200)}`);
+    log.info(`[YouTube/Gemini] Error: ${msg.substring(0, 200)}`);
     return null;
   }
 }
@@ -327,14 +328,14 @@ export async function extractYouTubeContent(
   url: string
 ): Promise<YouTubeExtraction | { error: string }> {
   try {
-    console.log(`[YouTube] Starting extraction for: ${url}`);
+    log.info(`[YouTube] Starting extraction for: ${url}`);
 
     const videoId = extractVideoId(url);
     if (!videoId) {
       return { error: `URL do YouTube invalida: ${url}` };
     }
 
-    console.log(`[YouTube] Video ID: ${videoId}`);
+    log.info(`[YouTube] Video ID: ${videoId}`);
 
     // Fetch metadata and transcript in parallel
     const [metadata, transcript] = await Promise.all([
@@ -342,9 +343,9 @@ export async function extractYouTubeContent(
       fetchTranscript(videoId),
     ]);
 
-    console.log(`[YouTube] Title: ${metadata.title}`);
-    console.log(`[YouTube] Author: ${metadata.author}`);
-    console.log(`[YouTube] Transcript: ${transcript ? `${transcript.length} chars` : 'not available'}`);
+    log.info(`[YouTube] Title: ${metadata.title}`);
+    log.info(`[YouTube] Author: ${metadata.author}`);
+    log.info(`[YouTube] Transcript: ${transcript ? `${transcript.length} chars` : 'not available'}`);
 
     return {
       video_id: videoId,
@@ -355,7 +356,7 @@ export async function extractYouTubeContent(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro desconhecido';
-    console.error(`[YouTube] Extraction failed:`, error);
+    log.error(`[YouTube] Extraction failed:` + " " + String(error));
     return { error: `Falha ao extrair conteudo do YouTube: ${message}` };
   }
 }

@@ -1,5 +1,7 @@
-"use server";
+﻿"use server";
 
+
+import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { revalidatePath } from "next/cache";
@@ -195,7 +197,7 @@ Responda APENAS com um JSON array no formato:
     return { hooks: data as Hook[] };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    console.error("[Hooks] generateHooks error:", message);
+    log.error("[Hooks] generateHooks error:" + " " + String(message));
     return { error: `Falha ao gerar hooks: ${message}` };
   }
 }

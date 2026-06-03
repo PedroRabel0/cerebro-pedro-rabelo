@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OpenAI GPT-4o — Fallback image PROMPT generation.
  * Generates detailed infographic prompts using GPT-4o when Gemini is unavailable.
  * Now reads brand colors from identity (passed via BrandConfig).
@@ -6,6 +6,7 @@
 import OpenAI from 'openai';
 import { logApiCost } from '@/lib/ai/client';
 
+import { log } from '@/lib/logger';
 interface BrandColors {
   bg: string;
   accent: string;
@@ -96,11 +97,11 @@ Reply with ONLY the prompt. No explanations.`,
       output_tokens: promptOutputTokens,
     });
 
-    console.log(`[GPT-Prompt] Generated prompt (${imagePrompt.length} chars)`);
+    log.info(`[GPT-Prompt] Generated prompt (${imagePrompt.length} chars)`);
     return { image_prompt: imagePrompt };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[GPT-Prompt Error]:', message);
+    log.error('[GPT-Prompt Error]:' + " " + String(message));
     return { error: `Falha GPT prompt: ${message}` };
   }
 }

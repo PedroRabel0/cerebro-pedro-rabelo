@@ -1,5 +1,7 @@
-"use server";
+﻿"use server";
 
+
+import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
@@ -183,10 +185,7 @@ ${adaptationGuide}
       });
 
       if ("error" in result) {
-        console.error(
-          `[Repurpose] Failed to generate ${targetType}:`,
-          result.error
-        );
+        log.error(`[Repurpose] Failed to generate ${targetType}: ${result.error}`);
         continue;
       }
 
@@ -215,7 +214,7 @@ ${adaptationGuide}
         .single();
 
       if (insertError) {
-        console.error(`[Repurpose] Insert error for ${targetType}:`, insertError);
+        log.error(`[Repurpose] Insert error for ${targetType}:` + " " + String(insertError));
         continue;
       }
 
@@ -230,7 +229,7 @@ ${adaptationGuide}
         result.content_text,
         targetType,
         inserted.id
-      ).catch((e) => console.error("[AI] Repurpose image error:", e));
+      ).catch((e) => log.error("[AI] Repurpose image error:" + " " + String(e)));
     }
 
     revalidatePath(PATH);
@@ -243,7 +242,7 @@ ${adaptationGuide}
     return { results };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    console.error("[Repurpose] Error:", message);
+    log.error("[Repurpose] Error:" + " " + String(message));
     return { error: `Falha ao reaproveitar conteudo: ${message}` };
   }
 }

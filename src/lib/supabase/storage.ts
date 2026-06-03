@@ -1,5 +1,6 @@
-import { createClient } from "./server";
+﻿import { createClient } from "./server";
 
+import { log } from '@/lib/logger';
 /**
  * Upload an image to Supabase Storage ("generated-images" bucket).
  *
@@ -27,7 +28,7 @@ export async function uploadImageToStorage(
         /^data:(image\/[a-zA-Z+]+);base64,(.+)$/
       );
       if (!match) {
-        console.error("[Storage] Invalid base64 data URL format");
+        log.error("[Storage] Invalid base64 data URL format");
         return null;
       }
       mimeType = match[1];
@@ -36,7 +37,7 @@ export async function uploadImageToStorage(
       // Fetch image from hosted URL (e.g. DALL-E)
       const response = await fetch(imageData);
       if (!response.ok) {
-        console.error(
+        log.error(
           `[Storage] Failed to fetch image from URL: ${response.status}`
         );
         return null;
@@ -59,7 +60,7 @@ export async function uploadImageToStorage(
       });
 
     if (uploadError) {
-      console.error("[Storage] Upload failed:", uploadError.message);
+      log.error("[Storage] Upload failed:" + " " + String(uploadError.message));
       return null;
     }
 
@@ -67,11 +68,11 @@ export async function uploadImageToStorage(
       data: { publicUrl },
     } = supabase.storage.from("generated-images").getPublicUrl(filePath);
 
-    console.log(`[Storage] Uploaded image: ${filePath}`);
+    log.info(`[Storage] Uploaded image: ${filePath}`);
     return publicUrl;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[Storage] uploadImageToStorage error:", message);
+    log.error("[Storage] uploadImageToStorage error:" + " " + String(message));
     return null;
   }
 }

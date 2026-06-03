@@ -1,10 +1,11 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes
 
 import { createClient } from "@/lib/supabase/server";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 
+import { log } from '@/lib/logger';
 /**
  * Daily cron: scrapes all active reference profiles,
  * analyzes cross-profile trends, and saves a scan report.
@@ -222,7 +223,7 @@ Gere JSON:
         }
       }
     } catch (err) {
-      console.error("[Cron Tendencias] AI error:", err);
+      log.error("[Cron Tendencias] AI error:" + " " + String(err));
     }
   }
 
@@ -239,7 +240,7 @@ Gere JSON:
       per_profile_summary: perProfileSummary,
     });
   } catch {
-    console.error("[Cron Tendencias] Failed to save scan — table may not exist");
+    log.error("[Cron Tendencias] Failed to save scan — table may not exist");
   }
 
   // 8. Log

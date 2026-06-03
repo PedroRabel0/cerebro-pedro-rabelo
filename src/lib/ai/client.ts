@@ -1,6 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
+﻿import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
 
+import { log } from '@/lib/logger';
 export function getClient(): Anthropic {
   return new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -17,7 +18,7 @@ export function logApiCost(
   cost_usd: number,
   details?: { input_tokens?: number; output_tokens?: number; unit?: string; quantity?: number }
 ) {
-  console.log(`[API Cost] ${provider}/${model} | $${cost_usd.toFixed(4)}`);
+  log.info(`[API Cost] ${provider}/${model} | $${cost_usd.toFixed(4)}`);
 
   createClient()
     .then((supabase) =>

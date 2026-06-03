@@ -1,5 +1,7 @@
-"use server";
+﻿"use server";
 
+
+import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { processUniversalInput } from "@/lib/ai/universal";
@@ -18,7 +20,7 @@ async function handleInstagramInput(url: string, supabase: Awaited<ReturnType<ty
   // 1. Scrape with Apify
   const scraped = await scrapeInstagramPost(url);
   if ("error" in scraped) {
-    console.error("[Apify] Scrape failed:", scraped.error);
+    log.error("[Apify] Scrape failed:" + " " + String(scraped.error));
     return null;
   }
 
@@ -98,7 +100,7 @@ export async function submitFileInput(formData: FormData) {
     const fileType = file.type;
     const ext = fileName.split(".").pop()?.toLowerCase() || "";
 
-    console.log(`[FileInput] Processing: ${fileName} (${(fileSize / 1024).toFixed(1)}KB, type: ${fileType}, ext: ${ext})`);
+    log.info(`[FileInput] Processing: ${fileName} (${(fileSize / 1024).toFixed(1)}KB, type: ${fileType}, ext: ${ext})`);
 
     // Reject files too large (10MB limit — matches next.config bodySizeLimit)
     if (fileSize > 10 * 1024 * 1024) {
@@ -167,10 +169,10 @@ export async function submitFileInput(formData: FormData) {
             error: `O PDF "${fileName}" não contém texto extraível. Pode ser um PDF de imagens/scan. Copie o texto do PDF manualmente e cole no campo de texto.`,
           };
         } else {
-          console.log(`[FileInput] PDF text extracted: ${textContent.length} chars`);
+          log.info(`[FileInput] PDF text extracted: ${textContent.length} chars`);
         }
       } catch (pdfErr) {
-        console.error("[FileInput] PDF extraction error:", pdfErr);
+        log.error("[FileInput] PDF extraction error:" + " " + String(pdfErr));
         return {
           captureId: "",
           status: "saved_without_ai" as const,
@@ -193,7 +195,7 @@ export async function submitFileInput(formData: FormData) {
             .map(t => t.replace(/<[^>]+>/g, ""))
             .join(" ")
             .slice(0, 60000);
-          console.log(`[FileInput] DOCX text extracted: ${textContent.length} chars`);
+          log.info(`[FileInput] DOCX text extracted: ${textContent.length} chars`);
         } else {
           return {
             captureId: "",
@@ -202,7 +204,7 @@ export async function submitFileInput(formData: FormData) {
           };
         }
       } catch (docxErr) {
-        console.error("[FileInput] DOCX extraction error:", docxErr);
+        log.error("[FileInput] DOCX extraction error:" + " " + String(docxErr));
         return {
           captureId: "",
           status: "saved_without_ai" as const,
@@ -221,7 +223,7 @@ export async function submitFileInput(formData: FormData) {
           const decoder = new TextDecoder("utf-8", { fatal: false });
           textContent = decoder.decode(buffer);
         } catch (encErr) {
-          console.error("[FileInput] Text extraction error:", encErr);
+          log.error("[FileInput] Text extraction error:" + " " + String(encErr));
           return { captureId: "", status: "saved_without_ai" as const, error: `Nao foi possivel ler o arquivo ${fileName}. Formato nao suportado.` };
         }
       }
@@ -231,7 +233,7 @@ export async function submitFileInput(formData: FormData) {
       return { captureId: "", status: "saved_without_ai" as const, error: `Arquivo ${fileName} parece vazio ou nao contém texto legivel.` };
     }
 
-    console.log(`[FileInput] Final text: ${textContent.length} chars from ${fileName}`);
+    log.info(`[FileInput] Final text: ${textContent.length} chars from ${fileName}`);
 
     // Sanitize: remove null bytes and control chars that crash PostgreSQL
     textContent = textContent
@@ -243,7 +245,7 @@ export async function submitFileInput(formData: FormData) {
     // Prefix with file metadata for AI context
     const enrichedInput = `[ARQUIVO: ${fileName} (${(fileSize / 1024).toFixed(1)}KB)]\n\n${textContent}`;
 
-    console.log(`[FileInput] Sanitized text: ${enrichedInput.length} chars`);
+    log.info(`[FileInput] Sanitized text: ${enrichedInput.length} chars`);
 
     // Delegate to normal processing
     const origin = (formData.get("origin") as string) || "pedro";
@@ -251,7 +253,7 @@ export async function submitFileInput(formData: FormData) {
 
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    console.error("[FileInput] Unexpected error:", message);
+    log.error("[FileInput] Unexpected error:" + " " + String(message));
     return { captureId: "", status: "saved_without_ai" as const, error: `Falha ao processar arquivo: ${message}` };
   }
 }
@@ -287,7 +289,7 @@ export async function submitUniversalInput(
       .limit(1)
       .single();
     if (existing) {
-      console.log(`[Dedup] Input already processed: ${existing.id}`);
+      log.info(`[Dedup] Input already processed: ${existing.id}`);
       revalidatePath("/");
       return {
         captureId: existing.id,
@@ -348,7 +350,7 @@ export async function submitUniversalInput(
         }).then(() => {});
       }
     } catch (err) {
-      console.error("[Instagram] Scrape error:", err);
+      log.error("[Instagram] Scrape error:" + " " + String(err));
     }
   }
 
@@ -357,7 +359,7 @@ export async function submitUniversalInput(
     const result = await processUniversalInput(aiInput);
 
     if ("error" in result) {
-      console.error("[Universal] AI processing failed:", result.error);
+      log.error("[Universal] AI processing failed:" + " " + String(result.error));
       revalidatePath("/");
       return { captureId: capture.id, status: "saved_without_ai" as const, instagramData };
     }
@@ -411,7 +413,7 @@ export async function submitUniversalInput(
       origin,
     };
   } catch (aiError) {
-    console.error("[Universal] Processing error:", aiError);
+    log.error("[Universal] Processing error:" + " " + String(aiError));
     revalidatePath("/");
     return { captureId: capture.id, status: "saved_without_ai" as const, instagramData };
   }

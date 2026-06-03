@@ -1,4 +1,4 @@
-import {
+﻿import {
   Identity,
   Playbook,
   Story,
@@ -17,6 +17,7 @@ import {
 } from './prompts';
 import { getClient, logCost, parseJSON } from './client';
 
+import { log } from '@/lib/logger';
 // --- Types ---
 
 export interface GenerateContentParams {
@@ -134,7 +135,7 @@ export async function generateContent(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[AI Error] generateContent:', message);
+    log.error('[AI Error] generateContent:' + " " + String(message));
     return { error: `Falha ao gerar conteúdo: ${message}` };
   }
 }
@@ -184,7 +185,7 @@ export async function processCapture(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[AI Error] processCapture:', message);
+    log.error('[AI Error] processCapture:' + " " + String(message));
     return { error: `Falha ao processar captura: ${message}` };
   }
 }
@@ -237,7 +238,7 @@ export async function analyzeCompleteness(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[AI Error] analyzeCompleteness:', message);
+    log.error('[AI Error] analyzeCompleteness:' + " " + String(message));
     return { error: `Falha ao analisar completude: ${message}` };
   }
 }
@@ -283,7 +284,7 @@ export async function generateBookQuestions(
     return parsed;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[AI Error] generateBookQuestions:', message);
+    log.error('[AI Error] generateBookQuestions:' + " " + String(message));
     return { error: `Falha ao gerar perguntas: ${message}` };
   }
 }
@@ -338,7 +339,7 @@ export async function analyzeDNA(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[AI Error] analyzeDNA:', message);
+    log.error('[AI Error] analyzeDNA:' + " " + String(message));
     return { error: `Falha ao analisar DNA do post: ${message}` };
   }
 }

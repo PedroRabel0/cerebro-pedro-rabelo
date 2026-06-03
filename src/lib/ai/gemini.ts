@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Image Generation Engine — Nano Banana Pro + Imagen 4 Ultra
  * Professional-grade image generation for Pedro Rabelo's content.
  *
@@ -9,6 +9,7 @@ import { logApiCost } from '@/lib/ai/client';
 import { generateImagePromptWithGPT } from '@/lib/ai/openai-images';
 import { createClient } from '@/lib/supabase/server';
 
+import { log } from '@/lib/logger';
 export interface ImageGenerationResult {
   image_url: string;
   image_prompt: string;
@@ -186,9 +187,9 @@ export async function generateImagePrompt(
     const supabase = await createClient();
     const { data: identity } = await supabase.from('identity').select('*').limit(1).single();
     brand = buildBrandFromIdentity(identity);
-    console.log(`[ImageEngine] Brand loaded from DB: accent=${brand.colors.accent}, bg=${brand.colors.bg}`);
+    log.info(`[ImageEngine] Brand loaded from DB: accent=${brand.colors.accent}, bg=${brand.colors.bg}`);
   } catch {
-    console.log('[ImageEngine] Could not load identity from DB, using defaults');
+    log.info('[ImageEngine] Could not load identity from DB, using defaults');
   }
 
   // Try Gemini Flash first (cheaper)
@@ -197,27 +198,27 @@ export async function generateImagePrompt(
     if (apiKey) {
       const imagePrompt = await generateArtDirectorPrompt(apiKey, contentText, contentType, brand);
       if (imagePrompt && imagePrompt.length > 100) {
-        console.log(`[ImageEngine] Prompt generated via Gemini (${imagePrompt.length} chars)`);
+        log.info(`[ImageEngine] Prompt generated via Gemini (${imagePrompt.length} chars)`);
         return { image_prompt: imagePrompt };
       }
     }
   } catch (error) {
-    console.error('[ImageEngine] Gemini prompt failed, trying GPT-4o...', error);
+    log.error('[ImageEngine] Gemini prompt failed, trying GPT-4o...' + " " + String(error));
   }
 
   // Fallback to GPT-4o
   try {
-    console.log('[ImageEngine] Gemini unavailable, falling back to GPT-4o...');
+    log.info('[ImageEngine] Gemini unavailable, falling back to GPT-4o...');
     const result = await generateImagePromptWithGPT(contentText, contentType, brand);
     if ('error' in result) {
-      console.error('[ImageEngine] GPT-4o fallback also failed:', result.error);
+      log.error('[ImageEngine] GPT-4o fallback also failed:' + " " + String(result.error));
     } else {
-      console.log(`[ImageEngine] GPT-4o prompt generated (${result.image_prompt.length} chars)`);
+      log.info(`[ImageEngine] GPT-4o prompt generated (${result.image_prompt.length} chars)`);
     }
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[ImageEngine] All prompt generators failed:', message);
+    log.error('[ImageEngine] All prompt generators failed:' + " " + String(message));
     return { error: `Falha ao gerar prompt: ${message}` };
   }
 }
@@ -265,7 +266,7 @@ async function generateArtDirectorPrompt(
     );
 
     if (!res.ok) {
-      console.error(`[ImageEngine] Prompt gen failed: ${res.status}`);
+      log.error(`[ImageEngine] Prompt gen failed: ${res.status}`);
       return null;
     }
 
@@ -279,10 +280,10 @@ async function generateArtDirectorPrompt(
       output_tokens: 200,
     });
 
-    console.log(`[ImageEngine] Art director prompt: "${prompt?.slice(0, 120)}..."`);
+    log.info(`[ImageEngine] Art director prompt: "${prompt?.slice(0, 120)}..."`);
     return prompt || null;
   } catch (err) {
-    console.error('[ImageEngine] Prompt generation error:', err);
+    log.error('[ImageEngine] Prompt generation error:' + " " + String(err));
     return null;
   }
 }
@@ -296,7 +297,7 @@ async function generateWithNanaBananaPro(
   imagePrompt: string,
 ): Promise<ImageGenerationResult | null> {
   try {
-    console.log('[NanaBanana Pro] Generating...');
+    log.info('[NanaBanana Pro] Generating...');
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
       {
@@ -312,7 +313,7 @@ async function generateWithNanaBananaPro(
 
     if (!res.ok) {
       const err = await res.text().catch(() => '');
-      console.error(`[NanaBanana Pro] HTTP ${res.status}: ${err.substring(0, 200)}`);
+      log.error(`[NanaBanana Pro] HTTP ${res.status}: ${err.substring(0, 200)}`);
       return null;
     }
 
@@ -322,7 +323,7 @@ async function generateWithNanaBananaPro(
     for (const part of parts) {
       if (part.inlineData) {
         const mime = part.inlineData.mimeType || 'image/png';
-        console.log('[NanaBanana Pro] Image generated successfully!');
+        log.info('[NanaBanana Pro] Image generated successfully!');
         logApiCost('gemini', 'nano-banana-pro', 0.134, { unit: 'image', quantity: 1 });
         return {
           image_url: `data:${mime};base64,${part.inlineData.data}`,
@@ -332,10 +333,10 @@ async function generateWithNanaBananaPro(
       }
     }
 
-    console.log('[NanaBanana Pro] No image in response');
+    log.info('[NanaBanana Pro] No image in response');
     return null;
   } catch (err) {
-    console.error('[NanaBanana Pro] Error:', err);
+    log.error('[NanaBanana Pro] Error:' + " " + String(err));
     return null;
   }
 }
@@ -345,7 +346,7 @@ async function generateWithImagen4Ultra(
   imagePrompt: string,
 ): Promise<ImageGenerationResult | null> {
   try {
-    console.log('[Imagen 4 Ultra] Generating...');
+    log.info('[Imagen 4 Ultra] Generating...');
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-ultra-generate-001:predict?key=${apiKey}`,
       {
@@ -365,7 +366,7 @@ async function generateWithImagen4Ultra(
 
     if (!res.ok) {
       const err = await res.text().catch(() => '');
-      console.error(`[Imagen 4 Ultra] HTTP ${res.status}: ${err.substring(0, 200)}`);
+      log.error(`[Imagen 4 Ultra] HTTP ${res.status}: ${err.substring(0, 200)}`);
       return null;
     }
 
@@ -373,7 +374,7 @@ async function generateWithImagen4Ultra(
     const predictions = data.predictions || [];
 
     if (predictions.length > 0 && predictions[0].bytesBase64Encoded) {
-      console.log('[Imagen 4 Ultra] Image generated successfully!');
+      log.info('[Imagen 4 Ultra] Image generated successfully!');
       logApiCost('gemini', 'imagen-4-ultra', 0.08, { unit: 'image', quantity: 1 });
       return {
         image_url: `data:image/png;base64,${predictions[0].bytesBase64Encoded}`,
@@ -382,10 +383,10 @@ async function generateWithImagen4Ultra(
       };
     }
 
-    console.log('[Imagen 4 Ultra] No image in response');
+    log.info('[Imagen 4 Ultra] No image in response');
     return null;
   } catch (err) {
-    console.error('[Imagen 4 Ultra] Error:', err);
+    log.error('[Imagen 4 Ultra] Error:' + " " + String(err));
     return null;
   }
 }
@@ -395,7 +396,7 @@ async function generateWithNanaBanana2(
   imagePrompt: string,
 ): Promise<ImageGenerationResult | null> {
   try {
-    console.log('[NanaBanana 2] Generating fallback...');
+    log.info('[NanaBanana 2] Generating fallback...');
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
       {
@@ -411,7 +412,7 @@ async function generateWithNanaBanana2(
 
     if (!res.ok) {
       const err = await res.text().catch(() => '');
-      console.error(`[NanaBanana 2] HTTP ${res.status}: ${err.substring(0, 200)}`);
+      log.error(`[NanaBanana 2] HTTP ${res.status}: ${err.substring(0, 200)}`);
       return null;
     }
 
@@ -421,7 +422,7 @@ async function generateWithNanaBanana2(
     for (const part of parts) {
       if (part.inlineData) {
         const mime = part.inlineData.mimeType || 'image/png';
-        console.log('[NanaBanana 2] Image generated successfully!');
+        log.info('[NanaBanana 2] Image generated successfully!');
         logApiCost('gemini', 'nano-banana-2', 0.045, { unit: 'image', quantity: 1 });
         return {
           image_url: `data:${mime};base64,${part.inlineData.data}`,
@@ -431,10 +432,10 @@ async function generateWithNanaBanana2(
       }
     }
 
-    console.log('[NanaBanana 2] No image in response');
+    log.info('[NanaBanana 2] No image in response');
     return null;
   } catch (err) {
-    console.error('[NanaBanana 2] Error:', err);
+    log.error('[NanaBanana 2] Error:' + " " + String(err));
     return null;
   }
 }

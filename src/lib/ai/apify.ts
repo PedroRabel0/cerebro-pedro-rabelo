@@ -1,10 +1,11 @@
-/**
+﻿/**
  * Apify Instagram Scraping — extracts post data from Instagram URLs.
  * Uses Apify's REST API directly (no SDK needed).
  */
 
 import { logApiCost } from '@/lib/ai/client';
 
+import { log } from '@/lib/logger';
 export interface InstagramPostData {
   caption: string | null;
   likes: number;
@@ -73,7 +74,7 @@ export async function scrapeInstagramPost(
     const actorId = 'apify~instagram-scraper';
     const apiUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${token}`;
 
-    console.log(`[Apify] Scraping single post: ${url}`);
+    log.info(`[Apify] Scraping single post: ${url}`);
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -88,7 +89,7 @@ export async function scrapeInstagramPost(
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '');
-      console.error(`[Apify] HTTP ${response.status}: ${errorBody.substring(0, 500)}`);
+      log.error(`[Apify] HTTP ${response.status}: ${errorBody.substring(0, 500)}`);
       return { error: `Apify retornou status ${response.status}: ${errorBody.substring(0, 200)}` };
     }
 
@@ -100,7 +101,7 @@ export async function scrapeInstagramPost(
 
     const result = mapPost(data[0] as Record<string, unknown>);
 
-    console.log(
+    log.info(
       `[Apify] Scraped Instagram post | likes: ${result.likes} | comments: ${result.comments}`,
     );
 
@@ -109,7 +110,7 @@ export async function scrapeInstagramPost(
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Apify Error] scrapeInstagramPost:', message);
+    log.error('[Apify Error] scrapeInstagramPost:' + " " + String(message));
     return { error: `Falha ao scraper Instagram: ${message}` };
   }
 }
@@ -135,7 +136,7 @@ export async function scrapeInstagramProfile(
     const actorId = 'apify~instagram-profile-scraper';
     const apiUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${token}`;
 
-    console.log(`[Apify] Scraping profile: @${cleanUsername} (limit: ${maxPosts}) URL: ${profileUrl}`);
+    log.info(`[Apify] Scraping profile: @${cleanUsername} (limit: ${maxPosts}) URL: ${profileUrl}`);
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -149,7 +150,7 @@ export async function scrapeInstagramProfile(
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '');
-      console.error(`[Apify] HTTP ${response.status}: ${errorBody.substring(0, 500)}`);
+      log.error(`[Apify] HTTP ${response.status}: ${errorBody.substring(0, 500)}`);
       return { error: `Apify retornou status ${response.status}: ${errorBody.substring(0, 200)}` };
     }
 
@@ -165,11 +166,11 @@ export async function scrapeInstagramProfile(
     const latestPosts = (profileData.latestPosts ?? []) as Record<string, unknown>[];
 
     if (latestPosts.length === 0) {
-      console.warn(`[Apify] Profile @${cleanUsername} returned 0 latestPosts`);
+      log.warn(`[Apify] Profile @${cleanUsername} returned 0 latestPosts`);
       return { error: 'Nenhum post encontrado neste perfil' };
     }
 
-    console.log(`[Apify] Profile @${cleanUsername}: found ${latestPosts.length} posts in latestPosts`);
+    log.info(`[Apify] Profile @${cleanUsername}: found ${latestPosts.length} posts in latestPosts`);
 
     const posts = latestPosts.slice(0, maxPosts).map((post) =>
       mapPost(post, cleanUsername),
@@ -180,7 +181,7 @@ export async function scrapeInstagramProfile(
     return posts;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Apify Error] scrapeInstagramProfile:', message);
+    log.error('[Apify Error] scrapeInstagramProfile:' + " " + String(message));
     return { error: `Falha ao scraper perfil: ${message}` };
   }
 }

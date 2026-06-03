@@ -1,5 +1,7 @@
-"use server";
+﻿"use server";
 
+
+import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { revalidatePath } from "next/cache";
@@ -196,7 +198,7 @@ Responda APENAS com um JSON array no formato:
     return { responses: data as FaqResponse[] };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    console.error("[Respostas] generateResponses error:", message);
+    log.error("[Respostas] generateResponses error:" + " " + String(message));
     return { error: `Falha ao gerar respostas: ${message}` };
   }
 }

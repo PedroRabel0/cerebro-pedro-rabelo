@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Instagram Carousel Slide Generator
  * Uses Gemini for background illustrations + OpenAI GPT Image for text overlay
  * Produces 1080x1080 PNG images ready to post on Instagram
@@ -6,6 +6,7 @@
 
 import OpenAI from 'openai';
 
+import { log } from '@/lib/logger';
 interface SlideImageResult {
   imageUrl: string; // base64 data URL
   slideIndex: number;
@@ -31,7 +32,7 @@ export async function generateCarouselSlides(
   const results: SlideImageResult[] = [];
   const allSlides = buildSlidePrompts(input);
 
-  console.log(`[SlideGen] Generating ${allSlides.length} slides...`);
+  log.info(`[SlideGen] Generating ${allSlides.length} slides...`);
 
   // Generate slides in batches of 2 to balance speed vs rate limits
   for (let i = 0; i < allSlides.length; i += 2) {
@@ -47,7 +48,7 @@ export async function generateCarouselSlides(
     }
   }
 
-  console.log(`[SlideGen] Generated ${results.length}/${allSlides.length} slides successfully`);
+  log.info(`[SlideGen] Generated ${results.length}/${allSlides.length} slides successfully`);
   return results;
 }
 
@@ -103,10 +104,10 @@ async function generateSingleSlide(
       return { imageUrl: geminiResult, slideIndex: index };
     }
 
-    console.log(`[SlideGen] Both APIs failed for slide ${index}`);
+    log.info(`[SlideGen] Both APIs failed for slide ${index}`);
     return null;
   } catch (error) {
-    console.error(`[SlideGen] Error generating slide ${index}:`, error);
+    log.error(`[SlideGen] Error generating slide ${index}:` + " " + String(error));
     return null;
   }
 }
@@ -123,7 +124,7 @@ async function generateWithGPTImage(slidePrompt: SlidePrompt): Promise<string | 
     const client = new OpenAI({ apiKey });
     const prompt = buildImagePrompt(slidePrompt);
 
-    console.log(`[SlideGen/GPT] Generating ${slidePrompt.type} slide...`);
+    log.info(`[SlideGen/GPT] Generating ${slidePrompt.type} slide...`);
 
     const response = await client.images.generate({
       model: 'gpt-image-1',
@@ -136,20 +137,20 @@ async function generateWithGPTImage(slidePrompt: SlidePrompt): Promise<string | 
     // gpt-image-1 returns b64_json by default
     const b64 = response.data?.[0]?.b64_json;
     if (b64) {
-      console.log(`[SlideGen/GPT] ${slidePrompt.type} slide generated successfully`);
+      log.info(`[SlideGen/GPT] ${slidePrompt.type} slide generated successfully`);
       return `data:image/png;base64,${b64}`;
     }
 
     const url = response.data?.[0]?.url;
     if (url) {
-      console.log(`[SlideGen/GPT] ${slidePrompt.type} slide generated (URL)`);
+      log.info(`[SlideGen/GPT] ${slidePrompt.type} slide generated (URL)`);
       return url;
     }
 
     return null;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.log(`[SlideGen/GPT] Failed: ${msg.substring(0, 150)}`);
+    log.info(`[SlideGen/GPT] Failed: ${msg.substring(0, 150)}`);
     return null;
   }
 }
@@ -165,7 +166,7 @@ async function generateWithGemini(slidePrompt: SlidePrompt): Promise<string | nu
 
     const prompt = buildImagePrompt(slidePrompt);
 
-    console.log(`[SlideGen/Gemini] Generating ${slidePrompt.type} slide...`);
+    log.info(`[SlideGen/Gemini] Generating ${slidePrompt.type} slide...`);
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
@@ -186,7 +187,7 @@ async function generateWithGemini(slidePrompt: SlidePrompt): Promise<string | nu
     );
 
     if (!response.ok) {
-      console.log(`[SlideGen/Gemini] Failed: ${response.status}`);
+      log.info(`[SlideGen/Gemini] Failed: ${response.status}`);
       return null;
     }
 
@@ -196,7 +197,7 @@ async function generateWithGemini(slidePrompt: SlidePrompt): Promise<string | nu
     for (const part of parts) {
       if (part.inlineData) {
         const mimeType = part.inlineData.mimeType || 'image/png';
-        console.log(`[SlideGen/Gemini] ${slidePrompt.type} slide generated`);
+        log.info(`[SlideGen/Gemini] ${slidePrompt.type} slide generated`);
         return `data:${mimeType};base64,${part.inlineData.data}`;
       }
     }
@@ -204,7 +205,7 @@ async function generateWithGemini(slidePrompt: SlidePrompt): Promise<string | nu
     return null;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.log(`[SlideGen/Gemini] Failed: ${msg.substring(0, 150)}`);
+    log.info(`[SlideGen/Gemini] Failed: ${msg.substring(0, 150)}`);
     return null;
   }
 }

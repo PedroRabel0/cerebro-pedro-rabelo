@@ -1,5 +1,7 @@
-"use server";
+﻿"use server";
 
+
+import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getClient, logCost } from "@/lib/ai/client";
@@ -87,7 +89,7 @@ export async function importInstagramMetrics(): Promise<ImportResult> {
     const supabase = await createClient();
 
     // 1. Scrape Pedro's latest 20 posts
-    console.log(`[Analytics Import] Scraping @${handle}...`);
+    log.info(`[Analytics Import] Scraping @${handle}...`);
     const scraped = await scrapeInstagramProfile(handle, 20);
 
     if ("error" in scraped) {
@@ -164,7 +166,7 @@ export async function importInstagramMetrics(): Promise<ImportResult> {
       entity_title: `Import @${handle}`,
     });
 
-    console.log(`[Analytics Import] @${handle}: ${imported} imported, ${skipped} skipped of ${scraped.length} total`);
+    log.info(`[Analytics Import] @${handle}: ${imported} imported, ${skipped} skipped of ${scraped.length} total`);
 
     revalidatePath(PATH);
 
@@ -176,7 +178,7 @@ export async function importInstagramMetrics(): Promise<ImportResult> {
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    console.error("[Analytics Import] Error:", message);
+    log.error("[Analytics Import] Error:" + " " + String(message));
     return {
       posts_found: 0,
       posts_imported: 0,

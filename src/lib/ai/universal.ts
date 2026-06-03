@@ -1,6 +1,7 @@
-import { extractYouTubeContent, isYouTubeUrl } from './youtube';
+﻿import { extractYouTubeContent, isYouTubeUrl } from './youtube';
 import { getClient, logCost, parseJSON } from './client';
 
+import { log } from '@/lib/logger';
 // --- Types ---
 
 export interface ProposalResult {
@@ -144,11 +145,11 @@ async function processChunk(
   const text =
     response.content[0].type === 'text' ? response.content[0].text : '';
 
-  console.log(`[Universal] AI response${chunkLabel}: ${text.length} chars, ${response.usage.output_tokens} tokens`);
+  log.info(`[Universal] AI response${chunkLabel}: ${text.length} chars, ${response.usage.output_tokens} tokens`);
 
   const parsed = parseJSON<UniversalInputResult>(text);
   if (!parsed) {
-    console.error(`[Universal] Failed to parse AI response${chunkLabel}. Raw:`, text.slice(0, 500));
+    log.error(`[Universal] Failed to parse AI response${chunkLabel}. Raw:` + " " + String(text.slice(0, 500)));
     return { error: `A IA retornou resposta invalida${chunkLabel}. Tente novamente.` };
   }
 
@@ -178,13 +179,13 @@ export async function processUniversalInput(
     // YouTube extraction
     let youtubeContent: { title: string; author: string; transcript: string | null; thumbnail_url: string } | null = null;
     if (isUrl && isYouTubeUrl(input.trim())) {
-      console.log('[Universal] Detected YouTube URL, extracting...');
+      log.info('[Universal] Detected YouTube URL, extracting...');
       const extraction = await extractYouTubeContent(input.trim());
       if (!('error' in extraction)) {
         youtubeContent = extraction;
-        console.log(`[Universal] YouTube: "${youtubeContent.title}" — transcript: ${youtubeContent.transcript?.length ?? 0} chars`);
+        log.info(`[Universal] YouTube: "${youtubeContent.title}" — transcript: ${youtubeContent.transcript?.length ?? 0} chars`);
       } else {
-        console.log(`[Universal] YouTube extraction failed: ${extraction.error}`);
+        log.info(`[Universal] YouTube extraction failed: ${extraction.error}`);
       }
     }
 
@@ -207,7 +208,7 @@ export async function processUniversalInput(
     const proposalRange = estimateProposalRange(rawText.length);
     const systemPrompt = buildSystemPrompt(proposalRange);
 
-    console.log(`[Universal] Input: ${rawText.length} chars, target proposals: ${proposalRange}`);
+    log.info(`[Universal] Input: ${rawText.length} chars, target proposals: ${proposalRange}`);
 
     // For short/medium texts: single pass
     if (rawText.length <= 15000) {
@@ -224,9 +225,9 @@ export async function processUniversalInput(
     }
 
     // For long texts: split into chunks and merge results
-    console.log(`[Universal] Long text (${rawText.length} chars) — splitting into chunks`);
+    log.info(`[Universal] Long text (${rawText.length} chars) — splitting into chunks`);
     const chunks = splitIntoChunks(rawText, 12000);
-    console.log(`[Universal] Split into ${chunks.length} chunks`);
+    log.info(`[Universal] Split into ${chunks.length} chunks`);
 
     const allProposals: ProposalResult[] = [];
     const allThemes: Set<string> = new Set();
@@ -243,7 +244,7 @@ export async function processUniversalInput(
       const result = await processChunk(client, systemPrompt, chunkPrompt, i, chunks.length);
 
       if ('error' in result) {
-        console.error(`[Universal] Chunk ${i + 1} failed:`, result.error);
+        log.error(`[Universal] Chunk ${i + 1} failed:` + " " + String(result.error));
         continue; // Skip failed chunk, don't fail everything
       }
 
@@ -271,7 +272,7 @@ export async function processUniversalInput(
       return true;
     });
 
-    console.log(`[Universal] Total: ${uniqueProposals.length} proposals from ${chunks.length} chunks (${allProposals.length} before dedup)`);
+    log.info(`[Universal] Total: ${uniqueProposals.length} proposals from ${chunks.length} chunks (${allProposals.length} before dedup)`);
 
     return {
       detected_type: detectedType,
@@ -285,7 +286,7 @@ export async function processUniversalInput(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[AI Error] processUniversalInput:', message);
+    log.error('[AI Error] processUniversalInput:' + " " + String(message));
     return { error: `Falha ao processar input: ${message}` };
   }
 }
