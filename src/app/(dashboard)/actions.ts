@@ -563,6 +563,214 @@ export async function askBrain(question: string): Promise<string> {
   return text;
 }
 
+// --- Brain Chat (Persistent) ---
+
+export async function getChats(): Promise<
+  { id: string; title: string; updated_at: string }[]
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("brain_chats")
+    .select("id, title, updated_at")
+    .order("updated_at", { ascending: false })
+    .limit(30);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createChat(): Promise<{ id: string }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("brain_chats")
+    .insert({ title: "Nova conversa" })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return { id: data.id };
+}
+
+export async function getChatMessages(
+  chatId: string
+): Promise<
+  { id: string; role: string; content: string; created_at: string }[]
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("brain_messages")
+    .select("id, role, content, created_at")
+    .eq("chat_id", chatId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function sendChatMessage(
+  chatId: string,
+  question: string
+): Promise<{ response: string }> {
+  const supabase = await createClient();
+
+  // 1. Save user message
+  await supabase
+    .from("brain_messages")
+    .insert({ chat_id: chatId, role: "user", content: question });
+
+  // 2. Fetch last 10 messages for conversation history
+  const { data: previousMessages } = await supabase
+    .from("brain_messages")
+    .select("role, content")
+    .eq("chat_id", chatId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  const history = (previousMessages ?? []).reverse();
+
+  // 3. Fetch knowledge context (same as askBrain)
+  const [identity, playbooks, stories, recentRefs] = await Promise.all([
+    supabase.from("identity").select("*").limit(1).single(),
+    supabase
+      .from("playbooks")
+      .select("id, title, body_markdown")
+      .limit(30),
+    supabase
+      .from("stories")
+      .select("id, title, summary, body_markdown, tags")
+      .limit(30),
+    supabase
+      .from("reference_posts")
+      .select(
+        "caption_text, dna_hook_type, dna_structure, dna_main_theme, profile:reference_profiles(display_name, handle)"
+      )
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+
+  const parts: string[] = [];
+
+  if (identity.data) {
+    parts.push(
+      `## Identidade do Pedro\n${JSON.stringify(identity.data, null, 2)}`
+    );
+  }
+
+  if (playbooks.data && playbooks.data.length > 0) {
+    const playbookText = playbooks.data
+      .map(
+        (p) =>
+          `### ${p.title}\n${p.body_markdown || "(sem conteúdo)"}`
+      )
+      .join("\n\n");
+    parts.push(`## Playbooks (${playbooks.data.length})\n${playbookText}`);
+  }
+
+  if (stories.data && stories.data.length > 0) {
+    const storyText = stories.data
+      .map(
+        (s) =>
+          `### ${s.title}\n${s.summary || ""}\n${s.body_markdown || "(sem conteúdo)"}\nTags: ${(s.tags || []).join(", ")}`
+      )
+      .join("\n\n");
+    parts.push(`## Histórias (${stories.data.length})\n${storyText}`);
+  }
+
+  if (recentRefs.data && recentRefs.data.length > 0) {
+    const refText = recentRefs.data
+      .map((r) => {
+        const profile = r.profile as unknown as {
+          display_name: string;
+          handle: string;
+        } | null;
+        const profileName = profile
+          ? `${profile.display_name} (@${profile.handle})`
+          : "Desconhecido";
+        return `- ${profileName}: ${(r.caption_text || "").slice(0, 200)} [Hook: ${r.dna_hook_type || "?"}, Tema: ${r.dna_main_theme || "?"}]`;
+      })
+      .join("\n");
+    parts.push(
+      `## Referências Recentes (${recentRefs.data.length})\n${refText}`
+    );
+  }
+
+  const knowledgeContext = parts.join("\n\n---\n\n");
+
+  const systemPrompt =
+    "Você é o Segundo Cérebro do Pedro Rabelo. Você sabe TUDO que está na base de conhecimento dele. " +
+    "Responda como se fosse a memória e inteligência do Pedro — use os playbooks, histórias e referências " +
+    "para dar respostas completas e contextualizadas. Se não souber algo, diga que ainda não tem essa " +
+    "informação na base. Responda sempre em português brasileiro, de forma direta e útil.\n\n" +
+    "=== BASE DE CONHECIMENTO ===\n\n" +
+    knowledgeContext;
+
+  // 4. Call Claude with conversation history
+  const client = getClient();
+  const messages = history.map((m) => ({
+    role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
+    content: m.content,
+  }));
+
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 2048,
+    system: [
+      {
+        type: "text" as const,
+        text: systemPrompt,
+        cache_control: { type: "ephemeral" as const },
+      },
+    ],
+    messages,
+  });
+
+  logCost(
+    "claude-sonnet-4-6",
+    response.usage.input_tokens,
+    response.usage.output_tokens
+  );
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text : "";
+
+  // 5. Save brain response
+  await supabase
+    .from("brain_messages")
+    .insert({ chat_id: chatId, role: "brain", content: text });
+
+  // 6. Auto-update title on first message & update timestamp
+  const { count } = await supabase
+    .from("brain_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("chat_id", chatId);
+
+  const updates: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (count !== null && count <= 2) {
+    updates.title = question.slice(0, 50);
+  }
+
+  await supabase.from("brain_chats").update(updates).eq("id", chatId);
+
+  return { response: text };
+}
+
+export async function deleteChat(chatId: string): Promise<void> {
+  const supabase = await createClient();
+  // Delete messages first, then chat
+  await supabase.from("brain_messages").delete().eq("chat_id", chatId);
+  await supabase.from("brain_chats").delete().eq("id", chatId);
+}
+
+export async function renameChat(
+  chatId: string,
+  title: string
+): Promise<void> {
+  const supabase = await createClient();
+  await supabase
+    .from("brain_chats")
+    .update({ title })
+    .eq("id", chatId);
+}
+
 // --- Activity Feed ---
 
 export async function getActivityFeed() {

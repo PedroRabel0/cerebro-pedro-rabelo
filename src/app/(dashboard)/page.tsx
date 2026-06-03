@@ -120,12 +120,8 @@ export default async function DashboardHome() {
         </div>
       )}
 
-      {/* Brain Chat — glass card */}
-      <div className="glass-card rounded-2xl p-6">
-        <h2 className="mb-4 flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-wider text-text-muted">
-          <Brain className="h-3.5 w-3.5 text-violet" />
-          Perguntar ao Cérebro
-        </h2>
+      {/* Brain Chat — full-width persistent chat */}
+      <div className="relative min-h-[500px]">
         <BrainChat />
       </div>
 
