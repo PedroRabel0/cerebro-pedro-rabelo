@@ -803,7 +803,15 @@ interface GenerationResult {
   content: string;
   sourceMap: Record<string, unknown> | null;
   imagePrompt?: string | null;
+  source?: "base_only" | "references_only" | "both" | "free_text";
 }
+
+const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
+  base_only: { label: "Do Pedro", className: "bg-accent/15 text-accent border-accent/30" },
+  references_only: { label: "De referências externas", className: "bg-blue/15 text-blue border-blue/30" },
+  both: { label: "Pedro + Referências", className: "bg-purple/15 text-purple border-purple/30" },
+  free_text: { label: "Texto livre", className: "bg-surface text-text-muted border-border" },
+};
 
 function SourceMapDisplay({ sourceMap }: { sourceMap: Record<string, unknown> | null }) {
   if (!sourceMap || Object.keys(sourceMap).length === 0) return null;
@@ -955,6 +963,11 @@ function ResultCard({
         <span className="font-mono text-xs font-bold text-accent uppercase tracking-wider">
           {typeLabel(result.contentType)}
         </span>
+        {result.source && SOURCE_LABELS[result.source] && (
+          <span className={`rounded-full border px-2 py-0.5 font-mono text-[11px] font-medium ${SOURCE_LABELS[result.source].className}`}>
+            {SOURCE_LABELS[result.source].label}
+          </span>
+        )}
         <div className="flex gap-1">
           <button
             onClick={handleCopy}
@@ -987,6 +1000,18 @@ function ResultCard({
       )}
 
       <SourceMapDisplay sourceMap={result.sourceMap} />
+
+      {/* Warning when external references were used */}
+      {(result.source === "references_only" || result.source === "both") && (
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-blue/20 bg-blue/5 px-3 py-2">
+          <span className="text-blue text-[11px]">↗</span>
+          <span className="text-[11px] text-blue">
+            {result.source === "both"
+              ? "Este conteudo usa a base do Pedro + referencias externas. Verifique antes de publicar."
+              : "Este conteudo foi gerado a partir de referencias externas, nao da base do Pedro."}
+          </span>
+        </div>
+      )}
 
       {/* Image prompt for user to copy to their preferred AI tool */}
       {result.imagePrompt && (

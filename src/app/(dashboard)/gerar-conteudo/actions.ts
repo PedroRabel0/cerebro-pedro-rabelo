@@ -434,6 +434,7 @@ export interface WizardResult {
   content: string;
   sourceMap: Record<string, unknown> | null;
   imagePrompt?: string | null;
+  source: "base_only" | "references_only" | "both" | "free_text";
 }
 
 export async function createWizardContent(
@@ -823,6 +824,7 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR. Use as informacoes dos playbooks
         content: result.content_text,
         sourceMap: result.source_map,
         imagePrompt,
+        source: payload.source as "base_only" | "references_only" | "both" | "free_text",
       });
     }
 
