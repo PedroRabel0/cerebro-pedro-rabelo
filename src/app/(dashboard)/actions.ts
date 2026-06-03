@@ -367,11 +367,12 @@ export async function submitUniversalInput(
     // Save all DB operations in PARALLEL (not sequential)
     await Promise.all([
       (async () => {
+        const originTag = origin === "outros" ? "origem:outros" : "origem:pedro";
         await supabase
           .from("captures")
           .update({
             title: result.title,
-            context: result.summary,
+            context: `${originTag} | ${result.summary}`,
             status: "processed",
             speaker_verified: result.speaker_verified,
           })
@@ -379,12 +380,14 @@ export async function submitUniversalInput(
       })(),
       (async () => {
         if (result.proposals.length > 0) {
+          // Tag proposals with origin so Insights knows the default
+          const originTag = origin === "outros" ? "origem:outros" : "origem:pedro";
           const proposalRows = result.proposals.map((p) => ({
             capture_id: capture.id,
             type: p.type as "playbook" | "story" | "question",
             title: p.title,
             content_markdown: p.content_markdown,
-            suggested_tags: p.suggested_tags || [],
+            suggested_tags: [originTag, ...(p.suggested_tags || [])],
             status: "pending",
           }));
           await supabase.from("proposals").insert(proposalRows);

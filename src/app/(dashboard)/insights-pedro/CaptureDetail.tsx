@@ -51,7 +51,10 @@ function ProposalCard({
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [feedback, setFeedback] = useState<"approved" | "rejected" | null>(null);
-  const [origin, setOrigin] = useState<"pedro" | "outros">("pedro");
+
+  // Auto-detect origin from tags (set during Alimentar)
+  const detectedOrigin = proposal.suggested_tags?.includes("origem:outros") ? "outros" : "pedro";
+  const [origin, setOrigin] = useState<"pedro" | "outros">(detectedOrigin);
 
   const config = proposalTypeConfig[proposal.type] ?? {
     label: proposal.type,
@@ -150,12 +153,12 @@ function ProposalCard({
         </div>
 
         {/* Tags */}
-        {proposal.suggested_tags && proposal.suggested_tags.length > 0 && (
+        {proposal.suggested_tags && proposal.suggested_tags.filter(t => !t.startsWith("origem:")).length > 0 && (
           <div className="flex flex-wrap gap-1 items-center">
-            {proposal.suggested_tags.map((tag) => (
+            {proposal.suggested_tags.filter(t => !t.startsWith("origem:")).map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-0.5 rounded-md bg-surface px-1.5 py-0.5 font-mono text-[10px] text-accent/80"
+                className="inline-flex items-center gap-0.5 rounded-md bg-surface px-1.5 py-0.5 font-mono text-[11px] text-accent/80"
               >
                 {tag}
               </span>
