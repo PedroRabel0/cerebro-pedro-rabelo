@@ -204,7 +204,7 @@ export default function BrainChat() {
   }
 
   return (
-    <div className="glass-card flex h-full min-h-[500px] overflow-hidden rounded-2xl">
+    <div className="flex h-full w-full overflow-hidden bg-bg">
       {/* Mobile sidebar toggle */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}

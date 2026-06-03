@@ -5,7 +5,7 @@ import BrainChat from "@/components/BrainChat";
 
 export default async function DashboardHome() {
   return (
-    <div className="relative h-[calc(100vh-6rem)]">
+    <div className="fixed inset-0 md:left-56">
       <BrainChat />
     </div>
   );
