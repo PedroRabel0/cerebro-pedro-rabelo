@@ -181,56 +181,24 @@ export async function submitFileInput(formData: FormData) {
       }
 
     } else if (ext === "docx" || fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-      // DOCX is a ZIP file — try multiple extraction methods
+      // DOCX: use mammoth library for reliable extraction
       try {
+        const mammoth = await import("mammoth");
         const buffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        log.info(`[FileInput] DOCX buffer: ${bytes.length} bytes`);
+        log.info(`[FileInput] DOCX buffer: ${buffer.byteLength} bytes`);
 
-        // Method 1: Decode full binary as latin1 (preserves all bytes, finds XML)
-        let rawStr = "";
-        for (let i = 0; i < bytes.length; i++) {
-          rawStr += String.fromCharCode(bytes[i]);
+        const result = await mammoth.extractRawText({ buffer });
+        textContent = (result.value || "").trim().slice(0, 60000);
+
+        if (textContent.length < 20) {
+          return {
+            captureId: "",
+            status: "saved_without_ai" as const,
+            error: `O arquivo "${fileName}" parece vazio ou nao contem texto extraivel.`,
+          };
         }
 
-        // Method 2: Try UTF-8 decode as fallback
-        if (!rawStr.includes("<w:t")) {
-          const decoder = new TextDecoder("utf-8", { fatal: false });
-          rawStr = decoder.decode(bytes);
-        }
-
-        log.info(`[FileInput] DOCX raw string: ${rawStr.length} chars, has w:t tags: ${rawStr.includes("<w:t")}`);
-
-        // Extract text between XML tags
-        const xmlText = rawStr.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
-        if (xmlText && xmlText.length > 0) {
-          textContent = xmlText
-            .map(t => t.replace(/<[^>]+>/g, ""))
-            .join(" ")
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 60000);
-          log.info(`[FileInput] DOCX text extracted: ${textContent.length} chars from ${xmlText.length} tags`);
-        } else {
-          // Method 3: Try extracting any readable text runs
-          const readableRuns = rawStr.match(/[a-zA-ZáàãâéèêíóòõôúçÁÀÃÂÉÈÊÍÓÒÕÔÚÇ0-9\s,.;:!?()"-]{20,}/g);
-          if (readableRuns && readableRuns.length > 0) {
-            textContent = readableRuns
-              .filter(r => r.trim().split(/\s+/).length >= 3)
-              .join("\n")
-              .slice(0, 60000);
-            log.info(`[FileInput] DOCX fallback extraction: ${textContent.length} chars from ${readableRuns.length} runs`);
-          }
-
-          if (textContent.length < 50) {
-            log.error(`[FileInput] DOCX extraction failed for ${fileName}`);
-            return {
-              captureId: "",
-              status: "saved_without_ai" as const,
-              error: `Nao foi possivel extrair texto de "${fileName}". Tente copiar o texto e colar diretamente, ou salvar como .txt.`,
-            };
-          }
-        }
+        log.info(`[FileInput] DOCX extracted via mammoth: ${textContent.length} chars`);
       } catch (docxErr) {
         log.error("[FileInput] DOCX extraction error:" + " " + String(docxErr));
         return {
