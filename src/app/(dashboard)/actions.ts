@@ -187,7 +187,7 @@ export async function submitFileInput(formData: FormData) {
         const buffer = await file.arrayBuffer();
         log.info(`[FileInput] DOCX buffer: ${buffer.byteLength} bytes`);
 
-        const result = await mammoth.extractRawText({ buffer });
+        const result = await mammoth.extractRawText({ buffer: Buffer.from(buffer) });
         textContent = (result.value || "").trim().slice(0, 60000);
 
         if (textContent.length < 20) {
