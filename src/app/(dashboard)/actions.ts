@@ -465,7 +465,7 @@ export async function getDashboardStats() {
 export async function askBrain(question: string): Promise<string> {
   const supabase = await createClient();
 
-  const [identity, playbooks, stories, recentRefs] = await Promise.all([
+  const [identity, playbooks, stories, recentRefs, brainRulesRes] = await Promise.all([
     supabase.from("identity").select("*").limit(1).single(),
     supabase
       .from("playbooks")
@@ -482,6 +482,10 @@ export async function askBrain(question: string): Promise<string> {
       )
       .order("created_at", { ascending: false })
       .limit(20),
+    supabase
+      .from("decision_rules")
+      .select("rule_text, context, category")
+      .order("category"),
   ]);
 
   // Build context
@@ -529,6 +533,13 @@ export async function askBrain(question: string): Promise<string> {
     parts.push(
       `## Referências Recentes (${recentRefs.data.length})\n${refText}`
     );
+  }
+
+  if (brainRulesRes.data && brainRulesRes.data.length > 0) {
+    const rulesText = brainRulesRes.data
+      .map((r: { rule_text: string; context?: string | null }) => `- ${r.rule_text}${r.context ? ` (${r.context})` : ''}`)
+      .join("\n");
+    parts.push(`## Regras de Decisao do Pedro (SIGA SEMPRE)\n${rulesText}`);
   }
 
   const knowledgeContext = parts.join("\n\n---\n\n");
@@ -629,7 +640,7 @@ export async function sendChatMessage(
   const history = (previousMessages ?? []).reverse();
 
   // 3. Fetch knowledge context (same as askBrain)
-  const [identity, playbooks, stories, recentRefs] = await Promise.all([
+  const [identity, playbooks, stories, recentRefs, chatRulesRes] = await Promise.all([
     supabase.from("identity").select("*").limit(1).single(),
     supabase
       .from("playbooks")
@@ -646,6 +657,10 @@ export async function sendChatMessage(
       )
       .order("created_at", { ascending: false })
       .limit(20),
+    supabase
+      .from("decision_rules")
+      .select("rule_text, context, category")
+      .order("category"),
   ]);
 
   const parts: string[] = [];
@@ -692,6 +707,13 @@ export async function sendChatMessage(
     parts.push(
       `## Referências Recentes (${recentRefs.data.length})\n${refText}`
     );
+  }
+
+  if (chatRulesRes.data && chatRulesRes.data.length > 0) {
+    const rulesText = chatRulesRes.data
+      .map((r: { rule_text: string; context?: string | null }) => `- ${r.rule_text}${r.context ? ` (${r.context})` : ''}`)
+      .join("\n");
+    parts.push(`## Regras de Decisao do Pedro (SIGA SEMPRE)\n${rulesText}`);
   }
 
   const knowledgeContext = parts.join("\n\n---\n\n");

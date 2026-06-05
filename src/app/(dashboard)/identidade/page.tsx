@@ -1,11 +1,16 @@
 export const dynamic = "force-dynamic";
 
 import { getIdentity, autoFillIdentity } from "./actions";
+import { getRules } from "./rules-actions";
 import IdentityForm from "./IdentityForm";
+import DecisionRules from "./DecisionRules";
 import { Target, Info } from "lucide-react";
 
 export default async function IdentidadePage() {
-  const existingBefore = await getIdentity();
+  const [existingBefore, rules] = await Promise.all([
+    getIdentity(),
+    getRules(),
+  ]);
   const identity = await autoFillIdentity();
   const wasAutoFilled = !existingBefore && !!identity;
 
@@ -37,6 +42,8 @@ export default async function IdentidadePage() {
       )}
 
       <IdentityForm initial={identity} wasAutoFilled={wasAutoFilled} />
+
+      <DecisionRules initialRules={rules} />
     </div>
   );
 }

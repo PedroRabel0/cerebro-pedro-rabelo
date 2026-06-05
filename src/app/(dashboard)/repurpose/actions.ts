@@ -61,7 +61,7 @@ export async function repurposeContent(
     }
 
     // Fetch identity for AI context
-    const [identityRes, feedbackRes] = await Promise.all([
+    const [identityRes, feedbackRes, repurposeRulesRes] = await Promise.all([
       supabase.from("identity").select("*").limit(1).single(),
       supabase
         .from("generated_contents")
@@ -70,6 +70,10 @@ export async function repurposeContent(
         .eq("feedback_rating", "bad")
         .order("created_at", { ascending: false })
         .limit(5),
+      supabase
+        .from("decision_rules")
+        .select("rule_text, context, category")
+        .order("category"),
     ]);
 
     const repurposeGroup = randomUUID();
@@ -182,6 +186,7 @@ ${adaptationGuide}
         contentType: targetType,
         freeText: freeTextPrompt,
         recentFeedbacks: feedbackRes.data ?? [],
+        rules: repurposeRulesRes.data ?? undefined,
       });
 
       if ("error" in result) {

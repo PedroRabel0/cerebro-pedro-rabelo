@@ -28,6 +28,7 @@ export interface GenerateContentParams {
   format?: Format;
   freeText?: string;
   recentFeedbacks?: Feedback[];
+  rules?: { rule_text: string; context?: string | null }[];
 }
 
 export interface GenerateContentResult {
@@ -82,7 +83,7 @@ export async function generateContent(
 ): Promise<GenerateContentResult | { error: string }> {
   try {
     const client = getClient();
-    const systemPrompt = buildContentGenerationSystemPrompt(params.identity);
+    const systemPrompt = buildContentGenerationSystemPrompt(params.identity, params.rules);
     const userPrompt = buildContentGenerationUserPrompt({
       contentType: params.contentType,
       playbook: params.playbook,

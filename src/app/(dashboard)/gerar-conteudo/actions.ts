@@ -88,7 +88,7 @@ export async function createGeneratedContent(formData: FormData) {
   // AI generation (non-blocking — record is already saved)
   try {
     // Fetch supporting data for AI
-    const [identityRes, playbookRes, storyRes, formatRes, feedbackRes] =
+    const [identityRes, playbookRes, storyRes, formatRes, feedbackRes, rulesRes] =
       await Promise.all([
         supabase.from("identity").select("*").limit(1).single(),
         playbookId
@@ -111,6 +111,10 @@ export async function createGeneratedContent(formData: FormData) {
           .eq("feedback_rating", "bad")
           .order("created_at", { ascending: false })
           .limit(5),
+        supabase
+          .from("decision_rules")
+          .select("rule_text, context, category")
+          .order("category"),
       ]);
 
     const result = await generateContent({
@@ -121,6 +125,7 @@ export async function createGeneratedContent(formData: FormData) {
       freeText: freeTextInput ?? undefined,
       contentType,
       recentFeedbacks: feedbackRes.data ?? [],
+      rules: rulesRes.data ?? undefined,
     });
 
     if (!("error" in result)) {
@@ -172,7 +177,7 @@ export async function createQuickContent(
 
   try {
     // Fetch identity, all playbooks, all stories in parallel
-    const [identityRes, playbooksRes, storiesRes, feedbackRes] =
+    const [identityRes, playbooksRes, storiesRes, feedbackRes, rulesRes] =
       await Promise.all([
         supabase.from("identity").select("*").limit(1).single(),
         supabase
@@ -192,6 +197,10 @@ export async function createQuickContent(
           .eq("feedback_rating", "bad")
           .order("created_at", { ascending: false })
           .limit(5),
+        supabase
+          .from("decision_rules")
+          .select("rule_text, context, category")
+          .order("category"),
       ]);
 
     // Pick top 3 playbooks relevant to the topic (simple keyword match, fallback to first 3)
@@ -279,6 +288,7 @@ export async function createQuickContent(
           }
         : undefined,
       contentType,
+      rules: rulesRes.data ?? undefined,
       freeText: `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUES BRASILEIRO (PT-BR).
 
 TOPICO SOLICITADO: ${topic}
@@ -451,7 +461,7 @@ export async function createWizardContent(
     const playbookId = payload.playbookId || null;
     const storyId = payload.storyId || payload.pullStoryId || null;
 
-    const [identityRes, playbooksRes, storiesRes, feedbackRes, playbookRes, storyRes] =
+    const [identityRes, playbooksRes, storiesRes, feedbackRes, playbookRes, storyRes, wizardRulesRes] =
       await Promise.all([
         supabase.from("identity").select("*").limit(1).single(),
         supabase
@@ -477,6 +487,10 @@ export async function createWizardContent(
         storyId
           ? supabase.from("stories").select("*").eq("id", storyId).single()
           : Promise.resolve({ data: null }),
+        supabase
+          .from("decision_rules")
+          .select("rule_text, context, category")
+          .order("category"),
       ]);
 
     // Fetch reference posts when source is "both" or "references_only"
@@ -771,6 +785,7 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR. Use as informacoes dos playbooks
         contentType,
         freeText: freeTextPrompt,
         recentFeedbacks: feedbackRes.data ?? [],
+        rules: wizardRulesRes.data ?? undefined,
       });
 
       if ("error" in result) {

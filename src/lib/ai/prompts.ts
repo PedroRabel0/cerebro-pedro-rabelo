@@ -66,7 +66,10 @@ export interface Feedback {
 
 // --- SYSTEM PROMPTS ---
 
-export function buildContentGenerationSystemPrompt(identity: Identity): string {
+export function buildContentGenerationSystemPrompt(
+  identity: Identity,
+  rules?: { rule_text: string; context?: string | null }[]
+): string {
   // Map DB fields to prompt context
   const voiceUses = identity.voice_uses || [];
   const voiceAvoids = identity.voice_avoids || [];
@@ -76,7 +79,7 @@ export function buildContentGenerationSystemPrompt(identity: Identity): string {
   const closingStyle = identity.closing_style || 'Fecha com provocação';
   const name = identity.name || 'Pedro Rabelo';
 
-  return `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR). SE O CONTEÚDO ORIGINAL ESTIVER EM INGLÊS OU QUALQUER OUTRO IDIOMA, TRADUZA E ADAPTE TUDO PARA PT-BR. TÍTULOS, RESUMOS, PROPOSTAS, TAGS — TUDO EM PORTUGUÊS. NUNCA RESPONDA EM INGLÊS OU OUTRO IDIOMA.
+  let prompt = `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR). SE O CONTEÚDO ORIGINAL ESTIVER EM INGLÊS OU QUALQUER OUTRO IDIOMA, TRADUZA E ADAPTE TUDO PARA PT-BR. TÍTULOS, RESUMOS, PROPOSTAS, TAGS — TUDO EM PORTUGUÊS. NUNCA RESPONDA EM INGLÊS OU OUTRO IDIOMA.
 
 Você é o ghostwriter do ${name}. Seu trabalho é gerar conteúdo que soe exatamente como ele falaria.
 
@@ -107,6 +110,13 @@ ${closingStyle}
 6. Comece com um gancho forte que prenda atenção
 7. Termine com reflexão ou chamada para ação natural
 8. O conteúdo deve parecer que saiu da boca do ${name}, não de uma IA`;
+
+  if (rules && rules.length > 0) {
+    prompt += `\n\n## Regras de Decisao do Pedro (SIGA SEMPRE):
+${rules.map(r => `- ${r.rule_text}${r.context ? ` (${r.context})` : ''}`).join('\n')}`;
+  }
+
+  return prompt;
 }
 
 export function buildContentGenerationUserPrompt(params: {
