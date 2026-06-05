@@ -409,8 +409,16 @@ export async function runRadarScan(): Promise<ScanResult> {
       .slice(0, 3)
       .map(([t]) => t);
 
-    const avgEng =
-      profilePosts.reduce((s, p) => s + (p.engagement_rate || 0), 0) / profilePosts.length;
+    // Calculate engagement: if real rate exists use it, otherwise use relative interaction score
+    const maxInteractions = Math.max(
+      ...profilePosts.map((p) => (p.likes || 0) + (p.comments || 0)),
+      1
+    );
+    const avgEng = profilePosts.reduce((s, p) => {
+      if (p.engagement_rate && p.engagement_rate > 0) return s + p.engagement_rate;
+      const interactions = (p.likes || 0) + (p.comments || 0);
+      return s + (interactions / maxInteractions) * 100;
+    }, 0) / profilePosts.length;
 
     // Best post
     const bestPost = [...profilePosts].sort(
@@ -532,6 +540,8 @@ Gere de 5 a 8 recomendacoes de conteudo. Todas em pt-br. Foque em insights PRATI
 
       const textBlock = response.content.find((b) => b.type === "text");
       if (textBlock && textBlock.type === "text") {
+        log.info(`[Radar] AI response: ${textBlock.text.length} chars`);
+
         const parsed = parseJSON<{
           cross_profile_insights: string;
           content_recommendations: ScanResult["content_recommendations"];
@@ -540,6 +550,10 @@ Gere de 5 a 8 recomendacoes de conteudo. Todas em pt-br. Foque em insights PRATI
         if (parsed) {
           crossInsights = parsed.cross_profile_insights || crossInsights;
           contentRecs = parsed.content_recommendations || [];
+          log.info(`[Radar] Parsed: ${contentRecs.length} recommendations`);
+        } else {
+          log.error("[Radar] Failed to parse AI response. Raw: " + textBlock.text.slice(0, 300));
+          crossInsights = "A IA gerou a analise mas nao foi possivel interpretar. Tente escanear novamente.";
         }
       }
     } catch (err) {
