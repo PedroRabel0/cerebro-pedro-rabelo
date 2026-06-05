@@ -425,39 +425,89 @@ export async function scrapeProfileNow(
 }
 
 /**
- * Background DNA analysis — updates posts that were saved without DNA.
+ * Background DNA analysis + video transcription.
+ * Updates posts that were saved without DNA, and transcribes reels.
  */
 async function analyzeDNAInBackground(
   posts: InstagramPostData[],
   postIds: string[],
 ) {
+  const { transcribeVideoFromUrl } = await import("@/lib/ai/whisper");
   const supabase = await createClient();
 
   for (let i = 0; i < posts.length; i++) {
     const post = posts[i];
     const postId = postIds[i];
-    if (!post.caption || !postId) continue;
+    if (!postId) continue;
 
-    try {
-      const dnaResult = await analyzeDNA({ content: post.caption });
-      if (!("error" in dnaResult)) {
-        const dna = dnaResult as unknown as Record<string, string>;
-        await supabase
-          .from("reference_posts")
-          .update({
-            dna_hook_type: dna.hook_type || null,
-            dna_structure: dna.structure || null,
-            dna_length: dna.length || null,
-            dna_tone: dna.tone || null,
-            dna_cta_type: dna.cta_type || null,
-            dna_main_theme: dna.main_theme || null,
-            dna_sub_theme: dna.sub_theme || null,
-            dna_thesis: dna.thesis || null,
-          })
-          .eq("id", postId);
+    // 1. DNA analysis (text-based, from caption)
+    if (post.caption) {
+      try {
+        const dnaResult = await analyzeDNA({ content: post.caption });
+        if (!("error" in dnaResult)) {
+          const dna = dnaResult as unknown as Record<string, string>;
+          await supabase
+            .from("reference_posts")
+            .update({
+              dna_hook_type: dna.hook_type || null,
+              dna_structure: dna.structure || null,
+              dna_length: dna.length || null,
+              dna_tone: dna.tone || null,
+              dna_cta_type: dna.cta_type || null,
+              dna_main_theme: dna.main_theme || null,
+              dna_sub_theme: dna.sub_theme || null,
+              dna_thesis: dna.thesis || null,
+            })
+            .eq("id", postId);
+        }
+      } catch (err) {
+        log.error(`[DNA Background] Error for post ${postId}: ${err}`);
       }
-    } catch (err) {
-      log.error(`[DNA Background] Error for post ${postId}:` + " " + String(err));
+    }
+
+    // 2. Video transcription (for reels/videos with video_url)
+    if (post.is_video && post.video_url) {
+      try {
+        log.info(`[Transcription] Transcribing reel ${postId}...`);
+        const transcription = await transcribeVideoFromUrl(post.video_url);
+
+        if (!("error" in transcription)) {
+          await supabase
+            .from("reference_posts")
+            .update({
+              transcript: transcription.text,
+              transcript_duration: transcription.duration_seconds,
+            })
+            .eq("id", postId);
+
+          // If caption was empty/short, also run DNA on the transcript
+          if (!post.caption || post.caption.length < 50) {
+            const dnaResult = await analyzeDNA({ content: transcription.text });
+            if (!("error" in dnaResult)) {
+              const dna = dnaResult as unknown as Record<string, string>;
+              await supabase
+                .from("reference_posts")
+                .update({
+                  dna_hook_type: dna.hook_type || null,
+                  dna_structure: dna.structure || null,
+                  dna_length: dna.length || null,
+                  dna_tone: dna.tone || null,
+                  dna_cta_type: dna.cta_type || null,
+                  dna_main_theme: dna.main_theme || null,
+                  dna_sub_theme: dna.sub_theme || null,
+                  dna_thesis: dna.thesis || null,
+                })
+                .eq("id", postId);
+            }
+          }
+
+          log.info(`[Transcription] Done: ${transcription.text.length} chars, ${transcription.duration_seconds}s`);
+        } else {
+          log.info(`[Transcription] Skipped ${postId}: ${transcription.error}`);
+        }
+      } catch (err) {
+        log.error(`[Transcription] Error for post ${postId}: ${err}`);
+      }
     }
   }
 
