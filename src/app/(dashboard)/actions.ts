@@ -180,28 +180,56 @@ export async function submitFileInput(formData: FormData) {
         };
       }
 
-    } else if (ext === "docx") {
-      // DOCX is a ZIP file — extract document.xml text
+    } else if (ext === "docx" || fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      // DOCX is a ZIP file — try multiple extraction methods
       try {
         const buffer = await file.arrayBuffer();
         const bytes = new Uint8Array(buffer);
-        const decoder = new TextDecoder("utf-8", { fatal: false });
-        const rawStr = decoder.decode(bytes);
+        log.info(`[FileInput] DOCX buffer: ${bytes.length} bytes`);
 
-        // Extract text between XML tags (rough but works for body text)
-        const xmlText = rawStr.match(/<w:t[^>]*>([^<]+)<\/w:t>/g);
+        // Method 1: Decode full binary as latin1 (preserves all bytes, finds XML)
+        let rawStr = "";
+        for (let i = 0; i < bytes.length; i++) {
+          rawStr += String.fromCharCode(bytes[i]);
+        }
+
+        // Method 2: Try UTF-8 decode as fallback
+        if (!rawStr.includes("<w:t")) {
+          const decoder = new TextDecoder("utf-8", { fatal: false });
+          rawStr = decoder.decode(bytes);
+        }
+
+        log.info(`[FileInput] DOCX raw string: ${rawStr.length} chars, has w:t tags: ${rawStr.includes("<w:t")}`);
+
+        // Extract text between XML tags
+        const xmlText = rawStr.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
         if (xmlText && xmlText.length > 0) {
           textContent = xmlText
             .map(t => t.replace(/<[^>]+>/g, ""))
             .join(" ")
+            .replace(/\s+/g, " ")
+            .trim()
             .slice(0, 60000);
-          log.info(`[FileInput] DOCX text extracted: ${textContent.length} chars`);
+          log.info(`[FileInput] DOCX text extracted: ${textContent.length} chars from ${xmlText.length} tags`);
         } else {
-          return {
-            captureId: "",
-            status: "saved_without_ai" as const,
-            error: `Não foi possível extrair texto do arquivo "${fileName}". Tente salvar como .txt e enviar novamente.`,
-          };
+          // Method 3: Try extracting any readable text runs
+          const readableRuns = rawStr.match(/[a-zA-ZáàãâéèêíóòõôúçÁÀÃÂÉÈÊÍÓÒÕÔÚÇ0-9\s,.;:!?()"-]{20,}/g);
+          if (readableRuns && readableRuns.length > 0) {
+            textContent = readableRuns
+              .filter(r => r.trim().split(/\s+/).length >= 3)
+              .join("\n")
+              .slice(0, 60000);
+            log.info(`[FileInput] DOCX fallback extraction: ${textContent.length} chars from ${readableRuns.length} runs`);
+          }
+
+          if (textContent.length < 50) {
+            log.error(`[FileInput] DOCX extraction failed for ${fileName}`);
+            return {
+              captureId: "",
+              status: "saved_without_ai" as const,
+              error: `Nao foi possivel extrair texto de "${fileName}". Tente copiar o texto e colar diretamente, ou salvar como .txt.`,
+            };
+          }
         }
       } catch (docxErr) {
         log.error("[FileInput] DOCX extraction error:" + " " + String(docxErr));
