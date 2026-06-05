@@ -20,7 +20,7 @@ export async function getNewsletters(): Promise<Newsletter[]> {
   return data as Newsletter[];
 }
 
-// --- Generate newsletter with AI ---
+// --- Generate newsletter from weekly activity ---
 
 export async function generateNewsletter(
   theme: string,
@@ -28,76 +28,134 @@ export async function generateNewsletter(
 ): Promise<Newsletter> {
   const supabase = await createClient();
 
-  // Fetch identity, recent playbooks, and stories in parallel
-  const [identityRes, playbooksRes, storiesRes] = await Promise.all([
+  // Fetch EVERYTHING from this week: identity, content, captures, proposals, activity
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const weekStart = sevenDaysAgo.toISOString();
+
+  const [
+    identityRes,
+    playbooksRes,
+    storiesRes,
+    contentsRes,
+    capturesRes,
+    proposalsRes,
+    activityRes,
+    hooksRes,
+  ] = await Promise.all([
     supabase.from("identity").select("*").limit(1).single(),
-    supabase
-      .from("playbooks")
-      .select("id, title, body_markdown")
-      .order("updated_at", { ascending: false })
-      .limit(10),
-    supabase
-      .from("stories")
-      .select("id, title, summary, body_markdown")
-      .order("updated_at", { ascending: false })
-      .limit(5),
+    supabase.from("playbooks").select("id, title, body_markdown, created_at")
+      .gte("created_at", weekStart).order("created_at", { ascending: false }),
+    supabase.from("stories").select("id, title, summary, created_at")
+      .gte("created_at", weekStart).order("created_at", { ascending: false }),
+    supabase.from("generated_contents").select("id, content_type, content_text, status, created_at")
+      .gte("created_at", weekStart).order("created_at", { ascending: false }).limit(20),
+    supabase.from("captures").select("id, title, status, source_type, created_at")
+      .gte("created_at", weekStart).order("created_at", { ascending: false }),
+    supabase.from("proposals").select("id, title, type, status, created_at")
+      .gte("created_at", weekStart).order("created_at", { ascending: false }),
+    supabase.from("activity_log").select("action, entity_title, created_at")
+      .gte("created_at", weekStart).order("created_at", { ascending: false }).limit(30),
+    supabase.from("hooks").select("id, text, category, created_at")
+      .gte("created_at", weekStart).order("created_at", { ascending: false }).limit(10),
   ]);
 
   const identity = identityRes.data;
   const playbooks = playbooksRes.data ?? [];
   const stories = storiesRes.data ?? [];
+  const contents = contentsRes.data ?? [];
+  const captures = capturesRes.data ?? [];
+  const proposals = proposalsRes.data ?? [];
+  const activities = activityRes.data ?? [];
+  const hooks = hooksRes.data ?? [];
 
-  // Build system prompt from identity
+  // Build system prompt
   const systemPrompt = identity
     ? buildContentGenerationSystemPrompt(identity)
-    : `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUES BRASILEIRO (PT-BR).
-Voce e o ghostwriter do Pedro Rabelo. Gere conteudo que soe exatamente como ele falaria.`;
+    : "REGRA: TODA SUA RESPOSTA EM PT-BR. Voce e o ghostwriter do Pedro Rabelo.";
 
-  // Build the newsletter-specific user prompt
-  const playbookContext = playbooks
-    .map((p) => `- **${p.title}**: ${(p.body_markdown || "").slice(0, 300)}`)
-    .join("\n");
+  // Build weekly panorama
+  const weeklyStats = {
+    playbooks_created: playbooks.length,
+    stories_created: stories.length,
+    contents_generated: contents.length,
+    captures_processed: captures.filter(c => c.status === "processed").length,
+    proposals_approved: proposals.filter(p => p.status === "approved").length,
+    proposals_total: proposals.length,
+    hooks_created: hooks.length,
+  };
 
-  const storyContext = stories
-    .map(
-      (s) =>
-        `- **${s.title}**: ${s.summary || (s.body_markdown || "").slice(0, 200)}`
-    )
+  const playbooksList = playbooks.length > 0
+    ? playbooks.map(p => `- ${p.title}`).join("\n")
+    : "(nenhum novo esta semana)";
+
+  const storiesList = stories.length > 0
+    ? stories.map(s => `- ${s.title}: ${s.summary || ""}`).join("\n")
+    : "(nenhuma nova esta semana)";
+
+  const contentsList = contents.length > 0
+    ? contents.map(c => `- [${c.content_type}] ${(c.content_text || "").slice(0, 150)}`).join("\n")
+    : "(nenhum conteudo gerado esta semana)";
+
+  const hooksList = hooks.length > 0
+    ? hooks.map(h => `- [${h.category}] "${h.text}"`).join("\n")
+    : "(nenhum hook esta semana)";
+
+  const activitySummary = activities.slice(0, 15)
+    .map(a => `- ${a.action}${a.entity_title ? ": " + a.entity_title : ""}`)
     .join("\n");
 
   const userPrompt = `## Tarefa
-Gere uma newsletter semanal completa sobre o tema: **${theme}**
-${weekLabel ? `Semana: ${weekLabel}` : ""}
+Gere uma newsletter semanal que faca um PANORAMA COMPLETO de tudo que aconteceu na semana na plataforma do Pedro.
+${theme ? `Tema/foco adicional: **${theme}**` : ""}
+${weekLabel ? `Semana: ${weekLabel}` : `Semana: ultimos 7 dias`}
 
-## Playbooks recentes para referencia
-${playbookContext || "(nenhum playbook disponivel)"}
+## DADOS REAIS DA SEMANA (use esses dados, nao invente):
 
-## Historias recentes para referencia
-${storyContext || "(nenhuma historia disponivel)"}
+### Numeros da semana:
+- ${weeklyStats.playbooks_created} playbooks novos
+- ${weeklyStats.stories_created} historias novas
+- ${weeklyStats.contents_generated} conteudos gerados
+- ${weeklyStats.captures_processed} inputs processados
+- ${weeklyStats.proposals_approved} propostas aprovadas (de ${weeklyStats.proposals_total} total)
+- ${weeklyStats.hooks_created} hooks criados
 
-## Estrutura obrigatoria da newsletter
-Retorne EXATAMENTE no formato abaixo (sem blocos de codigo, apenas o texto):
+### Playbooks criados esta semana:
+${playbooksList}
 
-SUBJECT: [linha de assunto impactante, curta, que gere curiosidade]
+### Historias criadas esta semana:
+${storiesList}
+
+### Conteudos gerados esta semana:
+${contentsList}
+
+### Hooks criados esta semana:
+${hooksList}
+
+### Atividade recente:
+${activitySummary || "(sem atividade registrada)"}
+
+## Estrutura da newsletter (retorne EXATAMENTE neste formato):
+
+SUBJECT: [assunto impactante sobre a semana]
 TITLE: [titulo da newsletter]
-TOPICS: [lista de topicos separados por virgula]
+TOPICS: [topicos separados por virgula]
 
 ---BODY---
-[Corpo completo da newsletter em Markdown com as seguintes secoes:]
+[Newsletter completa em Markdown:]
 
-1. **Gancho de abertura** - Um paragrafo curto e impactante que conecte o tema ao dia-a-dia do leitor
-2. **Topico principal** - Desenvolvimento do tema central com profundidade pratica
-3. **Insights dos Playbooks** - 2 a 3 insights extraidos dos playbooks acima, com aplicacao pratica
-4. **Historia em destaque** - Um destaque de uma historia real que ilustre o tema
-5. **CTA (Chamada para Acao)** - Encerramento com uma provocacao ou acao concreta para o leitor
+1. **Resumo da semana** - O que aconteceu em numeros e destaques (use os dados reais acima)
+2. **Destaque: Playbook/Historia da semana** - Aprofunde no conteudo mais relevante criado
+3. **Conteudos produzidos** - Resumo do que foi gerado e publicado
+4. **Melhores hooks da semana** - Os ganchos mais criativos criados
+5. **O que vem pela frente** - Provocacao ou direcao para a proxima semana
 
-## Regras
-- Escreva em portugues brasileiro
-- Tom conversacional e direto, como se estivesse falando com um amigo
-- Paragrafos curtos (maximo 3 linhas)
-- Use exemplos concretos
-- Evite jargoes corporativos
-- O conteudo deve parecer escrito pelo Pedro, nao por uma IA`;
+## Regras:
+- Use os DADOS REAIS acima, nao invente numeros
+- Se nao teve atividade em alguma area, mencione que esta semana foi mais leve nesse ponto
+- Tom do Pedro: direto, pratico, sem enrolacao
+- Paragrafos curtos
+- Se a semana foi produtiva, celebre. Se foi fraca, provoque acao.`;
 
   const anthropic = getClient();
   const response = await anthropic.messages.create({
