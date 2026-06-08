@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
+import VoiceButton from "@/components/VoiceButton";
 import { saveEntry, deleteEntry, generateDaySummary } from "./actions";
 
 interface JournalEntry {
@@ -165,16 +166,26 @@ function TodayEditor({
       </div>
 
       {/* Main content */}
-      <textarea
-        value={content}
-        onChange={(e) => {
-          setContent(e.target.value);
-          scheduleAutoSave();
-        }}
-        placeholder="O que aconteceu hoje? Reunioes, decisoes, aprendizados..."
-        className="w-full resize-none rounded-xl border border-border bg-card p-4 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
-        rows={6}
-      />
+      <div className="relative">
+        <textarea
+          value={content}
+          onChange={(e) => {
+            setContent(e.target.value);
+            scheduleAutoSave();
+          }}
+          placeholder="O que aconteceu hoje? Reunioes, decisoes, aprendizados..."
+          className="w-full resize-none rounded-xl border border-border bg-card p-4 pr-12 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
+          rows={6}
+        />
+        <div className="absolute right-2 top-2">
+          <VoiceButton
+            onTranscript={(text) => {
+              setContent((prev) => prev ? prev + " " + text : text);
+              scheduleAutoSave();
+            }}
+          />
+        </div>
+      </div>
 
       {/* Collapsible details */}
       <button
@@ -195,46 +206,79 @@ function TodayEditor({
             <label className="mb-1 block text-xs font-medium text-text-secondary">
               Destaques do dia
             </label>
-            <textarea
-              value={highlights}
-              onChange={(e) => {
-                setHighlights(e.target.value);
-                scheduleAutoSave();
-              }}
-              placeholder="O que deu certo hoje?"
-              className="w-full resize-none rounded-lg border border-border bg-card p-3 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
-              rows={2}
-            />
+            <div className="relative">
+              <textarea
+                value={highlights}
+                onChange={(e) => {
+                  setHighlights(e.target.value);
+                  scheduleAutoSave();
+                }}
+                placeholder="O que deu certo hoje?"
+                className="w-full resize-none rounded-lg border border-border bg-card p-3 pr-11 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
+                rows={2}
+              />
+              <div className="absolute right-1.5 top-1.5">
+                <VoiceButton
+                  size="sm"
+                  onTranscript={(text) => {
+                    setHighlights((prev) => prev ? prev + " " + text : text);
+                    scheduleAutoSave();
+                  }}
+                />
+              </div>
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-text-secondary">
               Desafios enfrentados
             </label>
-            <textarea
-              value={challenges}
-              onChange={(e) => {
-                setChallenges(e.target.value);
-                scheduleAutoSave();
-              }}
-              placeholder="O que foi dificil?"
-              className="w-full resize-none rounded-lg border border-border bg-card p-3 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
-              rows={2}
-            />
+            <div className="relative">
+              <textarea
+                value={challenges}
+                onChange={(e) => {
+                  setChallenges(e.target.value);
+                  scheduleAutoSave();
+                }}
+                placeholder="O que foi dificil?"
+                className="w-full resize-none rounded-lg border border-border bg-card p-3 pr-11 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
+                rows={2}
+              />
+              <div className="absolute right-1.5 top-1.5">
+                <VoiceButton
+                  size="sm"
+                  onTranscript={(text) => {
+                    setChallenges((prev) => prev ? prev + " " + text : text);
+                    scheduleAutoSave();
+                  }}
+                />
+              </div>
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-text-secondary">
               Decisoes tomadas
             </label>
-            <textarea
-              value={decisions}
-              onChange={(e) => {
-                setDecisions(e.target.value);
-                scheduleAutoSave();
-              }}
-              placeholder="Que decisoes foram tomadas hoje?"
-              className="w-full resize-none rounded-lg border border-border bg-card p-3 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
-              rows={2}
-            />
+            <div className="relative">
+              <textarea
+                value={decisions}
+                onChange={(e) => {
+                  setDecisions(e.target.value);
+                  scheduleAutoSave();
+                }}
+                placeholder="Que decisoes foram tomadas hoje?"
+                className="w-full resize-none rounded-lg border border-border bg-card p-3 pr-11 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
+                rows={2}
+              />
+              <div className="absolute right-1.5 top-1.5">
+                <VoiceButton
+                  size="sm"
+                  onTranscript={(text) => {
+                    setDecisions((prev) => prev ? prev + " " + text : text);
+                    scheduleAutoSave();
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import { Brain, Send, User, Plus, Trash2, MessageSquare, PanelLeftClose, PanelLeft, Sparkles, Zap } from "lucide-react";
+import VoiceButton from "@/components/VoiceButton";
 import {
   getChats,
   createChat,
@@ -388,6 +389,10 @@ export default function BrainChat() {
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm text-text placeholder:text-text-muted/50 focus:outline-none focus-visible:outline-none disabled:opacity-50"
                   style={{ maxHeight: "150px" }}
+                />
+                <VoiceButton
+                  onTranscript={(text) => setInput((prev) => prev ? prev + " " + text : text)}
+                  disabled={loading || !activeChatId}
                 />
                 <button
                   type="submit"

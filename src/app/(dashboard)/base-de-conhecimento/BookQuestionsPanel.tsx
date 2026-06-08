@@ -8,6 +8,7 @@ import {
   saveQuestionAnswer,
 } from "./actions";
 import { BookCheck, HelpCircle, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import VoiceButton from "@/components/VoiceButton";
 
 interface BookQuestion {
   question: string;
@@ -244,15 +245,28 @@ export default function BookQuestionsPanel({
                   {TYPE_LABELS[q.type] || q.type}
                 </span>
               </div>
-              <textarea
-                value={answers[i] || ""}
-                onChange={(e) =>
-                  setAnswers((prev) => ({ ...prev, [i]: e.target.value }))
-                }
-                placeholder="Sua resposta aqui..."
-                rows={3}
-                className="mb-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
-              />
+              <div className="relative mb-2">
+                <textarea
+                  value={answers[i] || ""}
+                  onChange={(e) =>
+                    setAnswers((prev) => ({ ...prev, [i]: e.target.value }))
+                  }
+                  placeholder="Sua resposta aqui... ou clique no microfone"
+                  rows={3}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 pr-11 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+                />
+                <div className="absolute right-1.5 top-1.5">
+                  <VoiceButton
+                    size="sm"
+                    onTranscript={(text) =>
+                      setAnswers((prev) => ({
+                        ...prev,
+                        [i]: prev[i] ? prev[i] + " " + text : text,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
               <button
                 onClick={() => handleSaveAnswer(i)}
                 disabled={!answers[i]?.trim() || savingIndex === i}

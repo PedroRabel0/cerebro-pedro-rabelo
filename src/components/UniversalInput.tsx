@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { submitUniversalInput, submitFileInput } from "@/app/(dashboard)/actions";
+import VoiceButton from "@/components/VoiceButton";
 import {
   Send,
   Loader2,
@@ -11,7 +12,7 @@ import {
   Camera,
   FileText,
   BookOpen,
-  Mic,
+  Mic as MicIcon,
   MessageSquare,
   Paperclip,
   Hash,
@@ -88,7 +89,7 @@ const typeIcons: Record<string, typeof Video> = {
   instagram: Camera,
   article: FileText,
   book: BookOpen,
-  podcast: Mic,
+  podcast: MicIcon,
   free_text: MessageSquare,
   unknown: Paperclip,
 };
@@ -461,6 +462,12 @@ export default function UniversalInput() {
             <span className="animate-fade-in rounded-full bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-medium text-accent">
               {detectedType}
             </span>
+          )}
+          {/* Voice button */}
+          {!selectedFile && state === "idle" && (
+            <VoiceButton
+              onTranscript={(text) => setInput((prev) => prev ? prev + " " + text : text)}
+            />
           )}
           {/* Upload button */}
           {!selectedFile && state === "idle" && (
