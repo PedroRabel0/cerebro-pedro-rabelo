@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
@@ -19,6 +19,14 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["500", "700"],
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#09090b",
+};
+
 export const metadata: Metadata = {
   title: "Segundo Cérebro do Pedro",
   description: "Sistema de gestão de conhecimento e geração de conteúdo com IA",
@@ -30,9 +38,6 @@ export const metadata: Metadata = {
     title: "Segundo Cérebro do Pedro",
     description: "Plataforma de gestão de conhecimento e geração de conteúdo com IA",
     type: "website",
-  },
-  other: {
-    "theme-color": "#09090b",
   },
 };
 

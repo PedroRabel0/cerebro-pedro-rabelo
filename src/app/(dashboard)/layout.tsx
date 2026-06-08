@@ -15,8 +15,8 @@ export default function DashboardLayout({
         Pular para o conteúdo
       </a>
       <Sidebar />
-      <main id="main-content" className="flex-1 md:ml-56">
-        <div className="mx-auto max-w-5xl px-4 py-6 pt-16 sm:px-6 md:px-8 md:py-10 md:pt-10">
+      <main id="main-content" className="flex-1 min-w-0 md:ml-56">
+        <div className="mx-auto max-w-5xl px-3 py-4 pt-14 sm:px-6 md:px-8 md:py-10 md:pt-10">
           {children}
         </div>
       </main>

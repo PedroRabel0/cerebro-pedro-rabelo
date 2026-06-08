@@ -152,8 +152,8 @@ export default function BrainChat() {
   return (
     <div className="flex h-full w-full overflow-hidden">
       {/* ===== LEFT: Chat History ===== */}
-      <div className={`${sidebarOpen ? "w-72" : "w-0"} shrink-0 overflow-hidden border-r border-border/50 bg-card/50 transition-all duration-300 md:block hidden`}>
-        <div className="flex h-full w-72 flex-col">
+      <div className={`${sidebarOpen ? "w-64" : "w-0"} shrink-0 overflow-hidden border-r border-border/50 bg-card/50 transition-all duration-300 md:block hidden`}>
+        <div className="flex h-full w-64 flex-col">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
             <div className="flex items-center gap-2">
@@ -414,7 +414,7 @@ export default function BrainChat() {
       {sidebarOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden" onClick={() => setSidebarOpen(false)} />
-          <div className="fixed inset-y-0 left-0 z-50 w-72 border-r border-border bg-card md:hidden">
+          <div className="fixed inset-y-0 left-0 z-50 w-64 border-r border-border bg-card md:hidden">
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
                 <div className="flex items-center gap-2">

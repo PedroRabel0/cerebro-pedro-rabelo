@@ -61,6 +61,11 @@
   --font-sans: var(--font-inter);
 }
 
+html, body {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
