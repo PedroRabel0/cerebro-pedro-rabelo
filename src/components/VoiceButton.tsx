@@ -136,16 +136,16 @@ export default function VoiceButton({
           : "Gravar por voz"
       }
       className={`
-        flex shrink-0 items-center justify-center rounded-xl transition-all
+        flex shrink-0 items-center justify-center rounded-xl border transition-all
         ${
           isProcessing
-            ? "bg-accent/20 text-accent cursor-wait"
+            ? "border-accent/40 bg-accent/20 text-accent cursor-wait"
             : isRecording
-            ? "bg-red/90 text-white shadow-lg shadow-red/20 animate-pulse"
-            : "bg-surface text-text-muted hover:bg-card-hover hover:text-accent"
+            ? "border-red bg-red/90 text-white shadow-lg shadow-red/20 animate-pulse"
+            : "border-border bg-card text-text-secondary hover:border-accent/50 hover:text-accent hover:bg-accent/10"
         }
         ${sizeClasses}
-        disabled:opacity-30 disabled:cursor-not-allowed
+        disabled:opacity-40 disabled:cursor-not-allowed
         ${className}
       `}
     >
