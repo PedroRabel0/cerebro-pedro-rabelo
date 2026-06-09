@@ -1056,6 +1056,82 @@ async function generateImagePromptForContent(
   revalidatePath(PATH);
 }
 
+/**
+ * Upload external image(s) to a generated content.
+ * Supports single image or multiple (carousel).
+ * Saves to Supabase Storage and updates the content's image_url.
+ */
+export async function uploadImageToContent(
+  contentId: string,
+  formData: FormData
+): Promise<{ imageUrl: string } | { error: string }> {
+  const supabase = await createClient();
+
+  try {
+    const files: File[] = [];
+    // Support multiple files (carousel)
+    for (const [key, value] of formData.entries()) {
+      if (key === "images" && value instanceof File && value.size > 0) {
+        files.push(value);
+      }
+    }
+
+    if (files.length === 0) {
+      return { error: "Nenhuma imagem enviada" };
+    }
+
+    const uploadedUrls: string[] = [];
+    const timestamp = Date.now();
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const ext = file.name.split(".").pop() || "png";
+      const filePath = `content-images/${contentId}-${timestamp}-${i}.${ext}`;
+
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      const { error: uploadError } = await supabase.storage
+        .from("generated-images")
+        .upload(filePath, buffer, {
+          contentType: file.type || "image/png",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        log.error("[UploadImage] Storage error: " + uploadError.message);
+        return { error: "Falha no upload: " + uploadError.message };
+      }
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("generated-images").getPublicUrl(filePath);
+
+      uploadedUrls.push(publicUrl);
+    }
+
+    // For multiple images (carousel), store as JSON array; for single, store the URL
+    const imageUrl = uploadedUrls.length === 1
+      ? uploadedUrls[0]
+      : JSON.stringify(uploadedUrls);
+
+    await supabase
+      .from("generated_contents")
+      .update({ image_url: imageUrl, image_model: "external" })
+      .eq("id", contentId);
+
+    log.info(`[UploadImage] ${uploadedUrls.length} image(s) uploaded for ${contentId}`);
+    revalidatePath(PATH);
+    revalidatePath("/calendario");
+
+    return { imageUrl };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    log.error("[UploadImage] Error: " + message);
+    return { error: `Falha ao fazer upload: ${message}` };
+  }
+}
+
 export async function savePublishedUrl(contentId: string, url: string) {
   const supabase = await createClient();
   const { error } = await supabase

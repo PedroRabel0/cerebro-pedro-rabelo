@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { GeneratedContent, ContentStatus } from "@/lib/supabase/types";
-import { updateContentStatus, updateContentText, deleteContent, savePublishedUrl } from "./actions";
+import {
+  updateContentStatus,
+  updateContentText,
+  deleteContent,
+  savePublishedUrl,
+  uploadImageToContent,
+} from "./actions";
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import SlideDesigner from "@/components/SlideDesigner";
 import {
@@ -18,7 +24,13 @@ import {
   Link,
   ExternalLink,
   Layout,
+  Copy,
+  Check,
+  Upload,
+  Loader2,
 } from "lucide-react";
+
+// --- Helpers ---
 
 function statusBadge(status: ContentStatus) {
   switch (status) {
@@ -42,11 +54,27 @@ function statusLabel(status: ContentStatus) {
   }
 }
 
-function SourceMapDisplay({ sourceMap }: { sourceMap: Record<string, unknown> | null }) {
+/** Parse image_url — could be a single URL, a base64 data URL, or a JSON array of URLs */
+function parseImageUrls(imageUrl: string | null): string[] {
+  if (!imageUrl) return [];
+  try {
+    const parsed = JSON.parse(imageUrl);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {
+    // Not JSON — single URL or data URL
+  }
+  return [imageUrl];
+}
+
+function SourceMapDisplay({
+  sourceMap,
+}: {
+  sourceMap: Record<string, unknown> | null;
+}) {
   if (!sourceMap || Object.keys(sourceMap).length === 0) return null;
   const entries = Object.entries(sourceMap);
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-1 font-mono text-[10px] text-text-muted">
+    <div className="flex flex-wrap items-center gap-1 font-mono text-[10px] text-text-muted">
       <span className="text-accent">Fontes:</span>
       {entries.map(([key, val], i) => (
         <span key={key}>
@@ -57,6 +85,8 @@ function SourceMapDisplay({ sourceMap }: { sourceMap: Record<string, unknown> | 
     </div>
   );
 }
+
+// --- Sub-components ---
 
 function InlineEditor({
   contentId,
@@ -82,11 +112,11 @@ function InlineEditor({
   }
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="space-y-2">
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={6}
+        rows={8}
         className="w-full rounded-xl border border-accent/30 bg-card px-3 py-2 text-sm text-text leading-relaxed focus:border-accent focus:outline-none resize-none"
       />
       <div className="flex gap-2">
@@ -142,7 +172,7 @@ function FeedbackForm({
   ] as const;
 
   return (
-    <div className="animate-slide-in mt-3 rounded-xl border border-border bg-card p-4">
+    <div className="animate-slide-in rounded-xl border border-border bg-card p-4">
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-text-muted">
@@ -243,7 +273,7 @@ function PublishedUrlInput({
   }
 
   return (
-    <div className="mt-3 flex items-center gap-2">
+    <div className="flex items-center gap-2">
       <input
         value={url}
         onChange={(e) => setUrl(e.target.value)}
@@ -292,6 +322,84 @@ function parseCarouselSlides(content: string): {
   };
 }
 
+// --- Image Upload Button for content card ---
+
+function ImageUploader({
+  contentId,
+  isCarousel,
+  onUploaded,
+}: {
+  contentId: string;
+  isCarousel: boolean;
+  onUploaded: (url: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append("images", files[i]);
+      }
+      const res = await uploadImageToContent(contentId, formData);
+      if ("error" in res) {
+        setError(res.error);
+      } else {
+        onUploaded(res.imageUrl);
+      }
+    } catch {
+      setError("Erro ao fazer upload");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  return (
+    <div>
+      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface/30 px-4 py-8 transition-colors hover:border-accent/40 hover:bg-surface/50">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          multiple={isCarousel}
+          onChange={handleUpload}
+          className="hidden"
+          disabled={uploading}
+        />
+        {uploading ? (
+          <>
+            <Loader2 className="h-5 w-5 animate-spin text-accent" />
+            <span className="text-sm text-accent">Subindo...</span>
+          </>
+        ) : (
+          <>
+            <Upload className="h-5 w-5 text-text-muted" />
+            <span className="text-sm text-text-muted">
+              {isCarousel
+                ? "Upload das imagens (múltiplas)"
+                : "Upload da imagem do post"}
+            </span>
+          </>
+        )}
+      </label>
+      {error && (
+        <p className="mt-1 text-xs text-red">{error}</p>
+      )}
+    </div>
+  );
+}
+
+// --- Main ContentList ---
+
 export default function ContentList({
   contents,
 }: {
@@ -301,10 +409,19 @@ export default function ContentList({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [publishUrlId, setPublishUrlId] = useState<string | null>(null);
   const [designId, setDesignId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Track images that were just uploaded (not yet in server data)
+  const [freshImages, setFreshImages] = useState<Record<string, string>>({});
 
   async function handleDelete(id: string) {
     if (!confirm("Apagar este conteudo?")) return;
     await deleteContent(id);
+  }
+
+  async function handleCopy(text: string, id: string) {
+    await navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   }
 
   if (contents.length === 0) {
@@ -326,14 +443,41 @@ export default function ContentList({
       <span className="mb-4 block font-mono text-[10px] text-text-muted">
         {contents.length} conteudo{contents.length !== 1 ? "s" : ""}
       </span>
-      <div className="space-y-3">
-        {contents.map((c) => (
-          <div
-            key={c.id}
-            className="card-hover rounded-2xl border border-border bg-card px-4 py-3"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
+
+      <div className="space-y-4">
+        {contents.map((c) => {
+          const imageUrls = parseImageUrls(freshImages[c.id] || c.image_url);
+          const hasImage = imageUrls.length > 0;
+          const isCopied = copiedId === c.id;
+          const isCarousel = c.content_type === "instagram_carousel";
+
+          return (
+            <div
+              key={c.id}
+              className="overflow-hidden rounded-2xl border border-border bg-card"
+            >
+              {/* Image section */}
+              {hasImage && (
+                <div className={`${imageUrls.length > 1 ? "grid grid-cols-3 gap-0.5" : ""} bg-surface`}>
+                  {imageUrls.map((url, i) => (
+                    <div key={i} className="relative aspect-square">
+                      <img
+                        src={url}
+                        alt={imageUrls.length > 1 ? `Slide ${i + 1}` : "Imagem do post"}
+                        className="h-full w-full object-cover"
+                      />
+                      {imageUrls.length > 1 && (
+                        <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                          {i + 1}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="p-4 space-y-3">
+                {/* Badges row */}
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`inline-block rounded-full px-2 py-0.5 font-mono text-[10px] ${contentTypeBadgeColor(c.content_type)}`}
@@ -345,7 +489,7 @@ export default function ContentList({
                   >
                     {statusLabel(c.status)}
                   </span>
-                  {c.image_model && (
+                  {c.image_model && c.image_model !== "external" && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-purple/10 px-2 py-0.5 font-mono text-[10px] text-purple">
                       <ImageIcon className="h-2.5 w-2.5" />
                       {c.image_model}
@@ -378,120 +522,151 @@ export default function ContentList({
                           : "Ruim"}
                     </span>
                   )}
+                  <span className="ml-auto text-[10px] text-text-muted">
+                    {new Date(c.created_at).toLocaleDateString("pt-BR", {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
                 </div>
-                <div className="mt-2 flex gap-3">
-                  {c.image_url && (
-                    <img
-                      src={c.image_url}
-                      alt="Imagem gerada"
-                      className="h-20 w-20 shrink-0 rounded-xl object-cover ring-1 ring-border"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    {editingId === c.id ? (
-                      <InlineEditor
-                        contentId={c.id}
-                        initialText={c.content_text || ""}
-                        onClose={() => setEditingId(null)}
-                      />
-                    ) : (
-                      <p className="text-sm leading-relaxed text-text line-clamp-2">
-                        {c.content_text}
-                      </p>
-                    )}
-                    <SourceMapDisplay sourceMap={c.source_map} />
-                    <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-text-muted">
-                      {c.playbook && (
-                        <span>Playbook: {c.playbook.title}</span>
-                      )}
-                      {c.story && <span>Historia: {c.story.title}</span>}
-                      {c.format && <span>Formato: {c.format.name}</span>}
-                      <span>
-                        {new Date(c.created_at).toLocaleDateString("pt-BR")}
-                      </span>
-                    </div>
+
+                {/* Caption / Content */}
+                {editingId === c.id ? (
+                  <InlineEditor
+                    contentId={c.id}
+                    initialText={c.content_text || ""}
+                    onClose={() => setEditingId(null)}
+                  />
+                ) : (
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+                    {c.content_text}
                   </div>
-                </div>
-              </div>
-              <div className="flex shrink-0 gap-1">
-                {editingId !== c.id && (
-                  <button
-                    onClick={() => setEditingId(c.id)}
-                    className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-accent transition hover:bg-accent/10"
-                  >
-                    <Pencil className="h-3 w-3" />
-                    <span className="hidden sm:inline">Editar</span>
-                  </button>
                 )}
-                <button
-                  onClick={() =>
-                    setPublishUrlId(publishUrlId === c.id ? null : c.id)
-                  }
-                  className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-green transition hover:bg-green/10"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  <span className="hidden sm:inline">{c.published_url ? "URL" : "Publicar"}</span>
-                </button>
-                <button
-                  onClick={() =>
-                    setFeedbackId(feedbackId === c.id ? null : c.id)
-                  }
-                  className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-blue transition hover:bg-blue/10"
-                >
-                  <MessageSquare className="h-3 w-3" />
-                  <span className="hidden sm:inline">Feedback</span>
-                </button>
-                {c.content_type === "instagram_carousel" && (
+
+                <SourceMapDisplay sourceMap={c.source_map} />
+
+                {/* Source info */}
+                <div className="flex flex-wrap gap-3 text-[10px] text-text-muted">
+                  {c.playbook && <span>Playbook: {c.playbook.title}</span>}
+                  {c.story && <span>Historia: {c.story.title}</span>}
+                  {c.format && <span>Formato: {c.format.name}</span>}
+                </div>
+
+                {/* Upload image area (when no image yet) */}
+                {!hasImage && editingId !== c.id && (
+                  <ImageUploader
+                    contentId={c.id}
+                    isCarousel={isCarousel}
+                    onUploaded={(url) =>
+                      setFreshImages((prev) => ({ ...prev, [c.id]: url }))
+                    }
+                  />
+                )}
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
+                  {/* Copy caption */}
+                  <button
+                    onClick={() => handleCopy(c.content_text || "", c.id)}
+                    className="flex items-center gap-1 rounded-xl bg-accent/10 px-3 py-1.5 font-mono text-[11px] font-medium text-accent transition hover:bg-accent/20"
+                  >
+                    {isCopied ? (
+                      <Check className="h-3 w-3" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                    {isCopied ? "Copiado!" : "Copiar legenda"}
+                  </button>
+
+                  {editingId !== c.id && (
+                    <button
+                      onClick={() => setEditingId(c.id)}
+                      className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-text-muted transition hover:text-text hover:bg-surface"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Editar
+                    </button>
+                  )}
                   <button
                     onClick={() =>
-                      setDesignId(designId === c.id ? null : c.id)
+                      setPublishUrlId(publishUrlId === c.id ? null : c.id)
                     }
-                    className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-purple transition hover:bg-purple/10"
+                    className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-green transition hover:bg-green/10"
                   >
-                    <Layout className="h-3 w-3" />
-                    <span className="hidden sm:inline">Ver Design</span>
+                    <ExternalLink className="h-3 w-3" />
+                    {c.published_url ? "URL" : "Publicar"}
                   </button>
+                  <button
+                    onClick={() =>
+                      setFeedbackId(feedbackId === c.id ? null : c.id)
+                    }
+                    className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-blue transition hover:bg-blue/10"
+                  >
+                    <MessageSquare className="h-3 w-3" />
+                    Feedback
+                  </button>
+                  {isCarousel && (
+                    <button
+                      onClick={() =>
+                        setDesignId(designId === c.id ? null : c.id)
+                      }
+                      className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-purple transition hover:bg-purple/10"
+                    >
+                      <Layout className="h-3 w-3" />
+                      Ver Design
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDelete(c.id)}
+                    className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-red transition hover:bg-red/10 ml-auto"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Apagar
+                  </button>
+                </div>
+
+                {/* Expandable panels */}
+                {feedbackId === c.id && (
+                  <FeedbackForm
+                    content={c}
+                    onClose={() => setFeedbackId(null)}
+                  />
                 )}
-                <button
-                  onClick={() => handleDelete(c.id)}
-                  className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-red transition hover:bg-red/10"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  <span className="hidden sm:inline">Apagar</span>
-                </button>
+                {publishUrlId === c.id && (
+                  <PublishedUrlInput
+                    contentId={c.id}
+                    currentUrl={c.published_url}
+                    onClose={() => setPublishUrlId(null)}
+                  />
+                )}
+                {designId === c.id &&
+                  isCarousel &&
+                  c.content_text && (
+                    <div className="rounded-xl border border-border bg-surface/30 p-4">
+                      {(() => {
+                        const parsed = parseCarouselSlides(c.content_text);
+                        return (
+                          <SlideDesigner
+                            slides={parsed.slides}
+                            hook={parsed.hook}
+                            cta={parsed.cta}
+                            title={
+                              c.free_text_input ||
+                              c.playbook?.title ||
+                              "Carousel"
+                            }
+                            hashtags={[]}
+                          />
+                        );
+                      })()}
+                    </div>
+                  )}
               </div>
             </div>
-            {feedbackId === c.id && (
-              <FeedbackForm
-                content={c}
-                onClose={() => setFeedbackId(null)}
-              />
-            )}
-            {publishUrlId === c.id && (
-              <PublishedUrlInput
-                contentId={c.id}
-                currentUrl={c.published_url}
-                onClose={() => setPublishUrlId(null)}
-              />
-            )}
-            {designId === c.id && c.content_type === "instagram_carousel" && c.content_text && (
-              <div className="mt-4 rounded-xl border border-border bg-surface/30 p-4">
-                {(() => {
-                  const parsed = parseCarouselSlides(c.content_text);
-                  return (
-                    <SlideDesigner
-                      slides={parsed.slides}
-                      hook={parsed.hook}
-                      cta={parsed.cta}
-                      title={c.free_text_input || c.playbook?.title || "Carousel"}
-                      hashtags={[]}
-                    />
-                  );
-                })()}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useTransition } from "react";
 import type { ContentType } from "@/lib/supabase/types";
-import { createWizardContent, updateContentStatus, generateImageForContent } from "./actions";
+import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent } from "./actions";
 import SlideDesigner from "@/components/SlideDesigner";
 import {
   Sparkles,
@@ -17,6 +17,7 @@ import {
   ThumbsDown,
   ChevronDown,
   Image as ImageIcon,
+  Upload,
 } from "lucide-react";
 
 // --------------- constants ---------------
@@ -950,11 +951,39 @@ function ResultCard({
   const [generatingImage, setGeneratingImage] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   async function handleCopy() {
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    setImageError(null);
+
+    try {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append("images", files[i]);
+      }
+      const res = await uploadImageToContent(result.id, formData);
+      if ("error" in res) {
+        setImageError(res.error);
+      } else {
+        setUploadedImageUrl(res.imageUrl);
+      }
+    } catch {
+      setImageError("Erro ao fazer upload da imagem");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
   }
 
   return (
@@ -1045,6 +1074,69 @@ function ResultCard({
       {imageError && (
         <div className="mt-3 rounded-xl border border-red/20 bg-red/5 px-3 py-2 text-xs text-red">
           {imageError}
+        </div>
+      )}
+
+      {/* Uploaded external image preview */}
+      {uploadedImageUrl && (
+        <div className="mt-3 rounded-xl border border-green/20 bg-green/5 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-green">
+              Imagem anexada
+            </span>
+            <span className="rounded-full bg-green/10 px-2 py-0.5 font-mono text-[10px] text-green">
+              Salvo
+            </span>
+          </div>
+          {(() => {
+            // Handle multiple images (JSON array)
+            try {
+              const urls = JSON.parse(uploadedImageUrl);
+              if (Array.isArray(urls)) {
+                return (
+                  <div className="grid grid-cols-3 gap-2">
+                    {urls.map((url: string, i: number) => (
+                      <img key={i} src={url} alt={`Slide ${i + 1}`} className="w-full rounded-lg border border-border" />
+                    ))}
+                  </div>
+                );
+              }
+            } catch {
+              // Single URL
+            }
+            return <img src={uploadedImageUrl} alt="Imagem do post" className="w-full max-w-md rounded-lg border border-border" />;
+          })()}
+        </div>
+      )}
+
+      {/* Upload external image (Claude Design etc) */}
+      {!uploadedImageUrl && !generatedImageUrl && (
+        <div className="mt-3">
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface/30 px-4 py-6 transition-colors hover:border-accent/40 hover:bg-surface/50">
+            <input
+              type="file"
+              accept="image/*"
+              multiple={result.contentType === "instagram_carousel"}
+              onChange={handleImageUpload}
+              className="hidden"
+              disabled={uploading}
+            />
+            {uploading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                <span className="font-mono text-xs text-accent">Subindo imagem...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 text-text-muted" />
+                <span className="font-mono text-xs text-text-muted">
+                  {result.contentType === "instagram_carousel"
+                    ? "Upload das imagens do carrossel (múltiplas)"
+                    : "Upload da imagem do post (Claude Design, Canva, etc)"}
+                </span>
+              </>
+            )}
+          </label>
         </div>
       )}
 
