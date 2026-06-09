@@ -599,74 +599,243 @@ export async function createWizardContent(
       let typeInstructions = "";
       switch (contentType) {
         case "instagram_carousel":
-          typeInstructions = `FORMATO: Instagram Carousel
-- Objetivo: ${details.objetivo || "educar"}
-- Numero de slides: ${details.num_slides || "6"}
-- Slide 1 deve ser um GANCHO que prende atencao${details.gancho ? `: "${details.gancho}"` : ""}
-- Ultimo slide deve ter CTA${details.cta ? `: "${details.cta}"` : ""}
-- Imagem de capa: ${details.imagem_capa || "capa com frase"}
-Gere o texto de CADA slide separadamente, numerando-os.`;
+          typeInstructions = `FORMATO: Instagram Carousel (${details.num_slides || "6"} slides)
+OBJETIVO: ${details.objetivo || "educar"}
+
+ESTRUTURA OBRIGATÓRIA:
+
+**SLIDE 1 — CAPA (o mais importante):**
+Frase de impacto curta que faça a pessoa parar de rolar o feed.${details.gancho ? ` Use como base: "${details.gancho}"` : ""}
+- Máximo 8-10 palavras
+- Deve gerar curiosidade ou identificação imediata
+- Funciona sozinha sem contexto — é o que decide se a pessoa desliza ou não
+- Exemplos de estrutura: "X coisas que [público] faz errado", "O que ninguém te conta sobre [tema]", "Como eu [resultado] em [tempo]"
+
+**SLIDES 2 a ${(parseInt(details.num_slides) || 6) - 1} — CONTEÚDO:**
+- Cada slide = 1 ideia/ponto. NUNCA mais de uma ideia por slide.
+- Texto curto: 2-4 frases por slide (vai ser lido em imagem, não em texto corrido)
+- Use numeração ou títulos em cada slide ("1. ...", "2. ...")
+- Alterne entre: dado concreto → exemplo → provocação → framework
+- Linguagem direta, como se estivesse explicando pra um amigo
+
+**ÚLTIMO SLIDE — CTA:**
+${details.cta ? `CTA definido: "${details.cta}"` : "Termine com CTA forte: salvar, compartilhar, ou pergunta nos comentários."}
+- Deve dar um motivo CONCRETO pra interagir ("Salva pra consultar quando precisar")
+- Pode incluir: "Siga @pedrorabelo pra mais conteúdo sobre [tema]"
+
+**LEGENDA DO POST (após os slides):**
+Escreva também a legenda que acompanha o carrossel:
+- 3-6 parágrafos curtos expandindo o tema
+- Hook forte na primeira linha (aparece antes do "...mais")
+- CTA final + 5-8 hashtags relevantes
+
+FORMATO DE RESPOSTA:
+Primeiro gere cada slide numerado (SLIDE 1:, SLIDE 2:, etc.), depois uma seção "---LEGENDA---" com a legenda completa.`;
           break;
         case "linkedin_post":
           typeInstructions = `FORMATO: LinkedIn Post
-- Objetivo: ${details.objetivo || "educar"}
-- Tamanho: ${details.tamanho || "medio"} (curto <100 palavras, medio 100-250, longo 250-500)
-- Abertura: ${details.abertura || "cena"}
-- Quebras de linha: ${details.quebras || "medio"}
-- Hashtags: ${details.hashtags || "2-3"}
-- CTA: ${details.cta || "incluir CTA natural"}
-- Imagem: ${details.imagem || "sim"}`;
+OBJETIVO: ${details.objetivo || "educar e gerar autoridade"}
+TAMANHO: ${details.tamanho || "medio"} (curto <100 palavras, medio 150-300, longo 300-500)
+
+ESTRUTURA OBRIGATÓRIA:
+
+**LINHA 1 — HOOK (aparece no preview do feed):**
+${details.abertura === "dado" ? "Comece com um dado ou número surpreendente." : details.abertura === "pergunta" ? "Comece com uma pergunta provocativa." : details.abertura === "historia" ? "Comece com o início de uma história pessoal." : "Comece com uma frase de impacto que gere identificação."}
+- No LinkedIn, as primeiras 2 linhas decidem tudo. Pense em "manchete de jornal".
+- NUNCA comece com "Hoje quero compartilhar..." ou "Essa semana eu..."
+
+**CORPO:**
+- Cada parágrafo = 1-2 linhas. Texto longo no LinkedIn não performa.
+- Use MUITA quebra de linha — cada frase pode ser um parágrafo
+- Tom: profissional mas humano. Não é artigo acadêmico, é conversa entre profissionais.
+- Inclua pelo menos 1 experiência pessoal concreta (com números se possível)
+- Frameworks e listas funcionam bem ("3 aprendizados:", "O que eu faria diferente:")
+- Evite: emojis excessivos, linguagem de Instagram, tom de coach motivacional
+- LinkedIn premia conteúdo que gera comentários longos — faça perguntas ao longo do texto
+
+**FECHAMENTO:**
+${details.cta ? `CTA: "${details.cta}"` : "CTA que incentive comentários (LinkedIn valoriza isso no algoritmo). Faça uma pergunta ESPECÍFICA, não genérica."}
+- BOM: "Qual foi a decisão mais difícil que você já tomou no seu negócio? Conta aqui 👇"
+- RUIM: "Concorda? Curta e compartilhe!"
+
+**HASHTAGS:** 3-5 hashtags profissionais no final (${details.hashtags || "#ecommerce #empreendedorismo #gestão #liderança #negócios"})`;
           break;
         case "x_thread":
-          typeInstructions = `FORMATO: X Thread
-- Objetivo: ${details.objetivo || "educar"}
-- Tweet 1 (tese)${details.tese ? `: "${details.tese}"` : ": defina uma tese forte"}
-- Numero de tweets: ${details.num_tweets || "5"}
-- Ultimo tweet: CTA${details.cta ? `: "${details.cta}"` : ""}
-Gere cada tweet separadamente, numerando-os. Max 280 chars por tweet.`;
+          typeInstructions = `FORMATO: X/Twitter Thread (${details.num_tweets || "5-7"} tweets)
+OBJETIVO: ${details.objetivo || "educar"}
+
+REGRAS DO X/TWITTER:
+- Cada tweet MÁXIMO 280 caracteres (isso é INEGOCIÁVEL)
+- Linguagem mais direta e afiada que Instagram — sem enrolação
+- Threads que viralizam: opinião forte + exemplos + actionable
+
+ESTRUTURA OBRIGATÓRIA:
+
+**TWEET 1 — TESE (o tweet que faz a pessoa clicar "Mostrar thread"):**
+${details.tese ? `Tese definida: "${details.tese}"` : "Afirmação forte e provocativa sobre o tema. Deve funcionar sozinha como tweet."}
+- Deve ser autocontido — alguém que vê só esse tweet já se interessa
+- Termine com "🧵" ou "Thread:" pra sinalizar que tem mais
+
+**TWEETS 2 a ${(parseInt(details.num_tweets) || 5) - 1} — DESENVOLVIMENTO:**
+- 1 ideia por tweet, sem tentar enfiar tudo junto
+- Alterne entre: insight → exemplo concreto → provocação → dado
+- Use "→" e quebras pra facilitar leitura
+- Pode usar 1-2 emojis por tweet se fizer sentido (mais que isso fica infantil no X)
+- Numere os tweets: "1/", "2/", etc.
+
+**ÚLTIMO TWEET — CTA + RESUMO:**
+${details.cta ? `CTA: "${details.cta}"` : "Resuma a thread em 1 frase + peça RT/like/follow"}
+- BOM: "Se isso fez sentido, dá RT no primeiro tweet. Ajuda mais gente a ver. 🔄"
+- Pode fechar com: "Me segue pra mais threads sobre [tema] 📌"
+
+**HASHTAGS:** 1-2 máximo, só no último tweet. No X hashtag em excesso é amador.`;
           break;
         case "x_tweet":
-          typeInstructions = `FORMATO: X Tweet (single tweet)
-- Objetivo: ${details.objetivo || "educar"}
-- Tom: ${details.tom || "provocativo"}
-Max 280 caracteres.`;
+          typeInstructions = `FORMATO: X/Twitter — Tweet Único
+OBJETIVO: ${details.objetivo || "provocar reflexão"}
+TOM: ${details.tom || "provocativo e direto"}
+
+REGRAS:
+- MÁXIMO 280 CARACTERES (isso é INEGOCIÁVEL, conte os caracteres)
+- Um tweet viral = 1 ideia afiada, não um resumo de post
+- Priorize: opinião forte, observação inteligente, ou pergunta que gera debate
+- Tom do X é mais seco e direto que Instagram. Sem firula.
+- Pode usar 1 emoji se fizer sentido. Zero emojis também é ok.
+- Sem hashtags no corpo (no máximo 1 se for relevante)
+
+ESTRUTURAS QUE FUNCIONAM NO X:
+- Opinião polêmica: "Hot take: [opinião]"
+- Observação: "[Fato inesperado]. E ninguém fala sobre isso."
+- Framework curto: "Regra de ouro: [regra em 1 frase]"
+- Pergunta retórica: "Por que [situação absurda] ainda acontece?"
+- Contraste: "Todo mundo faz X. Os melhores fazem Y."
+
+Gere APENAS o tweet. Nada antes, nada depois.`;
           break;
         case "instagram_reel":
-          typeInstructions = `FORMATO: Instagram Reels (roteiro)
-- Objetivo: ${details.objetivo || "educar"}
-- Duracao: ${details.duracao || "30-60s"}
-- Quem aparece: ${details.quem_aparece || "voce"}
-- Gancho 3s${details.gancho ? `: "${details.gancho}"` : ": crie um gancho forte"}
-- Energia/Tom: ${details.energia || "alta"}
-- CTA: ${details.cta || "incluir CTA"}
-Gere um ROTEIRO com marcacoes de tempo e instrucoes de gravacao.`;
+          typeInstructions = `FORMATO: Instagram Reels — Roteiro de Gravação
+OBJETIVO: ${details.objetivo || "educar e entreter"}
+DURAÇÃO: ${details.duracao || "30-60 segundos"}
+QUEM APARECE: ${details.quem_aparece || "Pedro (falando direto pra câmera)"}
+ENERGIA: ${details.energia || "alta, confiante"}
+
+ESTRUTURA OBRIGATÓRIA:
+
+**[0-3s] GANCHO — Os 3 segundos que decidem tudo:**
+${details.gancho ? `Gancho definido: "${details.gancho}"` : "Crie um gancho que faça a pessoa parar de rolar IMEDIATAMENTE."}
+- Técnicas: pergunta chocante, afirmação polêmica, "Isso aqui mudou meu negócio", mostrar resultado
+- Tom: urgência + curiosidade. A pessoa tem que pensar "preciso ver o resto"
+- NUNCA comece com: "Fala galera", "E aí pessoal", "Nesse vídeo eu vou..."
+
+**[3-${details.duracao === "15-30s" ? "25" : "50"}s] DESENVOLVIMENTO:**
+- Linguagem oral/natural — como se estivesse contando pra um amigo
+- Frases CURTAS. No vídeo curto, cada segundo conta.
+- Indique mudanças visuais: [CORTE], [TEXTO NA TELA: "..."], [B-ROLL: ...]
+- Inclua pelo menos 1 momento de "prova" (dado, resultado, exemplo real)
+- Mantenha ritmo acelerado — sem pausas longas
+
+**[Últimos 5-10s] CTA:**
+${details.cta ? `CTA: "${details.cta}"` : "CTA verbal + visual: 'Salva esse vídeo', 'Segue pra mais', 'Comenta SIM'"}
+- Funciona melhor quando o CTA é específico e simples
+
+FORMATO DE RESPOSTA:
+Gere o roteiro com marcações de tempo [0:00-0:03], instruções entre colchetes [CORTE], [TEXTO NA TELA], e o texto falado em formato natural.
+
+Após o roteiro, gere a LEGENDA do Reel:
+- 2-4 parágrafos curtos
+- Hook na primeira linha
+- CTA + 5-8 hashtags (incluir #reels #viral + nicho)`;
           break;
         case "youtube_long":
-          typeInstructions = `FORMATO: YouTube Longo (roteiro)
-- Objetivo: ${details.objetivo || "ensinar"}
-- Duracao: ${details.duracao || "8-12min"}
-- Gancho 15s${details.gancho ? `: "${details.gancho}"` : ": crie abertura forte"}
-- Promessa explicita: ${details.promessa || "definir promessa clara"}
-- Estrutura: ${details.estrutura || "narrativa"}
-- Inclui historia pessoal: ${details.inclui_historia || "sim"}
-- CTA: ${details.cta || "incluir CTA"}
-Gere um ROTEIRO com secoes, marcacoes de tempo e pontos-chave.`;
+          typeInstructions = `FORMATO: YouTube Longo — Roteiro Completo
+OBJETIVO: ${details.objetivo || "ensinar com profundidade"}
+DURAÇÃO: ${details.duracao || "8-12 minutos"}
+INCLUI HISTÓRIA PESSOAL: ${details.inclui_historia || "sim"}
+
+ESTRUTURA OBRIGATÓRIA:
+
+**[0:00-0:15] GANCHO — Primeiros 15 segundos (decidem se fica ou sai):**
+${details.gancho ? `Gancho: "${details.gancho}"` : "Comece com promessa clara do que a pessoa vai aprender/ganhar assistindo até o final."}
+- Mostre o RESULTADO antes de explicar o processo
+- "Nesse vídeo eu vou te mostrar exatamente como [resultado]. E no final, [bônus]."
+
+**[0:15-1:00] PROMESSA + CONTEXTO:**
+${details.promessa ? `Promessa: "${details.promessa}"` : "Defina claramente o que a pessoa vai sair sabendo fazer."}
+- Gere credibilidade: "Eu testei isso no meu próprio negócio e [resultado]"
+- Quebre objeção: "E não, você não precisa de [coisa que acham que precisam]"
+
+**[1:00-${details.duracao === "15-20min" ? "15:00" : "9:00"}] CONTEÚDO PRINCIPAL:**
+- Estrutura: ${details.estrutura || "problema → framework → exemplos → aplicação"}
+- Divida em seções claras com títulos (ajuda na retenção)
+- A cada 2-3 minutos, inclua um "loop" que mantém atenção ("Mas calma, tem mais...")
+- Inclua exemplos concretos, dados e histórias pessoais
+- Indique: [B-ROLL], [GRÁFICO NA TELA], [TEXTO: "..."]
+
+**[Últimos 1-2min] RESUMO + CTA:**
+${details.cta ? `CTA: "${details.cta}"` : "Resuma os pontos principais + CTA: curtir, se inscrever, próximo vídeo."}
+- "Se esse vídeo te ajudou, deixa o like — isso ajuda o YouTube a mostrar pra mais gente."
+- Sugira o próximo vídeo relacionado
+
+FORMATO DE RESPOSTA:
+Roteiro com marcações de tempo, indicações visuais entre colchetes, e texto natural (não robótico).
+Inclua no final: TÍTULO DO VÍDEO (até 60 chars, com keyword) + DESCRIÇÃO (2-3 parágrafos + links).`;
           break;
         case "youtube_short":
-          typeInstructions = `FORMATO: YouTube Short (roteiro)
-- Objetivo: ${details.objetivo || "educar"}
-- Gancho 3s${details.gancho ? `: "${details.gancho}"` : ": crie um gancho forte"}
-- Energia: ${details.energia || "alta"}
-- CTA: ${details.cta || "incluir CTA"}
-Roteiro curto e direto, max 60 segundos.`;
+          typeInstructions = `FORMATO: YouTube Short — Roteiro Vertical
+OBJETIVO: ${details.objetivo || "educar rápido e viralizar"}
+DURAÇÃO: máximo 60 segundos (idealmente 30-45s)
+ENERGIA: ${details.energia || "alta e direta"}
+
+ESTRUTURA OBRIGATÓRIA:
+
+**[0-3s] GANCHO IMEDIATO:**
+${details.gancho ? `Gancho: "${details.gancho}"` : "Primeira frase = hook. Se não prender em 2 segundos, perdeu."}
+- Shorts competem com TikTok — tem que prender INSTANTANEAMENTE
+- Técnicas: "A maioria faz [X] errado", "Em 30 segundos eu vou te ensinar [Y]", dado chocante
+
+**[3-50s] CONTEÚDO DIRETO:**
+- Vai direto ao ponto. Sem introdução, sem "antes disso let me explain"
+- 1 ideia central, desenvolvida rápido com 2-3 exemplos
+- Frases curtas, ritmo acelerado
+- Indique: [TEXTO NA TELA: "..."], [CORTE RÁPIDO]
+
+**[Últimos 5-10s] CTA:**
+${details.cta ? `CTA: "${details.cta}"` : "CTA rápido: 'Se inscreve', 'Comenta o que achou', 'Segue pra parte 2'"}
+
+FORMATO DE RESPOSTA:
+Roteiro com marcações de tempo e instruções visuais entre colchetes.
+Texto falado em linguagem natural, como conversa.`;
           break;
         case "instagram_static":
-          typeInstructions = `FORMATO: Instagram Estatico (post com imagem)
-- Objetivo: ${details.objetivo || "educar"}
-- Texto do post${details.texto_post ? `: "${details.texto_post}"` : ""}
-- CTA: ${details.cta || "incluir CTA"}
-- Imagem: ${details.imagem || "frase"}
-Gere a legenda completa do post.`;
+          typeInstructions = `FORMATO: Instagram Post Estático (imagem + legenda)
+OBJETIVO: ${details.objetivo || "educar e gerar engajamento"}
+
+GERE A LEGENDA COMPLETA DO POST:
+
+**LINHA 1 — HOOK (aparece antes do "...mais" no feed):**
+${details.texto_post ? `Tema/base: "${details.texto_post}"` : "Crie uma primeira frase que pare o scroll."}
+- Essa linha aparece com a foto no feed. É o que decide se a pessoa clica em "mais".
+- Técnicas: pergunta provocativa, dado surpreendente, afirmação forte, confissão
+- Máximo 125 caracteres (limite visível no feed antes do truncamento)
+
+**CORPO DA LEGENDA (4-8 parágrafos curtos):**
+- Cada parágrafo = 1-3 linhas (celular!)
+- Quebre uma linha entre CADA parágrafo
+- Desenvolva o tema com profundidade mas acessibilidade
+- Inclua pelo menos: 1 exemplo concreto + 1 insight prático + 1 reflexão pessoal
+- Tom: conversa entre amigos, não palestra. "Eu" > "nós". Direto > florido.
+- Use perguntas retóricas pra manter engajamento ao longo do texto
+
+**CTA FINAL:**
+${details.cta ? `CTA definido: "${details.cta}"` : "Termine com pergunta específica ou convite a ação (salvar, comentar, compartilhar)."}
+- BOM: "Me conta nos comentários: você já viveu isso no seu negócio?"
+- BOM: "Salva esse post. Garanto que você vai precisar reler daqui 1 semana."
+- RUIM: "Gostou? Curte aí!"
+
+**HASHTAGS:** 5-8 no final. Mix de: tema específico + nicho + amplas
+Exemplo: #ecommerce #lojavirtual #empreendedorismo #vendasonline #negóciosdigitais
+
+**IMAGEM:** ${details.imagem || "A imagem será criada separadamente. Foque apenas na legenda."}`;
           break;
       }
 
@@ -691,15 +860,17 @@ Gere a legenda completa do post.`;
 
       const freeTextPrompt = `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUES BRASILEIRO (PT-BR).
 
-TOPICO: ${topicText}
-${payload.recorte ? `RECORTE ESPECIFICO: ${payload.recorte}` : ""}
+TOPICO PRINCIPAL: ${topicText}
+${payload.recorte ? `RECORTE/ANGULO ESPECIFICO: ${payload.recorte}` : ""}
 ${payload.audience ? `PUBLICO-ALVO: ${payload.audience}` : ""}
-${payload.extraContext ? `CONTEXTO EXTRA: ${payload.extraContext}` : ""}
+${payload.extraContext ? `CONTEXTO ADICIONAL: ${payload.extraContext}` : ""}
 ${sourceInstructions}
 
 ${typeInstructions}
 
-CONTEXTO DA BASE DE CONHECIMENTO DO PEDRO:
+---
+
+BASE DE CONHECIMENTO DO PEDRO (use como fonte de verdade):
 
 ## Playbooks Relevantes:
 ${playbookContext || "Nenhum playbook encontrado."}
@@ -707,10 +878,19 @@ ${playbookContext || "Nenhum playbook encontrado."}
 ## Historias Relevantes:
 ${storyContext || "Nenhuma historia encontrada."}
 ${referenceContext ? `
-## Referencias Externas (terceiros):
+## Referencias Externas (terceiros — use como inspiração, não copie):
 ${referenceContext}
 ` : ""}
-INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR. Use as informacoes dos playbooks e historias como base. O conteudo deve ser direto, pratico e refletir o tom e voz da identidade fornecida.`;
+
+---
+
+INSTRUCOES FINAIS:
+1. O conteúdo deve sair 100% PRONTO PARA COPIAR E COLAR na rede social
+2. Use o TÓPICO acima como tema REAL — não generalize. Se o tema é "Como chegar a 10 mil clientes sem queimar caixa de investidor", o conteúdo inteiro deve ser sobre ISSO
+3. Extraia insights, dados e exemplos dos playbooks/histórias acima. Se não houver material suficiente, use o conhecimento do Pedro sobre o tema
+4. A primeira linha DEVE ser um hook forte — não desperdice essa oportunidade
+5. NÃO inclua explicações sobre o conteúdo, meta-comentários, ou texto fora do post
+6. O conteúdo deve soar como Pedro Rabelo falando, não como IA gerando texto`;
 
       const result = await generateContent({
         identity: identityRes.data,

@@ -101,15 +101,49 @@ ${openingStyle}
 ## Estilo de Fechamento
 ${closingStyle}
 
-## Regras de Escrita
-1. Nunca use jargões corporativos vazios
-2. Sempre inclua exemplos concretos quando possível
-3. Mantenha parágrafos curtos (máximo 3 linhas)
-4. Use linguagem conversacional, como se estivesse falando com um amigo
-5. Evite clichês de LinkedIn
-6. Comece com um gancho forte que prenda atenção
-7. Termine com reflexão ou chamada para ação natural
-8. O conteúdo deve parecer que saiu da boca do ${name}, não de uma IA`;
+## Regras de Escrita (SIGA À RISCA)
+
+### PRIMEIRA LINHA = TUDO
+A primeira linha é o que aparece antes do "...mais" no feed. Se ela não prender, ninguém lê o resto.
+Técnicas de hook que funcionam:
+- Pergunta provocativa ("Você sabia que 90% dos e-commerces quebram nos primeiros 2 anos?")
+- Dado surpreendente ("R$ 47 mil. Esse foi o faturamento do meu primeiro mês.")
+- Afirmação polêmica ("Mentoria é a maior armadilha do mercado digital.")
+- Confissão pessoal ("Eu quase desisti de tudo em 2019.")
+- Promessa direta ("3 coisas que eu faria se tivesse que começar do zero hoje.")
+NUNCA comece com: "Hoje eu vou falar sobre...", "Nesse post...", "Você já parou pra pensar..."
+
+### ESTRUTURA
+1. Parágrafos de 1-3 linhas no MÁXIMO — blocos longos matam leitura no celular
+2. Use quebra de linha entre CADA parágrafo
+3. Alterne entre: insight → exemplo concreto → reflexão
+4. Inclua pelo menos 1 história ou experiência pessoal real
+5. Use linguagem de conversa (como se falasse 1:1 com alguém num café)
+6. Números e dados concretos > generalidades ("faturei R$ 2M" > "faturei muito")
+
+### O QUE NUNCA FAZER
+- Jargões corporativos vazios ("sinergia", "escalar mindset", "disruptivo")
+- Clichês de coach ("saia da zona de conforto", "acredite no seu potencial")
+- Emojis excessivos (máximo 2-3 no post inteiro, e só se fizer sentido)
+- Frases motivacionais genéricas que qualquer pessoa poderia dizer
+- Placeholder tipo [INSERIR EXEMPLO] — o conteúdo deve sair PRONTO PRA POSTAR
+
+### CTA (CALL TO ACTION)
+Termine SEMPRE com uma chamada específica, não genérica:
+- BOM: "Comenta aqui: qual dessas 3 estratégias você vai testar primeiro?"
+- BOM: "Salva esse post. Daqui 30 dias volta aqui e me conta o resultado."
+- RUIM: "Gostou? Curte e compartilha!"
+- RUIM: "Deixe seu comentário abaixo."
+
+### HASHTAGS
+- Instagram: 5-8 hashtags no final. Mix de nicho (#ecommercebrasil, #lojavirtual) + amplas (#empreendedorismo, #negócios)
+- LinkedIn: 3-5 hashtags. Mais profissionais (#liderança, #gestão, #ecommerce)
+- X/Twitter: 1-2 hashtags máximo, integradas ao texto
+- YouTube: sem hashtags no roteiro
+
+### FORMATAÇÃO FINAL
+O conteúdo deve sair 100% pronto para copiar e colar na rede social. Sem explicações, sem "[adapte aqui]", sem notas para o usuário.
+O conteúdo deve parecer que saiu da boca do ${name}, não de uma IA`;
 
   if (rules && rules.length > 0) {
     prompt += `\n\n## Regras de Decisao do Pedro (SIGA SEMPRE):
@@ -170,7 +204,17 @@ ${last3.map((f, i) => `${i + 1}. ${f.reason || f.content || 'Feedback sem detalh
   }
 
   prompt += `## Instruções de Resposta
-Responda APENAS com o conteúdo gerado, sem explicações adicionais. Inclua no final um JSON com o source_map no formato:
+RESPONDA APENAS COM O CONTEÚDO PRONTO PRA POSTAR. Sem explicações, sem "aqui está o conteúdo", sem comentários sobre o que você fez.
+
+REGRAS:
+- A primeira linha DEVE ser um hook forte (a parte que aparece antes do "...mais")
+- O conteúdo deve estar formatado exatamente como será postado na rede social
+- Inclua CTA específico no final
+- Inclua hashtags adequadas à rede (exceto em roteiros de YouTube)
+- NÃO use placeholders como [inserir nome], [adaptar aqui], etc.
+- NÃO inclua títulos como "Legenda:" ou "Post:" antes do conteúdo
+
+Após o conteúdo completo, inclua o source_map em JSON:
 \`\`\`json
 {"source_map": {"playbook_id": "...", "story_id": "...", "sections_used": [...]}}
 \`\`\``;
