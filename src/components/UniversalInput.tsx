@@ -244,6 +244,7 @@ export default function UniversalInput() {
   const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(null);
   const [resumedFromNav, setResumedFromNav] = useState(false);
   const [contentOrigin, setContentOrigin] = useState<"pedro" | "outros">("pedro");
+  const [skipInsights, setSkipInsights] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -311,7 +312,12 @@ export default function UniversalInput() {
       }));
     } catch {}
 
-    const processingSteps = selectedFile
+    const processingSteps = skipInsights
+      ? [
+          { label: selectedFile ? "Enviando arquivo" : "Enviando input", status: "active" as const },
+          { label: "Salvando na base de conhecimento", status: "pending" as const },
+        ]
+      : selectedFile
       ? [
           { label: "Enviando arquivo", status: "active" as const },
           { label: "Processando com Claude AI", status: "pending" as const },
@@ -329,11 +335,12 @@ export default function UniversalInput() {
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("origin", contentOrigin);
+        if (skipInsights) formData.append("skipInsights", "true");
         setCurrentStep(1);
         res = await submitFileInput(formData);
       } else {
         setCurrentStep(1);
-        res = await submitUniversalInput(input.trim(), contentOrigin);
+        res = await submitUniversalInput(input.trim(), contentOrigin, skipInsights);
       }
 
       // Clear processing state
@@ -408,6 +415,25 @@ export default function UniversalInput() {
           >
             De outros
           </button>
+
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSkipInsights(!skipInsights)}
+              className={`relative h-5 w-9 rounded-full transition-colors ${
+                skipInsights ? "bg-amber/40" : "bg-border"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform shadow-sm ${
+                  skipInsights ? "translate-x-4" : ""
+                }`}
+              />
+            </button>
+            <span className={`font-mono text-[11px] ${skipInsights ? "text-amber" : "text-text-muted"}`}>
+              Só alimentar
+            </span>
+          </div>
         </div>
       )}
 

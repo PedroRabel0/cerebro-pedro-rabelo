@@ -245,7 +245,8 @@ export async function submitFileInput(formData: FormData) {
 
     // Delegate to normal processing
     const origin = (formData.get("origin") as string) || "pedro";
-    return submitUniversalInput(enrichedInput.slice(0, 60000), origin as "pedro" | "outros");
+    const skipInsights = formData.get("skipInsights") === "true";
+    return submitUniversalInput(enrichedInput.slice(0, 60000), origin as "pedro" | "outros", skipInsights);
 
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
@@ -256,7 +257,8 @@ export async function submitFileInput(formData: FormData) {
 
 export async function submitUniversalInput(
   input: string,
-  origin: "pedro" | "outros" = "pedro"
+  origin: "pedro" | "outros" = "pedro",
+  skipInsights: boolean = false
 ) {
   const supabase = await createClient();
 
@@ -350,7 +352,37 @@ export async function submitUniversalInput(
     }
   }
 
-  // 4. AI Processing (Claude) — the main bottleneck
+  // 4. Skip insights mode — just save raw content, no AI processing
+  if (skipInsights) {
+    const originTag = origin === "outros" ? "origem:outros" : "origem:pedro";
+    await supabase
+      .from("captures")
+      .update({
+        title: isUrl ? `Feed: ${new URL(input.trim()).hostname}` : input.slice(0, 80),
+        context: `${originTag} | Alimentado sem insights`,
+        status: "stored",
+      })
+      .eq("id", capture.id);
+
+    await supabase.from("activity_log").insert({
+      actor: "ia",
+      action: "Input salvo na base (sem insights)",
+      entity_type: "capture",
+      entity_id: capture.id,
+      entity_title: input.slice(0, 60),
+    });
+
+    revalidatePath("/base-de-conhecimento");
+    log.info(`[Universal] Stored without insights: ${capture.id}`);
+    return {
+      captureId: capture.id,
+      status: "stored" as const,
+      instagramData,
+      origin,
+    };
+  }
+
+  // 5. AI Processing (Claude) — the main bottleneck
   try {
     const result = await processUniversalInput(aiInput);
 
