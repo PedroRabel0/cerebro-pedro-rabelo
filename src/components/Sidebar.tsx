@@ -23,6 +23,7 @@ import {
   Mail,
   AudioLines,
   NotebookPen,
+  Upload,
 } from "lucide-react";
 import { useUserRole, type UserRole } from "@/lib/hooks/useUserRole";
 
@@ -61,6 +62,7 @@ const navSections: NavSection[] = [
       { href: "/diario", label: "Diario", Icon: NotebookPen },
       { href: "/respostas", label: "Pedro Clone", Icon: MessageCircle },
       { href: "/newsletter", label: "Newsletter", Icon: Mail },
+      { href: "/upload-externo", label: "Upload", Icon: Upload },
       { href: "/calendario", label: "Calendário", Icon: CalendarDays },
       { href: "/evolucao-voz", label: "Voz", Icon: AudioLines },
     ],
