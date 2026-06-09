@@ -1,4 +1,4 @@
-﻿export const revalidate = 30;
+﻿export const dynamic = "force-dynamic";
 
 import { getMetrics, getInstagramHandle } from "./actions";
 import AnalyticsDashboard from "./AnalyticsDashboard";

@@ -1,4 +1,4 @@
-﻿export const revalidate = 30;
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 import { getRepurposeableContents } from "./actions";

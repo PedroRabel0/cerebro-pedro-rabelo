@@ -1,4 +1,4 @@
-﻿export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 import { getCalendarEntries, getUnscheduledContents } from "./actions";
 import CalendarView from "./CalendarView";

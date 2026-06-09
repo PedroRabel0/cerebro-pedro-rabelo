@@ -1,4 +1,4 @@
-﻿export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 import { getSnapshots } from "./actions";
 import VoiceTimeline from "./VoiceTimeline";
