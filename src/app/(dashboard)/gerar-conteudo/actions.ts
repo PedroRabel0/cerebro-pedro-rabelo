@@ -624,10 +624,11 @@ ${details.cta ? `CTA definido: "${details.cta}"` : "Termine com CTA forte: salva
 - Pode incluir: "Siga @pedrorabelo pra mais conteúdo sobre [tema]"
 
 **LEGENDA DO POST (após os slides):**
-Escreva também a legenda que acompanha o carrossel:
-- 3-6 parágrafos curtos expandindo o tema
-- Hook forte na primeira linha (aparece antes do "...mais")
-- CTA final + 5-8 hashtags relevantes
+IMPORTANTE: A legenda NÃO repete o conteúdo dos slides. Os slides já ensinam — a legenda COMPLEMENTA com:
+- Hook forte na primeira linha
+- 2-4 parágrafos curtos: contexto pessoal, por que esse tema importa, ou bastidor
+- CTA final + 5-8 hashtags
+- Máximo 100-120 palavras na legenda
 
 FORMATO DE RESPOSTA:
 Primeiro gere cada slide numerado (SLIDE 1:, SLIDE 2:, etc.), depois uma seção "---LEGENDA---" com a legenda completa.`;
@@ -635,7 +636,7 @@ Primeiro gere cada slide numerado (SLIDE 1:, SLIDE 2:, etc.), depois uma seção
         case "linkedin_post":
           typeInstructions = `FORMATO: LinkedIn Post
 OBJETIVO: ${details.objetivo || "educar e gerar autoridade"}
-TAMANHO: ${details.tamanho || "medio"} (curto <100 palavras, medio 150-300, longo 300-500)
+TAMANHO: ${details.tamanho || "medio"} (curto <100 palavras, medio 100-200, longo 200-300). NUNCA passe de 300 palavras.
 
 ESTRUTURA OBRIGATÓRIA:
 
@@ -810,32 +811,17 @@ Texto falado em linguagem natural, como conversa.`;
           typeInstructions = `FORMATO: Instagram Post Estático (imagem + legenda)
 OBJETIVO: ${details.objetivo || "educar e gerar engajamento"}
 
-GERE A LEGENDA COMPLETA DO POST:
+IMPORTANTE: O design/imagem do post é criado SEPARADAMENTE. A legenda NÃO deve repetir o conteúdo visual — ela COMPLEMENTA.
 
-**LINHA 1 — HOOK (aparece antes do "...mais" no feed):**
-${details.texto_post ? `Tema/base: "${details.texto_post}"` : "Crie uma primeira frase que pare o scroll."}
-- Essa linha aparece com a foto no feed. É o que decide se a pessoa clica em "mais".
-- Técnicas: pergunta provocativa, dado surpreendente, afirmação forte, confissão
-- Máximo 125 caracteres (limite visível no feed antes do truncamento)
+GERE UMA LEGENDA CURTA E DIRETA (máximo 100-150 palavras):
 
-**CORPO DA LEGENDA (4-8 parágrafos curtos):**
-- Cada parágrafo = 1-3 linhas (celular!)
-- Quebre uma linha entre CADA parágrafo
-- Desenvolva o tema com profundidade mas acessibilidade
-- Inclua pelo menos: 1 exemplo concreto + 1 insight prático + 1 reflexão pessoal
-- Tom: conversa entre amigos, não palestra. "Eu" > "nós". Direto > florido.
-- Use perguntas retóricas pra manter engajamento ao longo do texto
+1. HOOK (1ª linha): Frase de impacto que pare o scroll. Max 125 caracteres.
+${details.texto_post ? `   Tema/base: "${details.texto_post}"` : ""}
+2. CORPO (3-5 parágrafos de 1-2 linhas): Contextualize o tema, conte algo pessoal, dê 1 insight prático. NÃO liste tópicos que já estão no design.
+3. CTA: ${details.cta ? `"${details.cta}"` : "Pergunta específica ou convite a salvar/comentar."}
+4. HASHTAGS: 5-8 no final
 
-**CTA FINAL:**
-${details.cta ? `CTA definido: "${details.cta}"` : "Termine com pergunta específica ou convite a ação (salvar, comentar, compartilhar)."}
-- BOM: "Me conta nos comentários: você já viveu isso no seu negócio?"
-- BOM: "Salva esse post. Garanto que você vai precisar reler daqui 1 semana."
-- RUIM: "Gostou? Curte aí!"
-
-**HASHTAGS:** 5-8 no final. Mix de: tema específico + nicho + amplas
-Exemplo: #ecommerce #lojavirtual #empreendedorismo #vendasonline #negóciosdigitais
-
-**IMAGEM:** ${details.imagem || "A imagem será criada separadamente. Foque apenas na legenda."}`;
+Tom: conversa direta, como se falasse 1:1 com alguém. Sem enrolação.`;
           break;
       }
 
@@ -885,12 +871,15 @@ ${referenceContext}
 ---
 
 INSTRUCOES FINAIS:
-1. O conteúdo deve sair 100% PRONTO PARA COPIAR E COLAR na rede social
-2. Use o TÓPICO acima como tema REAL — não generalize. Se o tema é "Como chegar a 10 mil clientes sem queimar caixa de investidor", o conteúdo inteiro deve ser sobre ISSO
-3. Extraia insights, dados e exemplos dos playbooks/histórias acima. Se não houver material suficiente, use o conhecimento do Pedro sobre o tema
-4. A primeira linha DEVE ser um hook forte — não desperdice essa oportunidade
-5. NÃO inclua explicações sobre o conteúdo, meta-comentários, ou texto fora do post
-6. O conteúdo deve soar como Pedro Rabelo falando, não como IA gerando texto`;
+1. SEJA CURTO E DIRETO. A legenda deve ter no MÁXIMO 150 palavras (Instagram/X) ou 250 palavras (LinkedIn). Menos é mais.
+2. A legenda COMPLEMENTA o design visual — NÃO repita o que já está na imagem. Se o design mostra "5 passos pra X", a legenda NÃO lista os 5 passos de novo. Ela contextualiza, provoca ou conta a história por trás.
+3. Use o TÓPICO como tema REAL — não generalize
+4. A primeira linha DEVE ser um hook forte
+5. Vá DIRETO ao ponto — sem introdução longa, sem "Hoje quero compartilhar..."
+6. 1 ideia central por post. Não tente cobrir tudo.
+7. O conteúdo deve soar como Pedro Rabelo falando, não como IA gerando texto
+8. NÃO inclua meta-comentários ("aqui está a legenda", "segue o conteúdo")
+9. PRONTO PRA COPIAR E COLAR — sem placeholders, sem adaptações necessárias`;
 
       const result = await generateContent({
         identity: identityRes.data,

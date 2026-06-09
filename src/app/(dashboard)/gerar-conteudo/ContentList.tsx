@@ -410,6 +410,7 @@ export default function ContentList({
   const [publishUrlId, setPublishUrlId] = useState<string | null>(null);
   const [designId, setDesignId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   // Track images that were just uploaded (not yet in server data)
   const [freshImages, setFreshImages] = useState<Record<string, string>>({});
 
@@ -532,7 +533,7 @@ export default function ContentList({
                   </span>
                 </div>
 
-                {/* Caption / Content */}
+                {/* Caption / Content — click to expand, edit is separate */}
                 {editingId === c.id ? (
                   <InlineEditor
                     contentId={c.id}
@@ -540,9 +541,29 @@ export default function ContentList({
                     onClose={() => setEditingId(null)}
                   />
                 ) : (
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-text">
-                    {c.content_text}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                    className="w-full text-left rounded-xl bg-surface/40 px-3 py-2.5 transition hover:bg-surface/70 cursor-pointer"
+                  >
+                    <div
+                      className={`whitespace-pre-wrap text-sm leading-relaxed text-text ${
+                        expandedId === c.id ? "" : "line-clamp-3"
+                      }`}
+                    >
+                      {c.content_text}
+                    </div>
+                    {c.content_text && c.content_text.length > 150 && expandedId !== c.id && (
+                      <span className="mt-1 block font-mono text-[10px] text-accent">
+                        Clique pra ver tudo ↓
+                      </span>
+                    )}
+                    {expandedId === c.id && (
+                      <span className="mt-1 block font-mono text-[10px] text-text-muted">
+                        Clique pra recolher ↑
+                      </span>
+                    )}
+                  </button>
                 )}
 
                 <SourceMapDisplay sourceMap={c.source_map} />

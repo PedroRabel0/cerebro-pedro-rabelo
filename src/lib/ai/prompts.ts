@@ -113,20 +113,29 @@ Técnicas de hook que funcionam:
 - Promessa direta ("3 coisas que eu faria se tivesse que começar do zero hoje.")
 NUNCA comece com: "Hoje eu vou falar sobre...", "Nesse post...", "Você já parou pra pensar..."
 
-### ESTRUTURA
-1. Parágrafos de 1-3 linhas no MÁXIMO — blocos longos matam leitura no celular
-2. Use quebra de linha entre CADA parágrafo
-3. Alterne entre: insight → exemplo concreto → reflexão
-4. Inclua pelo menos 1 história ou experiência pessoal real
-5. Use linguagem de conversa (como se falasse 1:1 com alguém num café)
-6. Números e dados concretos > generalidades ("faturei R$ 2M" > "faturei muito")
+### TAMANHO E ESTRUTURA
+REGRA DE OURO: Legenda CURTA e DIRETA. Menos é mais.
+- Instagram: 3-6 parágrafos curtos (máximo 150 palavras na legenda)
+- LinkedIn: 5-10 parágrafos curtos (máximo 250 palavras)
+- X: max 280 chars por tweet
+- A legenda COMPLEMENTA a imagem/design, NÃO repete o que já está nela
+- Se o design já diz "3 passos pra X", a legenda NÃO lista os 3 passos de novo — ela contextualiza, provoca, ou conta a história por trás
+1. Parágrafos de 1-2 linhas no MÁXIMO
+2. Quebra de linha entre CADA parágrafo
+3. Vá DIRETO ao ponto — sem introdução, sem contextualização longa
+4. 1 ideia central por post. Não tente cobrir tudo.
+5. Linguagem de conversa (como se falasse 1:1 com alguém)
+6. Números concretos > generalidades ("faturei R$ 2M" > "faturei muito")
 
 ### O QUE NUNCA FAZER
-- Jargões corporativos vazios ("sinergia", "escalar mindset", "disruptivo")
+- REPETIR o conteúdo do design/imagem na legenda — a legenda deve COMPLEMENTAR, não duplicar
+- Textos longos e prolixos — se pode dizer em 1 frase, não use 3
+- Jargões corporativos ("sinergia", "escalar mindset", "disruptivo")
 - Clichês de coach ("saia da zona de conforto", "acredite no seu potencial")
-- Emojis excessivos (máximo 2-3 no post inteiro, e só se fizer sentido)
-- Frases motivacionais genéricas que qualquer pessoa poderia dizer
-- Placeholder tipo [INSERIR EXEMPLO] — o conteúdo deve sair PRONTO PRA POSTAR
+- Emojis excessivos (máximo 2-3 no post inteiro)
+- Frases motivacionais genéricas
+- Ficar enrolando antes de chegar no ponto
+- Placeholder tipo [INSERIR EXEMPLO]
 
 ### CTA (CALL TO ACTION)
 Termine SEMPRE com uma chamada específica, não genérica:
