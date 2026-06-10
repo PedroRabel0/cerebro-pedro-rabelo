@@ -1139,7 +1139,7 @@ export async function refineContent(
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 2000,
       system: `Voce e um editor de conteudo para redes sociais. O usuario gerou um conteudo e quer fazer ajustes.
 
@@ -1148,10 +1148,9 @@ REGRAS:
 - Mantenha o tom, estilo e estrutura original a menos que ele peca pra mudar
 - Responda APENAS com o texto final editado, sem explicacoes, sem "Aqui esta:", sem markdown
 - O texto deve estar pronto para copiar e colar na rede social
-- Se o usuario pedir algo sobre a legenda/caption, ajuste o texto
-- Se o usuario pedir algo sobre o prompt de imagem, ajuste o prompt
 - Mantenha hashtags se ja existiam, a menos que peca pra remover
-- Mantenha emojis se ja existiam, a menos que peca pra remover`,
+- Mantenha emojis se ja existiam, a menos que peca pra remover
+- Se o usuario pedir algo sobre design, imagem, visual, piramide, diagrama, prompt — ajuste a LEGENDA para refletir o novo conceito visual (o prompt de imagem sera ajustado separadamente)`,
       messages: [
         {
           role: 'user',
@@ -1178,7 +1177,7 @@ REGRAS:
     let refinedPrompt: string | null = null;
     if (alsoRefinePrompt && currentPrompt) {
       const promptResponse = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1500,
         system: `Voce e um editor de prompts para geracao de imagens. Ajuste o prompt de imagem conforme a instrucao do usuario. Responda APENAS com o prompt ajustado em ingles, nada mais.`,
         messages: [
