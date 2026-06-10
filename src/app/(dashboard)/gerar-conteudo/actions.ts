@@ -1121,6 +1121,62 @@ export async function uploadImageToContent(
   }
 }
 
+/**
+ * Remove the image from a content (set image_url to null).
+ * Also removes the file(s) from Supabase Storage if possible.
+ */
+export async function removeContentImage(
+  contentId: string
+): Promise<{ success: boolean } | { error: string }> {
+  const supabase = await createClient();
+
+  try {
+    // Get current image_url to delete from storage
+    const { data: content } = await supabase
+      .from("generated_contents")
+      .select("image_url")
+      .eq("id", contentId)
+      .single();
+
+    if (content?.image_url) {
+      // Try to extract storage paths and delete files
+      const urls: string[] = [];
+      try {
+        const parsed = JSON.parse(content.image_url);
+        if (Array.isArray(parsed)) urls.push(...parsed);
+      } catch {
+        urls.push(content.image_url);
+      }
+
+      // Extract file paths from public URLs and delete from storage
+      for (const url of urls) {
+        const match = url.match(/generated-images\/(.+)$/);
+        if (match) {
+          await supabase.storage
+            .from("generated-images")
+            .remove([match[1]]);
+        }
+      }
+    }
+
+    // Clear image_url and image_model in DB
+    await supabase
+      .from("generated_contents")
+      .update({ image_url: null, image_model: null })
+      .eq("id", contentId);
+
+    log.info(`[RemoveImage] Image removed for ${contentId}`);
+    revalidatePath(PATH);
+    revalidatePath("/calendario");
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    log.error("[RemoveImage] Error: " + message);
+    return { error: `Falha ao remover imagem: ${message}` };
+  }
+}
+
 export async function savePublishedUrl(contentId: string, url: string) {
   const supabase = await createClient();
   const { error } = await supabase

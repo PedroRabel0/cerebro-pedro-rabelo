@@ -8,6 +8,7 @@ import {
   deleteContent,
   savePublishedUrl,
   uploadImageToContent,
+  removeContentImage,
 } from "./actions";
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import SlideDesigner from "@/components/SlideDesigner";
@@ -461,21 +462,69 @@ export default function ContentList({
             >
               {/* Image section */}
               {hasImage && (
-                <div className={`${imageUrls.length > 1 ? "grid grid-cols-3 gap-0.5" : ""} bg-surface`}>
-                  {imageUrls.map((url, i) => (
-                    <div key={i} className="relative aspect-square">
-                      <img
-                        src={url}
-                        alt={imageUrls.length > 1 ? `Slide ${i + 1}` : "Imagem do post"}
-                        className="h-full w-full object-cover"
+                <div className="relative">
+                  <div className={`${imageUrls.length > 1 ? "grid grid-cols-3 gap-0.5" : ""} bg-surface`}>
+                    {imageUrls.map((url, i) => (
+                      <div key={i} className="relative aspect-square">
+                        <img
+                          src={url}
+                          alt={imageUrls.length > 1 ? `Slide ${i + 1}` : "Imagem do post"}
+                          className="h-full w-full object-cover"
+                        />
+                        {imageUrls.length > 1 && (
+                          <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                            {i + 1}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Overlay buttons to replace/remove image */}
+                  <div className="absolute right-2 top-2 flex gap-1.5">
+                    <label className="flex cursor-pointer items-center gap-1 rounded-lg bg-black/70 px-2.5 py-1.5 font-mono text-[10px] text-white backdrop-blur-sm transition hover:bg-black/90">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple={isCarousel}
+                        onChange={async (e) => {
+                          const files = e.target.files;
+                          if (!files || files.length === 0) return;
+                          // Remove old image first, then upload new
+                          await removeContentImage(c.id);
+                          const formData = new FormData();
+                          for (let i = 0; i < files.length; i++) {
+                            formData.append("images", files[i]);
+                          }
+                          const res = await uploadImageToContent(c.id, formData);
+                          if (!("error" in res)) {
+                            setFreshImages((prev) => ({ ...prev, [c.id]: res.imageUrl }));
+                          }
+                          e.target.value = "";
+                        }}
+                        className="hidden"
                       />
-                      {imageUrls.length > 1 && (
-                        <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                          {i + 1}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                      <Upload className="h-3 w-3" />
+                      Trocar
+                    </label>
+                    <button
+                      onClick={async () => {
+                        if (!confirm("Remover esta imagem?")) return;
+                        await removeContentImage(c.id);
+                        setFreshImages((prev) => {
+                          const next = { ...prev };
+                          delete next[c.id];
+                          return next;
+                        });
+                        // Force re-render by clearing the image from local state
+                        // The page will revalidate and show no image
+                        window.location.reload();
+                      }}
+                      className="flex items-center gap-1 rounded-lg bg-red/80 px-2.5 py-1.5 font-mono text-[10px] text-white backdrop-blur-sm transition hover:bg-red"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Remover
+                    </button>
+                  </div>
                 </div>
               )}
 
