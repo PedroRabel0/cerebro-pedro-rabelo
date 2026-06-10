@@ -1259,6 +1259,20 @@ export default function GenerationWizard({
     });
   }
 
+  // Auto-advance when a type is selected (go to details step)
+  function selectTypeAndAdvance(t: ContentType) {
+    setState((prev) => {
+      const sel = prev.selectedTypes.includes(t)
+        ? prev.selectedTypes.filter((x) => x !== t)
+        : [...prev.selectedTypes, t];
+      return { ...prev, selectedTypes: sel };
+    });
+    // Small delay so user sees the selection before advancing
+    if (!state.selectedTypes.includes(t)) {
+      setTimeout(() => setStep("details"), 200);
+    }
+  }
+
   // If no playbooks exist, force free_text mode
   const effectiveTopicMode =
     state.topicMode === "from_base" && playbooks.length === 0
@@ -1495,7 +1509,7 @@ export default function GenerationWizard({
               <button
                 key={t.value}
                 type="button"
-                onClick={() => toggleType(t.value)}
+                onClick={() => selectTypeAndAdvance(t.value)}
                 className={`rounded-2xl border px-4 py-3 text-left font-mono text-xs transition-all ${
                   active
                     ? "border-accent bg-accent/10 text-accent font-bold"
@@ -1516,6 +1530,9 @@ export default function GenerationWizard({
             );
           })}
         </div>
+        <p className="text-[10px] text-text-muted">
+          Clique para selecionar e avancar. Clique novamente para desmarcar.
+        </p>
         {state.selectedTypes.length > 0 && (
           <p className="text-xs text-text-muted">
             {state.selectedTypes.length} tipo{state.selectedTypes.length !== 1 ? "s" : ""} selecionado{state.selectedTypes.length !== 1 ? "s" : ""}

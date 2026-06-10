@@ -409,7 +409,9 @@ export default function ContentList({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [publishUrlId, setPublishUrlId] = useState<string | null>(null);
   const [designId, setDesignId] = useState<string | null>(null);
+  const [promptId, setPromptId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // Track images that were just uploaded (not yet in server data)
   const [freshImages, setFreshImages] = useState<Record<string, string>>({});
@@ -628,6 +630,17 @@ export default function ContentList({
                     <MessageSquare className="h-3 w-3" />
                     Feedback
                   </button>
+                  {c.image_prompt && (
+                    <button
+                      onClick={() =>
+                        setPromptId(promptId === c.id ? null : c.id)
+                      }
+                      className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] text-purple transition hover:bg-purple/10"
+                    >
+                      <ImageIcon className="h-3 w-3" />
+                      {promptId === c.id ? "Fechar Prompt" : "Ver Prompt"}
+                    </button>
+                  )}
                   {isCarousel && (
                     <button
                       onClick={() =>
@@ -661,6 +674,36 @@ export default function ContentList({
                     currentUrl={c.published_url}
                     onClose={() => setPublishUrlId(null)}
                   />
+                )}
+                {promptId === c.id && c.image_prompt && (
+                  <div className="animate-slide-in rounded-xl border border-purple/20 bg-purple/5 p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ImageIcon className="h-3.5 w-3.5 text-purple" />
+                        <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-purple">
+                          Prompt de Imagem
+                        </span>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(c.image_prompt!);
+                          setCopiedPromptId(c.id);
+                          setTimeout(() => setCopiedPromptId(null), 2000);
+                        }}
+                        className="flex items-center gap-1 rounded-lg bg-purple/10 px-2.5 py-1 font-mono text-[10px] text-purple transition hover:bg-purple/20"
+                      >
+                        {copiedPromptId === c.id ? (
+                          <Check className="h-3 w-3" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                        {copiedPromptId === c.id ? "Copiado!" : "Copiar prompt"}
+                      </button>
+                    </div>
+                    <p className="whitespace-pre-wrap text-xs text-text-secondary leading-relaxed">
+                      {c.image_prompt}
+                    </p>
+                  </div>
                 )}
                 {designId === c.id &&
                   isCarousel &&
