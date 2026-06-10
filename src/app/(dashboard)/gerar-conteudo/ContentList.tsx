@@ -9,6 +9,7 @@ import {
   savePublishedUrl,
   uploadImageToContent,
   removeContentImage,
+  refineContent,
 } from "./actions";
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import SlideDesigner from "@/components/SlideDesigner";
@@ -29,6 +30,8 @@ import {
   Check,
   Upload,
   Loader2,
+  Send,
+  Sparkles,
 } from "lucide-react";
 
 // --- Helpers ---
@@ -399,6 +402,112 @@ function ImageUploader({
   );
 }
 
+// --- Refine Chat ---
+
+function RefineChat({
+  contentId,
+  currentText,
+  contentType,
+  currentPrompt,
+  onRefined,
+}: {
+  contentId: string;
+  currentText: string;
+  contentType: string;
+  currentPrompt: string | null;
+  onRefined: (newText: string, newPrompt?: string | null) => void;
+}) {
+  const [instruction, setInstruction] = useState("");
+  const [refining, setRefining] = useState(false);
+  const [history, setHistory] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+
+  async function handleRefine() {
+    if (!instruction.trim()) return;
+    const userMsg = instruction.trim();
+    setHistory((prev) => [...prev, { role: "user", text: userMsg }]);
+    setInstruction("");
+    setRefining(true);
+
+    const res = await refineContent(
+      contentId,
+      currentText,
+      userMsg,
+      contentType,
+      !!currentPrompt,
+      currentPrompt,
+    );
+
+    if ("error" in res) {
+      setHistory((prev) => [...prev, { role: "ai", text: `Erro: ${res.error}` }]);
+    } else {
+      setHistory((prev) => [...prev, { role: "ai", text: "Pronto, ajustei o conteudo." }]);
+      onRefined(res.text, res.imagePrompt);
+    }
+    setRefining(false);
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl border border-accent/20 bg-accent/5 p-3">
+      <div className="flex items-center gap-2 mb-1">
+        <Sparkles className="h-3.5 w-3.5 text-accent" />
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-accent">
+          Ajustar com IA
+        </span>
+      </div>
+
+      {/* Chat history */}
+      {history.length > 0 && (
+        <div className="max-h-40 overflow-y-auto space-y-1.5 rounded-lg bg-surface/50 p-2">
+          {history.map((msg, i) => (
+            <div
+              key={i}
+              className={`text-xs leading-relaxed ${
+                msg.role === "user"
+                  ? "text-text font-medium"
+                  : "text-text-muted italic"
+              }`}
+            >
+              <span className={`font-mono text-[9px] uppercase ${msg.role === "user" ? "text-accent" : "text-green"}`}>
+                {msg.role === "user" ? "Voce" : "IA"}:
+              </span>{" "}
+              {msg.text}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Input */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={instruction}
+          onChange={(e) => setInstruction(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleRefine();
+            }
+          }}
+          placeholder="Ex: encurta, muda o tom, tira hashtags..."
+          disabled={refining}
+          className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none disabled:opacity-50"
+        />
+        <button
+          onClick={handleRefine}
+          disabled={refining || !instruction.trim()}
+          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover disabled:opacity-50"
+        >
+          {refining ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Send className="h-3.5 w-3.5" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- Main ContentList ---
 
 export default function ContentList({
@@ -411,9 +520,13 @@ export default function ContentList({
   const [publishUrlId, setPublishUrlId] = useState<string | null>(null);
   const [designId, setDesignId] = useState<string | null>(null);
   const [promptId, setPromptId] = useState<string | null>(null);
+  const [refineId, setRefineId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Track refined texts (not yet in server data — avoids full reload)
+  const [refinedTexts, setRefinedTexts] = useState<Record<string, string>>({});
+  const [refinedPrompts, setRefinedPrompts] = useState<Record<string, string>>({});
   // Track images that were just uploaded (not yet in server data)
   const [freshImages, setFreshImages] = useState<Record<string, string>>({});
 
@@ -454,6 +567,8 @@ export default function ContentList({
           const hasImage = imageUrls.length > 0;
           const isCopied = copiedId === c.id;
           const isCarousel = c.content_type === "instagram_carousel";
+          const displayText = refinedTexts[c.id] || c.content_text;
+          const displayPrompt = refinedPrompts[c.id] || c.image_prompt;
 
           return (
             <div
@@ -588,7 +703,7 @@ export default function ContentList({
                 {editingId === c.id ? (
                   <InlineEditor
                     contentId={c.id}
-                    initialText={c.content_text || ""}
+                    initialText={displayText || ""}
                     onClose={() => setEditingId(null)}
                   />
                 ) : (
@@ -602,9 +717,9 @@ export default function ContentList({
                         expandedId === c.id ? "" : "line-clamp-3"
                       }`}
                     >
-                      {c.content_text}
+                      {displayText}
                     </div>
-                    {c.content_text && c.content_text.length > 150 && expandedId !== c.id && (
+                    {displayText && displayText.length > 150 && expandedId !== c.id && (
                       <span className="mt-1 block font-mono text-[10px] text-accent">
                         Clique pra ver tudo ↓
                       </span>
@@ -641,7 +756,7 @@ export default function ContentList({
                 <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
                   {/* Copy caption */}
                   <button
-                    onClick={() => handleCopy(c.content_text || "", c.id)}
+                    onClick={() => handleCopy(displayText || "", c.id)}
                     className="flex items-center gap-1 rounded-xl bg-accent/10 px-3 py-1.5 font-mono text-[11px] font-medium text-accent transition hover:bg-accent/20"
                   >
                     {isCopied ? (
@@ -679,7 +794,20 @@ export default function ContentList({
                     <MessageSquare className="h-3 w-3" />
                     Feedback
                   </button>
-                  {c.image_prompt && (
+                  <button
+                    onClick={() =>
+                      setRefineId(refineId === c.id ? null : c.id)
+                    }
+                    className={`flex items-center gap-1 rounded-xl px-2.5 py-1.5 font-mono text-[10px] transition ${
+                      refineId === c.id
+                        ? "bg-accent/10 text-accent"
+                        : "text-accent hover:bg-accent/10"
+                    }`}
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Ajustar
+                  </button>
+                  {displayPrompt && (
                     <button
                       onClick={() =>
                         setPromptId(promptId === c.id ? null : c.id)
@@ -724,7 +852,7 @@ export default function ContentList({
                     onClose={() => setPublishUrlId(null)}
                   />
                 )}
-                {promptId === c.id && c.image_prompt && (
+                {promptId === c.id && displayPrompt && (
                   <div className="animate-slide-in rounded-xl border border-purple/20 bg-purple/5 p-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -735,7 +863,7 @@ export default function ContentList({
                       </div>
                       <button
                         onClick={async () => {
-                          await navigator.clipboard.writeText(c.image_prompt!);
+                          await navigator.clipboard.writeText(displayPrompt);
                           setCopiedPromptId(c.id);
                           setTimeout(() => setCopiedPromptId(null), 2000);
                         }}
@@ -750,9 +878,23 @@ export default function ContentList({
                       </button>
                     </div>
                     <p className="whitespace-pre-wrap text-xs text-text-secondary leading-relaxed">
-                      {c.image_prompt}
+                      {displayPrompt}
                     </p>
                   </div>
+                )}
+                {refineId === c.id && (
+                  <RefineChat
+                    contentId={c.id}
+                    currentText={displayText || ""}
+                    contentType={c.content_type}
+                    currentPrompt={displayPrompt}
+                    onRefined={(newText, newPrompt) => {
+                      setRefinedTexts((prev) => ({ ...prev, [c.id]: newText }));
+                      if (newPrompt) {
+                        setRefinedPrompts((prev) => ({ ...prev, [c.id]: newPrompt }));
+                      }
+                    }}
+                  />
                 )}
                 {designId === c.id &&
                   isCarousel &&

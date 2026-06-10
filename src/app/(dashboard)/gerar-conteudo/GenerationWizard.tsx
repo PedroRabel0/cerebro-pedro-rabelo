@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useTransition } from "react";
 import type { ContentType } from "@/lib/supabase/types";
-import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent } from "./actions";
+import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent, refineContent } from "./actions";
 import SlideDesigner from "@/components/SlideDesigner";
 import {
   Sparkles,
@@ -18,6 +18,7 @@ import {
   ChevronDown,
   Image as ImageIcon,
   Upload,
+  Send,
 } from "lucide-react";
 
 // --------------- constants ---------------
@@ -953,6 +954,9 @@ function ResultCard({
   const [imageError, setImageError] = useState<string | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [refineInput, setRefineInput] = useState("");
+  const [refining, setRefining] = useState(false);
+  const [refineHistory, setRefineHistory] = useState<{ role: "user" | "ai"; text: string }[]>([]);
 
   async function handleCopy() {
     await navigator.clipboard.writeText(text);
@@ -1139,6 +1143,89 @@ function ResultCard({
           </label>
         </div>
       )}
+
+      {/* Refine chat */}
+      <div className="space-y-2 rounded-xl border border-accent/20 bg-accent/5 p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles className="h-3.5 w-3.5 text-accent" />
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-accent">
+            Ajustar com IA
+          </span>
+        </div>
+
+        {refineHistory.length > 0 && (
+          <div className="max-h-32 overflow-y-auto space-y-1.5 rounded-lg bg-surface/50 p-2">
+            {refineHistory.map((msg, i) => (
+              <div
+                key={i}
+                className={`text-xs leading-relaxed ${
+                  msg.role === "user" ? "text-text font-medium" : "text-text-muted italic"
+                }`}
+              >
+                <span className={`font-mono text-[9px] uppercase ${msg.role === "user" ? "text-accent" : "text-green"}`}>
+                  {msg.role === "user" ? "Voce" : "IA"}:
+                </span>{" "}
+                {msg.text}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={refineInput}
+            onChange={(e) => setRefineInput(e.target.value)}
+            onKeyDown={async (e) => {
+              if (e.key === "Enter" && !e.shiftKey && refineInput.trim()) {
+                e.preventDefault();
+                const userMsg = refineInput.trim();
+                setRefineHistory((prev) => [...prev, { role: "user", text: userMsg }]);
+                setRefineInput("");
+                setRefining(true);
+                const res = await refineContent(
+                  result.id, text, userMsg, result.contentType,
+                  !!result.imagePrompt, result.imagePrompt,
+                );
+                if ("error" in res) {
+                  setRefineHistory((prev) => [...prev, { role: "ai", text: `Erro: ${res.error}` }]);
+                } else {
+                  setText(res.text);
+                  setRefineHistory((prev) => [...prev, { role: "ai", text: "Pronto, ajustei." }]);
+                }
+                setRefining(false);
+              }
+            }}
+            placeholder="Ex: encurta, muda o tom, tira hashtags..."
+            disabled={refining}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none disabled:opacity-50"
+          />
+          <button
+            onClick={async () => {
+              if (!refineInput.trim()) return;
+              const userMsg = refineInput.trim();
+              setRefineHistory((prev) => [...prev, { role: "user", text: userMsg }]);
+              setRefineInput("");
+              setRefining(true);
+              const res = await refineContent(
+                result.id, text, userMsg, result.contentType,
+                !!result.imagePrompt, result.imagePrompt,
+              );
+              if ("error" in res) {
+                setRefineHistory((prev) => [...prev, { role: "ai", text: `Erro: ${res.error}` }]);
+              } else {
+                setText(res.text);
+                setRefineHistory((prev) => [...prev, { role: "ai", text: "Pronto, ajustei." }]);
+              }
+              setRefining(false);
+            }}
+            disabled={refining || !refineInput.trim()}
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-mono text-xs font-bold text-bg transition hover:bg-accent-hover disabled:opacity-50"
+          >
+            {refining ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+      </div>
 
       {/* SlideDesigner for carousels */}
       {result.contentType === "instagram_carousel" && (

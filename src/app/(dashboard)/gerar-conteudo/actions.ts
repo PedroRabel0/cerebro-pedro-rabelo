@@ -1122,6 +1122,103 @@ export async function uploadImageToContent(
 }
 
 /**
+ * Refine/adjust generated content based on user instruction.
+ * Uses Claude to modify the existing text following the user's direction.
+ * Can optionally also regenerate the image prompt.
+ */
+export async function refineContent(
+  contentId: string,
+  currentText: string,
+  instruction: string,
+  contentType: string,
+  alsoRefinePrompt?: boolean,
+  currentPrompt?: string | null,
+): Promise<{ text: string; imagePrompt?: string | null } | { error: string }> {
+  try {
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      system: `Voce e um editor de conteudo para redes sociais. O usuario gerou um conteudo e quer fazer ajustes.
+
+REGRAS:
+- Faca EXATAMENTE o que o usuario pedir, nada mais
+- Mantenha o tom, estilo e estrutura original a menos que ele peca pra mudar
+- Responda APENAS com o texto final editado, sem explicacoes, sem "Aqui esta:", sem markdown
+- O texto deve estar pronto para copiar e colar na rede social
+- Se o usuario pedir algo sobre a legenda/caption, ajuste o texto
+- Se o usuario pedir algo sobre o prompt de imagem, ajuste o prompt
+- Mantenha hashtags se ja existiam, a menos que peca pra remover
+- Mantenha emojis se ja existiam, a menos que peca pra remover`,
+      messages: [
+        {
+          role: 'user',
+          content: `CONTEUDO ATUAL (${contentType}):\n---\n${currentText}\n---\n\nINSTRUCAO DO USUARIO: ${instruction}\n\nResponda APENAS com o texto ajustado, nada mais.`,
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((b) => b.type === 'text');
+    const refinedText = textBlock?.text?.trim() || '';
+
+    if (!refinedText) {
+      return { error: 'Claude nao retornou texto' };
+    }
+
+    // Save to DB
+    const supabase = await createClient();
+    await supabase
+      .from('generated_contents')
+      .update({ content_text: refinedText })
+      .eq('id', contentId);
+
+    // Also refine image prompt if requested
+    let refinedPrompt: string | null = null;
+    if (alsoRefinePrompt && currentPrompt) {
+      const promptResponse = await client.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: `Voce e um editor de prompts para geracao de imagens. Ajuste o prompt de imagem conforme a instrucao do usuario. Responda APENAS com o prompt ajustado em ingles, nada mais.`,
+        messages: [
+          {
+            role: 'user',
+            content: `PROMPT ATUAL:\n---\n${currentPrompt}\n---\n\nINSTRUCAO: ${instruction}\n\nResponda APENAS com o prompt ajustado.`,
+          },
+        ],
+      });
+
+      const promptBlock = promptResponse.content.find((b) => b.type === 'text');
+      refinedPrompt = promptBlock?.text?.trim() || null;
+
+      if (refinedPrompt) {
+        await supabase
+          .from('generated_contents')
+          .update({ image_prompt: refinedPrompt })
+          .eq('id', contentId);
+      }
+    }
+
+    // Log cost
+    const { logApiCost } = await import('@/lib/ai/client');
+    const inputTokens = response.usage?.input_tokens ?? 500;
+    const outputTokens = response.usage?.output_tokens ?? 300;
+    const cost = (inputTokens / 1_000_000) * 3.0 + (outputTokens / 1_000_000) * 15.0;
+    logApiCost('anthropic', 'claude-sonnet-4', cost, { input_tokens: inputTokens, output_tokens: outputTokens });
+
+    log.info(`[Refine] Content ${contentId} refined: "${instruction.slice(0, 50)}..."`);
+    revalidatePath(PATH);
+
+    return { text: refinedText, imagePrompt: refinedPrompt };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Erro desconhecido';
+    log.error('[Refine] Error: ' + message);
+    return { error: `Falha ao ajustar: ${message}` };
+  }
+}
+
+/**
  * Remove the image from a content (set image_url to null).
  * Also removes the file(s) from Supabase Storage if possible.
  */
