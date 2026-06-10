@@ -352,28 +352,45 @@ export async function submitUniversalInput(
     }
   }
 
-  // 4. Skip insights mode — just save raw content, no AI processing
+  // 4. Skip insights mode — save directly to knowledge base as playbook
   if (skipInsights) {
     const originTag = origin === "outros" ? "origem:outros" : "origem:pedro";
+    const playbookTitle = isUrl
+      ? `Feed: ${new URL(input.trim()).hostname}`
+      : input.slice(0, 80) + (input.length > 80 ? "..." : "");
+
+    // Update capture as stored
     await supabase
       .from("captures")
       .update({
-        title: isUrl ? `Feed: ${new URL(input.trim()).hostname}` : input.slice(0, 80),
+        title: playbookTitle,
         context: `${originTag} | Alimentado sem insights`,
         status: "stored",
       })
       .eq("id", capture.id);
 
+    // Save directly as playbook in knowledge base
+    await supabase.from("playbooks").insert({
+      title: playbookTitle,
+      body_markdown: input.replace(/\0/g, "").slice(0, 60000),
+      completeness_score: 0.2,
+      has_example: false,
+      has_story: false,
+      has_origin: false,
+      has_counterexample: false,
+    });
+
     await supabase.from("activity_log").insert({
       actor: "ia",
-      action: "Input salvo na base (sem insights)",
-      entity_type: "capture",
+      action: "Input salvo na base de conhecimento (sem insights)",
+      entity_type: "playbook",
       entity_id: capture.id,
-      entity_title: input.slice(0, 60),
+      entity_title: playbookTitle,
     });
 
     revalidatePath("/base-de-conhecimento");
-    log.info(`[Universal] Stored without insights: ${capture.id}`);
+    revalidatePath("/");
+    log.info(`[Universal] Stored as playbook without insights: ${capture.id}`);
     return {
       captureId: capture.id,
       status: "stored" as const,

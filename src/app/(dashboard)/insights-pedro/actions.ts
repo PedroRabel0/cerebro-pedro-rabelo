@@ -15,6 +15,7 @@ export async function getCaptures() {
   const { data, error } = await supabase
     .from("captures")
     .select("*")
+    .neq("status", "stored")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data;
