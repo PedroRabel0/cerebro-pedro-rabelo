@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import type { Playbook, Theme } from "@/lib/supabase/types";
-import { createPlaybook, updatePlaybook, deletePlaybook, togglePlaybookOrigin } from "./actions";
+import { createPlaybook, updatePlaybook, deletePlaybook, togglePlaybookOrigin, answerGapQuestion } from "./actions";
 import BookQuestionsPanel from "./BookQuestionsPanel";
 import DiffView from "./DiffView";
 import { useUserRole } from "@/lib/hooks/useUserRole";
-import { BookOpen } from "lucide-react";
+import { BookOpen, MessageCircle, Send, ChevronDown, ChevronUp, Loader2, ArrowUpRight, Link2 } from "lucide-react";
 
 function CompletenessBar({ score }: { score: number }) {
   const color =
@@ -20,6 +20,114 @@ function CompletenessBar({ score }: { score: number }) {
         />
       </div>
       <span className="font-mono text-[10px] text-text-muted">{score}%</span>
+    </div>
+  );
+}
+
+function GapQuestionsPanel({ playbookId, perguntas }: { playbookId: string; perguntas: import("@/lib/supabase/types").PerguntaAberta[] }) {
+  const [answeringIdx, setAnsweringIdx] = useState<number | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  const openQuestions = perguntas
+    .map((q, originalIdx) => ({ ...q, originalIdx }))
+    .filter(q => q.status === "aberta");
+
+  const visibleQuestions = showAll ? openQuestions : openQuestions.slice(0, 3);
+
+  async function handleSubmit(originalIdx: number) {
+    if (!answer.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      const result = await answerGapQuestion(playbookId, originalIdx, answer.trim());
+      if (result.success) {
+        setAnsweringIdx(null);
+        setAnswer("");
+      }
+    } catch (err) {
+      console.error("Failed to answer:", err);
+    }
+    setSubmitting(false);
+  }
+
+  if (openQuestions.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-amber/20 bg-amber/5 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[10px] font-bold uppercase text-amber">
+          Lacunas ({openQuestions.length})
+        </span>
+        <span className="text-[10px] text-text-muted">Responda para enriquecer o playbook</span>
+      </div>
+      {visibleQuestions.map((q) => (
+        <div key={q.originalIdx} className="rounded-lg bg-white/5 p-2 space-y-1.5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] text-text-secondary leading-relaxed">{q.pergunta}</p>
+              <p className="text-[10px] text-text-muted mt-0.5">
+                Campo: <span className="text-amber/80 font-medium">{q.campo_alvo}</span>
+                {q.trecho_gatilho && (
+                  <span className="ml-2 italic text-text-muted/60">&ldquo;{q.trecho_gatilho.slice(0, 60)}...&rdquo;</span>
+                )}
+              </p>
+            </div>
+            {answeringIdx !== q.originalIdx && (
+              <button
+                onClick={() => { setAnsweringIdx(q.originalIdx); setAnswer(""); }}
+                className="shrink-0 flex items-center gap-1 rounded-lg bg-amber/15 px-2 py-1 font-mono text-[10px] font-bold text-amber transition hover:bg-amber/25"
+              >
+                <MessageCircle className="h-3 w-3" />
+                Responder
+              </button>
+            )}
+          </div>
+          {answeringIdx === q.originalIdx && (
+            <div className="flex gap-2 mt-1">
+              <input
+                type="text"
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(q.originalIdx); }}
+                placeholder="Sua resposta..."
+                autoFocus
+                disabled={submitting}
+                className="flex-1 rounded-lg border border-amber/30 bg-card px-3 py-1.5 text-xs text-text placeholder:text-text-muted focus:border-amber focus:outline-none disabled:opacity-50"
+              />
+              <button
+                onClick={() => handleSubmit(q.originalIdx)}
+                disabled={!answer.trim() || submitting}
+                className="flex items-center gap-1 rounded-lg bg-amber px-3 py-1.5 font-mono text-[10px] font-bold text-white transition hover:bg-amber/80 disabled:opacity-50"
+              >
+                {submitting ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Send className="h-3 w-3" />
+                )}
+              </button>
+              <button
+                onClick={() => setAnsweringIdx(null)}
+                className="rounded-lg border border-border px-2 py-1.5 text-[10px] text-text-muted hover:text-text"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+      {openQuestions.length > 3 && (
+        <button
+          onClick={() => setShowAll(!showAll)}
+          className="flex items-center gap-1 text-[10px] text-amber hover:text-amber/80 transition"
+        >
+          {showAll ? (
+            <><ChevronUp className="h-3 w-3" /> Mostrar menos</>
+          ) : (
+            <><ChevronDown className="h-3 w-3" /> +{openQuestions.length - 3} mais</>
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -436,38 +544,48 @@ export default function PlaybookList({
                           </details>
                         )}
 
-                        {/* Relações */}
+                        {/* Relações — clicáveis */}
                         {p.relacoes && ((p.relacoes.faz_parte_de?.length || 0) > 0 || (p.relacoes.relacionado_a?.length || 0) > 0) && (
-                          <div className="flex flex-wrap gap-1.5 items-center">
-                            {(p.relacoes.faz_parte_de?.length || 0) > 0 && (
-                              <span className="rounded-full bg-purple/10 text-purple border border-purple/20 px-2 py-0.5 font-mono text-[10px]">
-                                Parte de {p.relacoes.faz_parte_de!.length} playbook{p.relacoes.faz_parte_de!.length > 1 ? "s" : ""}
-                              </span>
-                            )}
-                            {(p.relacoes.relacionado_a?.length || 0) > 0 && (
-                              <span className="rounded-full bg-accent/10 text-accent border border-accent/20 px-2 py-0.5 font-mono text-[10px]">
-                                {p.relacoes.relacionado_a!.length} relacionado{p.relacoes.relacionado_a!.length > 1 ? "s" : ""}
-                              </span>
-                            )}
+                          <div className="rounded-lg bg-surface p-3 space-y-2">
+                            <span className="font-mono text-[10px] font-bold uppercase text-text-muted flex items-center gap-1">
+                              <Link2 className="h-3 w-3" /> Relações
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {p.relacoes.faz_parte_de?.map((relId) => {
+                                const related = playbooks.find((pb) => pb.id === relId);
+                                return (
+                                  <button
+                                    key={relId}
+                                    onClick={() => setExpandedId(relId)}
+                                    className="inline-flex items-center gap-1 rounded-full bg-purple/10 text-purple border border-purple/20 px-2 py-0.5 font-mono text-[10px] transition hover:bg-purple/20 hover:border-purple/40 cursor-pointer"
+                                    title={related ? `Parte de: ${related.title}` : relId}
+                                  >
+                                    <ArrowUpRight className="h-2.5 w-2.5" />
+                                    {related ? related.title.slice(0, 35) + (related.title.length > 35 ? "..." : "") : "Playbook"}
+                                  </button>
+                                );
+                              })}
+                              {p.relacoes.relacionado_a?.map((relId) => {
+                                const related = playbooks.find((pb) => pb.id === relId);
+                                return (
+                                  <button
+                                    key={relId}
+                                    onClick={() => setExpandedId(relId)}
+                                    className="inline-flex items-center gap-1 rounded-full bg-accent/10 text-accent border border-accent/20 px-2 py-0.5 font-mono text-[10px] transition hover:bg-accent/20 hover:border-accent/40 cursor-pointer"
+                                    title={related ? `Relacionado: ${related.title}` : relId}
+                                  >
+                                    <ArrowUpRight className="h-2.5 w-2.5" />
+                                    {related ? related.title.slice(0, 35) + (related.title.length > 35 ? "..." : "") : "Playbook"}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
 
-                        {/* Perguntas abertas */}
+                        {/* Perguntas abertas — interativas */}
                         {p.perguntas_abertas && p.perguntas_abertas.filter(q => q.status === "aberta").length > 0 && (
-                          <div className="rounded-lg border border-amber/20 bg-amber/5 p-3 space-y-1.5">
-                            <span className="font-mono text-[10px] font-bold uppercase text-amber">
-                              Lacunas ({p.perguntas_abertas.filter(q => q.status === "aberta").length})
-                            </span>
-                            {p.perguntas_abertas.filter(q => q.status === "aberta").slice(0, 3).map((q, i) => (
-                              <div key={i} className="text-[11px]">
-                                <p className="text-text-secondary">{q.pergunta}</p>
-                                <p className="text-[10px] text-text-muted mt-0.5">Campo: {q.campo_alvo}</p>
-                              </div>
-                            ))}
-                            {p.perguntas_abertas.filter(q => q.status === "aberta").length > 3 && (
-                              <p className="text-[10px] text-amber">+{p.perguntas_abertas.filter(q => q.status === "aberta").length - 3} mais</p>
-                            )}
-                          </div>
+                          <GapQuestionsPanel playbookId={p.id} perguntas={p.perguntas_abertas} />
                         )}
                       </div>
                     ) : (

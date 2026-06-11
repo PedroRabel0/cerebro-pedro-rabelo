@@ -1,24 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import type { Playbook, Story, Theme } from "@/lib/supabase/types";
+import type { Playbook, Story, HistoriaPessoal, Theme } from "@/lib/supabase/types";
 import PlaybookList from "./PlaybookList";
 import StoryList from "./StoryList";
+import HistoriaPessoalList from "./HistoriaPessoalList";
 import ThemeManager from "./ThemeManager";
 import UniversalInput from "@/components/UniversalInput";
 import { migrateAllPlaybooks } from "./actions";
-import { BookOpen, BookMarked, Zap, Users, User, RefreshCw, Loader2 } from "lucide-react";
+import { BookOpen, BookMarked, BookHeart, Zap, Users, User, RefreshCw, Loader2 } from "lucide-react";
 
 type MainTab = "pedro" | "outros" | "alimentar";
-type SubTab = "playbooks" | "historias";
+type SubTab = "playbooks" | "historias" | "historias_pessoais";
 
 export default function Tabs({
   playbooks,
   stories,
+  historiasPessoais,
   themes,
 }: {
   playbooks: Playbook[];
   stories: Story[];
+  historiasPessoais: HistoriaPessoal[];
   themes: Theme[];
 }) {
   const [mainTab, setMainTab] = useState<MainTab>("pedro");
@@ -157,6 +160,20 @@ export default function Tabs({
                   ({activeStories.length})
                 </span>
               </button>
+              <button
+                onClick={() => setSubTab("historias_pessoais")}
+                className={`flex items-center gap-1.5 rounded-xl px-4 py-2 font-mono text-xs transition-all ${
+                  subTab === "historias_pessoais"
+                    ? "bg-card text-accent shadow-sm"
+                    : "text-text-muted hover:text-text"
+                }`}
+              >
+                <BookHeart className="h-3.5 w-3.5" />
+                Hist. Pessoais
+                <span className="text-[9px] text-text-muted">
+                  ({historiasPessoais.length})
+                </span>
+              </button>
             </div>
 
             {/* Origin badge */}
@@ -223,6 +240,8 @@ export default function Tabs({
 
             {subTab === "playbooks" ? (
               <PlaybookList playbooks={activePlaybooks} themes={themes} />
+            ) : subTab === "historias_pessoais" ? (
+              <HistoriaPessoalList historias={historiasPessoais} />
             ) : (
               <StoryList stories={activeStories} />
             )}

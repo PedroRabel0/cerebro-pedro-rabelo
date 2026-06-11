@@ -8,7 +8,7 @@ import { analyzeCompleteness, generateBookQuestions } from "@/lib/ai";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { updatePlaybookEmbedding } from "@/lib/ai/embeddings";
 import { calculateCompletude, generateGapQuestions } from "@/lib/ai/kb-pipeline";
-import type { PlaybookEstrutura } from "@/lib/supabase/types";
+import type { PlaybookEstrutura, PerguntaAberta } from "@/lib/supabase/types";
 
 // --- Themes ---
 
@@ -114,6 +114,25 @@ export async function togglePlaybookOrigin(id: string, newOrigin: "pedro" | "out
 export async function deletePlaybook(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("playbooks").delete().eq("id", id);
+  if (error) throw error;
+  revalidatePath("/base-de-conhecimento");
+}
+
+// --- Histórias Pessoais (Epiphany Bridge) ---
+
+export async function getHistoriasPessoais() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("historias_pessoais")
+    .select("*, tema:themes(*)")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function deleteHistoriaPessoal(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("historias_pessoais").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/base-de-conhecimento");
 }
@@ -314,6 +333,75 @@ export async function saveQuestionAnswer(
     .eq("id", playbookId)
     .single();
   return updated;
+}
+
+/**
+ * Responde uma pergunta gap-driven e incorpora a resposta no playbook via mergeAnswer (4.5b).
+ */
+export async function answerGapQuestion(
+  playbookId: string,
+  questionIndex: number,
+  answer: string,
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+
+  const { data: playbook, error: fetchError } = await supabase
+    .from("playbooks")
+    .select("*")
+    .eq("id", playbookId)
+    .single();
+
+  if (fetchError || !playbook) return { success: false, error: "Playbook não encontrado" };
+
+  const estrutura = playbook.estrutura as PlaybookEstrutura | null;
+  const perguntas = (playbook.perguntas_abertas || []) as PerguntaAberta[];
+  const pergunta = perguntas[questionIndex];
+
+  if (!estrutura || !pergunta) return { success: false, error: "Pergunta não encontrada" };
+
+  try {
+    // Chama mergeAnswer (4.5b) — Haiku incorpora resposta no campo certo
+    const { mergeAnswer: mergeAnswerFn } = await import("@/lib/ai/kb-pipeline");
+    const result = await mergeAnswerFn(
+      { titulo: playbook.title, estrutura },
+      pergunta,
+      answer,
+    );
+
+    if ("error" in result) {
+      return { success: false, error: result.error };
+    }
+
+    // Atualiza o campo no playbook
+    const updatedEstrutura = { ...estrutura };
+    if (result.campo_atualizado && result.novo_valor) {
+      (updatedEstrutura as Record<string, unknown>)[result.campo_atualizado] = result.novo_valor;
+    }
+
+    // Marca pergunta como respondida
+    const updatedPerguntas = perguntas.map((p, i) =>
+      i === questionIndex ? { ...p, status: "respondida" as const } : p
+    );
+
+    // Atualiza tudo no DB
+    const { error: updateError } = await supabase
+      .from("playbooks")
+      .update({
+        estrutura: updatedEstrutura,
+        perguntas_abertas: updatedPerguntas,
+        completeness_score: result.completude,
+      })
+      .eq("id", playbookId);
+
+    if (updateError) return { success: false, error: updateError.message };
+
+    revalidatePath("/base-de-conhecimento");
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erro desconhecido";
+    log.error(`[GapAnswer] Erro: ${msg}`);
+    return { success: false, error: msg };
+  }
 }
 
 // ============================================================

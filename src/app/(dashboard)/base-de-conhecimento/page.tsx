@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { getPlaybooks, getStories, getThemes } from "./actions";
+import { getPlaybooks, getStories, getHistoriasPessoais, getThemes } from "./actions";
 import { getDashboardStats, getActivityFeed } from "../actions";
 import Tabs from "./Tabs";
 import ActivityAccordion from "@/components/ActivityAccordion";
@@ -15,9 +15,10 @@ import {
 } from "lucide-react";
 
 export default async function BaseDeConhecimentoPage() {
-  const [playbooks, stories, themes, stats, activityFeed] = await Promise.all([
+  const [playbooks, stories, historiasPessoais, themes, stats, activityFeed] = await Promise.all([
     getPlaybooks(),
     getStories(),
+    getHistoriasPessoais(),
     getThemes(),
     getDashboardStats(),
     getActivityFeed(),
@@ -110,7 +111,7 @@ export default async function BaseDeConhecimentoPage() {
       </div>
 
       {/* Knowledge Base Tabs */}
-      <Tabs playbooks={playbooks} stories={stories} themes={themes} />
+      <Tabs playbooks={playbooks} stories={stories} historiasPessoais={historiasPessoais} themes={themes} />
 
       {/* Activity Feed */}
       <ActivityAccordion entries={activityFeed} />
