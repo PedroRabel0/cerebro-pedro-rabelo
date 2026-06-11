@@ -423,18 +423,22 @@ export async function submitUniversalInput(
           status: "processed",
           speaker_verified: legacyResult.speaker_verified,
         }).eq("id", capture.id),
-        legacyResult.proposals.length > 0
-          ? supabase.from("proposals").insert(
-              legacyResult.proposals.map((p) => ({
-                capture_id: capture.id,
-                type: p.type as "playbook" | "story" | "question",
-                title: p.title,
-                content_markdown: p.content_markdown,
-                suggested_tags: [originTag, ...(p.suggested_tags || [])],
-                status: "pending",
-              }))
-            )
-          : Promise.resolve(),
+        // Filtra "question" — alimentar é só conhecimento (playbooks + stories)
+        (() => {
+          const knowledgeOnly = legacyResult.proposals.filter((p) => p.type !== "question");
+          return knowledgeOnly.length > 0
+            ? supabase.from("proposals").insert(
+                knowledgeOnly.map((p) => ({
+                  capture_id: capture.id,
+                  type: p.type as "playbook" | "story",
+                  title: p.title,
+                  content_markdown: p.content_markdown,
+                  suggested_tags: [originTag, ...(p.suggested_tags || [])],
+                  status: "pending",
+                }))
+              )
+            : Promise.resolve();
+        })(),
       ]);
       revalidatePath("/");
       revalidatePath("/insights-pedro");

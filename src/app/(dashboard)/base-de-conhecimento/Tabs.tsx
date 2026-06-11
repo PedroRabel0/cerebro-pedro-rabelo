@@ -116,7 +116,7 @@ export default function Tabs({
       {mainTab === "alimentar" && (
         <div>
           <p className="mb-4 text-sm text-text-secondary">
-            Cole transcrições, links do YouTube, posts do Instagram, ou envie arquivos do seu computador. A IA vai processar e gerar propostas para a base.
+            Cole transcrições, links do YouTube, posts do Instagram, ou envie arquivos. A IA vai extrair <strong className="text-text">conhecimento</strong> (playbooks e histórias) para a base — sem gerar conteúdo para postar. Para criar posts, use a página <a href="/gerar-conteudo" className="text-accent hover:underline">Geração de Conteúdo</a>.
           </p>
           <UniversalInput />
         </div>

@@ -35,7 +35,7 @@ export default async function GerarConteudoPage() {
               Geração de Conteúdo
             </h1>
             <p className="mt-0.5 text-sm text-text-secondary">
-              Crie, reaproveite e organize conteúdo com IA.
+              Crie conteúdo para postar, puxando da base de conhecimento acumulada.
             </p>
           </div>
         </div>

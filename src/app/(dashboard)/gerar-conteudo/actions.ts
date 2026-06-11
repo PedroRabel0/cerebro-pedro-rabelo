@@ -7,9 +7,126 @@ import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
 import { generateImagePrompt } from "@/lib/ai/gemini";
 import { generateImage } from "@/lib/ai/image-gen";
+import { findSimilarPlaybooks } from "@/lib/ai/embeddings";
 import type { ContentType } from "@/lib/supabase/types";
 
 const PATH = "/gerar-conteudo";
+
+// --- Semantic Search for Content Generation ---
+
+interface RelevantKnowledge {
+  playbooks: { id: string; title: string; body_markdown: string | null }[];
+  stories: { id: string; title: string; summary: string | null; body_markdown: string | null }[];
+}
+
+/**
+ * Busca semântica: encontra os playbooks e stories mais relevantes para um tópico,
+ * usando embeddings (pgvector) em vez de keyword matching.
+ * Fallback: se embedding falhar, usa keyword matching como antes.
+ */
+async function findRelevantKnowledge(
+  topic: string,
+  opts?: { maxPlaybooks?: number; maxStories?: number; playbookId?: string; storyId?: string }
+): Promise<RelevantKnowledge> {
+  const supabase = await createClient();
+  const maxPb = opts?.maxPlaybooks ?? 5;
+  const maxSt = opts?.maxStories ?? 3;
+
+  // Se um playbook/story específico foi selecionado, inclua-o + busque complementos
+  let selectedPlaybook: { id: string; title: string; body_markdown: string | null } | null = null;
+  let selectedStory: { id: string; title: string; summary: string | null; body_markdown: string | null } | null = null;
+
+  if (opts?.playbookId) {
+    const { data } = await supabase.from("playbooks").select("id, title, body_markdown").eq("id", opts.playbookId).single();
+    if (data) selectedPlaybook = data;
+  }
+  if (opts?.storyId) {
+    const { data } = await supabase.from("stories").select("id, title, summary, body_markdown").eq("id", opts.storyId).single();
+    if (data) selectedStory = data;
+  }
+
+  // Busca semântica via embeddings
+  let semanticPlaybookIds: string[] = [];
+  try {
+    const similar = await findSimilarPlaybooks(topic, 0.3, maxPb + 2);
+    semanticPlaybookIds = similar.map((s) => s.id);
+    log.info(`[ContentGen] Busca semântica "${topic.slice(0, 50)}..." → ${similar.length} playbooks relevantes`);
+  } catch (err) {
+    log.error(`[ContentGen] Busca semântica falhou, usando fallback: ${err}`);
+  }
+
+  // Fetch playbooks — semânticos + selecionado
+  const pbIds = new Set<string>(semanticPlaybookIds);
+  if (selectedPlaybook) pbIds.add(selectedPlaybook.id);
+
+  let playbooks: RelevantKnowledge["playbooks"] = [];
+  if (pbIds.size > 0) {
+    const { data } = await supabase
+      .from("playbooks")
+      .select("id, title, body_markdown")
+      .in("id", Array.from(pbIds));
+    playbooks = data ?? [];
+  }
+
+  // Se busca semântica não retornou nada, fallback para keyword + recentes
+  if (playbooks.length === 0) {
+    const topicLower = topic.toLowerCase();
+    const { data: allPb } = await supabase
+      .from("playbooks")
+      .select("id, title, body_markdown")
+      .order("updated_at", { ascending: false })
+      .limit(20);
+
+    const all = allPb ?? [];
+    const matched = all.filter(
+      (p) =>
+        p.title.toLowerCase().includes(topicLower) ||
+        topicLower.split(" ").some((w: string) => w.length > 3 && p.title.toLowerCase().includes(w))
+    );
+    playbooks = matched.length > 0 ? matched.slice(0, maxPb) : all.slice(0, maxPb);
+  }
+
+  // Ordena: selecionado primeiro, depois semânticos na ordem original
+  if (selectedPlaybook) {
+    playbooks = [
+      playbooks.find((p) => p.id === selectedPlaybook!.id) || selectedPlaybook,
+      ...playbooks.filter((p) => p.id !== selectedPlaybook!.id),
+    ].slice(0, maxPb);
+  } else {
+    playbooks = playbooks.slice(0, maxPb);
+  }
+
+  // Stories — busca por keyword (stories não têm embedding por ora)
+  const topicLower = topic.toLowerCase();
+  const { data: allStories } = await supabase
+    .from("stories")
+    .select("id, title, summary, body_markdown")
+    .order("updated_at", { ascending: false })
+    .limit(20);
+
+  let stories: RelevantKnowledge["stories"] = [];
+  if (selectedStory) {
+    stories.push(selectedStory);
+  }
+
+  const stAll = allStories ?? [];
+  const stMatched = stAll.filter(
+    (s) =>
+      s.id !== selectedStory?.id &&
+      (s.title.toLowerCase().includes(topicLower) ||
+        (s.summary && s.summary.toLowerCase().includes(topicLower)) ||
+        topicLower.split(" ").some((w: string) => w.length > 3 && s.title.toLowerCase().includes(w)))
+  );
+
+  const remaining = maxSt - stories.length;
+  if (stMatched.length > 0) {
+    stories.push(...stMatched.slice(0, remaining));
+  } else if (stories.length < maxSt) {
+    stories.push(...stAll.filter((s) => s.id !== selectedStory?.id).slice(0, remaining));
+  }
+
+  return { playbooks, stories };
+}
 
 // --- Content Formats ---
 
@@ -176,20 +293,11 @@ export async function createQuickContent(
   }
 
   try {
-    // Fetch identity, all playbooks, all stories in parallel
-    const [identityRes, playbooksRes, storiesRes, feedbackRes, rulesRes] =
+    // Busca semântica: encontra playbooks/stories mais relevantes da base toda
+    const [knowledge, identityRes, feedbackRes, rulesRes] =
       await Promise.all([
+        findRelevantKnowledge(topic, { maxPlaybooks: 5, maxStories: 3 }),
         supabase.from("identity").select("*").limit(1).single(),
-        supabase
-          .from("playbooks")
-          .select("id, title, body_markdown")
-          .order("updated_at", { ascending: false })
-          .limit(20),
-        supabase
-          .from("stories")
-          .select("id, title, summary, body_markdown")
-          .order("updated_at", { ascending: false })
-          .limit(20),
         supabase
           .from("generated_contents")
           .select("feedback_text, feedback_rating")
@@ -203,60 +311,26 @@ export async function createQuickContent(
           .order("category"),
       ]);
 
-    // Pick top 3 playbooks relevant to the topic (simple keyword match, fallback to first 3)
-    const allPlaybooks = playbooksRes.data ?? [];
-    const topicLower = topic.toLowerCase();
-    const relevantPlaybooks = allPlaybooks
-      .filter(
-        (p) =>
-          p.title.toLowerCase().includes(topicLower) ||
-          topicLower.split(" ").some((w: string) => w.length > 3 && p.title.toLowerCase().includes(w))
-      )
-      .slice(0, 3);
-    const selectedPlaybooks =
-      relevantPlaybooks.length > 0
-        ? relevantPlaybooks
-        : allPlaybooks.slice(0, 3);
-
-    // Pick top 2 stories relevant to the topic
-    const allStories = storiesRes.data ?? [];
-    const relevantStories = allStories
-      .filter(
-        (s) =>
-          s.title.toLowerCase().includes(topicLower) ||
-          (s.summary && s.summary.toLowerCase().includes(topicLower)) ||
-          topicLower.split(" ").some((w) => w.length > 3 && s.title.toLowerCase().includes(w))
-      )
-      .slice(0, 2);
-    const selectedStories =
-      relevantStories.length > 0
-        ? relevantStories
-        : allStories.slice(0, 2);
-
-    // Build playbook context
-    const playbookContext = selectedPlaybooks
-      .map(
-        (p) =>
-          `### ${p.title}\n${(p.body_markdown || "").slice(0, 1500)}`
-      )
+    // Build context from semantic search results
+    const playbookContext = knowledge.playbooks
+      .map((p) => `### ${p.title}\n${(p.body_markdown || "").slice(0, 1500)}`)
       .join("\n\n");
 
-    // Build story context
-    const storyContext = selectedStories
-      .map(
-        (s) =>
-          `### ${s.title}\n${s.summary || ""}\n${(s.body_markdown || "").slice(0, 1000)}`
-      )
+    const storyContext = knowledge.stories
+      .map((s) => `### ${s.title}\n${s.summary || ""}\n${(s.body_markdown || "").slice(0, 1000)}`)
       .join("\n\n");
 
-    // Use the existing generateContent function with constructed inputs
+    const primaryPb = knowledge.playbooks[0];
+    const primarySt = knowledge.stories[0];
+
+    // Use the existing generateContent function with semantic search results
     const result = await generateContent({
       identity: identityRes.data,
-      playbook: selectedPlaybooks[0]
+      playbook: primaryPb
         ? {
-            id: selectedPlaybooks[0].id,
-            title: selectedPlaybooks[0].title,
-            body_markdown: selectedPlaybooks[0].body_markdown,
+            id: primaryPb.id,
+            title: primaryPb.title,
+            body_markdown: primaryPb.body_markdown,
             subtitle: null,
             completeness_score: 0,
             has_example: false,
@@ -271,12 +345,12 @@ export async function createQuickContent(
             theme_id: null,
           }
         : undefined,
-      story: selectedStories[0]
+      story: primarySt
         ? {
-            id: selectedStories[0].id,
-            title: selectedStories[0].title,
-            summary: selectedStories[0].summary,
-            body_markdown: selectedStories[0].body_markdown,
+            id: primarySt.id,
+            title: primarySt.title,
+            summary: primarySt.summary,
+            body_markdown: primarySt.body_markdown,
             period: null,
             tags: [],
             lesson: null,
@@ -293,7 +367,7 @@ export async function createQuickContent(
 
 TOPICO SOLICITADO: ${topic}
 
-CONTEXTO ADICIONAL DA BASE DE CONHECIMENTO:
+CONTEXTO DA BASE DE CONHECIMENTO (${knowledge.playbooks.length} playbooks + ${knowledge.stories.length} histórias encontrados por busca semântica):
 
 ## Playbooks Relevantes:
 ${playbookContext || "Nenhum playbook encontrado."}
@@ -301,7 +375,7 @@ ${playbookContext || "Nenhum playbook encontrado."}
 ## Historias Relevantes:
 ${storyContext || "Nenhuma historia encontrada."}
 
-INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR sobre o topico acima. Use as informacoes dos playbooks e historias como base. O conteudo deve ser direto, pratico e refletir o tom e voz da identidade fornecida.`,
+INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR sobre o topico acima. Use as informacoes dos playbooks e historias como base — eles sao o conhecimento acumulado do Pedro. O conteudo deve ser direto, pratico e refletir o tom e voz da identidade fornecida. Cruze insights de multiplos playbooks quando fizer sentido.`,
       recentFeedbacks: feedbackRes.data ?? [],
     });
 
@@ -314,8 +388,8 @@ INSTRUCAO: Gere um conteudo PRONTO PARA POSTAR sobre o topico acima. Use as info
       .from("generated_contents")
       .insert({
         source_type: "free_text" as const,
-        playbook_id: selectedPlaybooks[0]?.id || null,
-        story_id: selectedStories[0]?.id || null,
+        playbook_id: primaryPb?.id || null,
+        story_id: primarySt?.id || null,
         free_text_input: topic,
         content_type: contentType,
         format_id: null,
@@ -457,23 +531,32 @@ export async function createWizardContent(
   }
 
   try {
-    // Fetch identity, playbook, stories in parallel
     const playbookId = payload.playbookId || null;
     const storyId = payload.storyId || payload.pullStoryId || null;
 
-    const [identityRes, playbooksRes, storiesRes, feedbackRes, playbookRes, storyRes, wizardRulesRes] =
+    // Primeiro, carrega playbook/story selecionados (se houver) para montar o tópico
+    const [playbookRes, storyRes] = await Promise.all([
+      playbookId
+        ? supabase.from("playbooks").select("*").eq("id", playbookId).single()
+        : Promise.resolve({ data: null }),
+      storyId
+        ? supabase.from("stories").select("*").eq("id", storyId).single()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    // Tópico: texto livre OU título do playbook selecionado
+    const topicText = payload.freeTopic || playbookRes.data?.title || "conteudo";
+
+    // Busca semântica + identity + feedback + rules em paralelo
+    const [knowledge, identityRes, feedbackRes, wizardRulesRes] =
       await Promise.all([
+        findRelevantKnowledge(topicText, {
+          maxPlaybooks: 6,
+          maxStories: payload.pullStory === "no" ? 0 : 3,
+          playbookId: playbookId || undefined,
+          storyId: storyId || undefined,
+        }),
         supabase.from("identity").select("*").limit(1).single(),
-        supabase
-          .from("playbooks")
-          .select("id, title, body_markdown")
-          .order("updated_at", { ascending: false })
-          .limit(20),
-        supabase
-          .from("stories")
-          .select("id, title, summary, body_markdown")
-          .order("updated_at", { ascending: false })
-          .limit(20),
         supabase
           .from("generated_contents")
           .select("feedback_text, feedback_rating")
@@ -481,12 +564,6 @@ export async function createWizardContent(
           .eq("feedback_rating", "bad")
           .order("created_at", { ascending: false })
           .limit(5),
-        playbookId
-          ? supabase.from("playbooks").select("*").eq("id", playbookId).single()
-          : Promise.resolve({ data: null }),
-        storyId
-          ? supabase.from("stories").select("*").eq("id", storyId).single()
-          : Promise.resolve({ data: null }),
         supabase
           .from("decision_rules")
           .select("rule_text, context, category")
@@ -533,60 +610,13 @@ export async function createWizardContent(
       }
     }
 
-    // Build context from knowledge base
-    const allPlaybooks = playbooksRes.data ?? [];
-    const allStories = storiesRes.data ?? [];
-
-    const topicText = payload.freeTopic || playbookRes.data?.title || "conteudo";
-    const topicLower = topicText.toLowerCase();
-
-    // Pick relevant playbooks
-    const relevantPlaybooks = playbookId
-      ? allPlaybooks.filter((p) => p.id === playbookId)
-      : allPlaybooks
-          .filter(
-            (p) =>
-              p.title.toLowerCase().includes(topicLower) ||
-              topicLower
-                .split(" ")
-                .some((w: string) => w.length > 3 && p.title.toLowerCase().includes(w))
-          )
-          .slice(0, 3);
-    const selectedPlaybooks =
-      relevantPlaybooks.length > 0
-        ? relevantPlaybooks
-        : allPlaybooks.slice(0, 3);
-
-    // Pick relevant stories
-    let selectedStories: typeof allStories = [];
-    if (storyId) {
-      selectedStories = allStories.filter((s) => s.id === storyId);
-    } else if (payload.pullStory === "no") {
-      selectedStories = [];
-    } else {
-      const relevant = allStories
-        .filter(
-          (s) =>
-            s.title.toLowerCase().includes(topicLower) ||
-            (s.summary && s.summary.toLowerCase().includes(topicLower)) ||
-            topicLower
-              .split(" ")
-              .some((w: string) => w.length > 3 && s.title.toLowerCase().includes(w))
-        )
-        .slice(0, 2);
-      selectedStories = relevant.length > 0 ? relevant : allStories.slice(0, 2);
-    }
-
-    // Build context strings
-    const playbookContext = selectedPlaybooks
+    // Build context strings from semantic search results
+    const playbookContext = knowledge.playbooks
       .map((p) => `### ${p.title}\n${(p.body_markdown || "").slice(0, 1500)}`)
       .join("\n\n");
 
-    const storyContext = selectedStories
-      .map(
-        (s) =>
-          `### ${s.title}\n${s.summary || ""}\n${(s.body_markdown || "").slice(0, 1000)}`
-      )
+    const storyContext = knowledge.stories
+      .map((s) => `### ${s.title}\n${s.summary || ""}\n${(s.body_markdown || "").slice(0, 1000)}`)
       .join("\n\n");
 
     // Generate content for each selected type
@@ -856,7 +886,7 @@ ${typeInstructions}
 
 ---
 
-BASE DE CONHECIMENTO DO PEDRO (use como fonte de verdade):
+BASE DE CONHECIMENTO DO PEDRO (${knowledge.playbooks.length} playbooks + ${knowledge.stories.length} histórias encontrados por busca semântica — use como fonte de verdade):
 
 ## Playbooks Relevantes:
 ${playbookContext || "Nenhum playbook encontrado."}
@@ -881,13 +911,17 @@ INSTRUCOES FINAIS:
 8. NÃO inclua meta-comentários ("aqui está a legenda", "segue o conteúdo")
 9. PRONTO PRA COPIAR E COLAR — sem placeholders, sem adaptações necessárias`;
 
+      // Seleciona o playbook/story principal (selecionado pelo user ou primeiro semântico)
+      const primaryPb = playbookRes.data || knowledge.playbooks[0];
+      const primarySt = storyRes.data || knowledge.stories[0];
+
       const result = await generateContent({
         identity: identityRes.data,
-        playbook: playbookRes.data
+        playbook: primaryPb
           ? {
-              id: playbookRes.data.id,
-              title: playbookRes.data.title,
-              body_markdown: playbookRes.data.body_markdown,
+              id: primaryPb.id,
+              title: primaryPb.title,
+              body_markdown: primaryPb.body_markdown,
               subtitle: null,
               completeness_score: 0,
               has_example: false,
@@ -901,31 +935,13 @@ INSTRUCOES FINAIS:
               updated_at: "",
               theme_id: null,
             }
-          : selectedPlaybooks[0]
-            ? {
-                id: selectedPlaybooks[0].id,
-                title: selectedPlaybooks[0].title,
-                body_markdown: selectedPlaybooks[0].body_markdown,
-                subtitle: null,
-                completeness_score: 0,
-                has_example: false,
-                has_story: false,
-                has_origin: false,
-                has_counterexample: false,
-                version_current: null,
-                version_previous: null,
-                created_by: null,
-                created_at: "",
-                updated_at: "",
-                theme_id: null,
-              }
-            : undefined,
-        story: storyRes.data
+          : undefined,
+        story: primarySt
           ? {
-              id: storyRes.data.id,
-              title: storyRes.data.title,
-              summary: storyRes.data.summary,
-              body_markdown: storyRes.data.body_markdown,
+              id: primarySt.id,
+              title: primarySt.title,
+              summary: primarySt.summary ?? null,
+              body_markdown: primarySt.body_markdown ?? null,
               period: null,
               tags: [],
               lesson: null,
@@ -935,22 +951,7 @@ INSTRUCOES FINAIS:
               created_at: "",
               updated_at: "",
             }
-          : selectedStories[0]
-            ? {
-                id: selectedStories[0].id,
-                title: selectedStories[0].title,
-                summary: selectedStories[0].summary,
-                body_markdown: selectedStories[0].body_markdown,
-                period: null,
-                tags: [],
-                lesson: null,
-                version_current: null,
-                version_previous: null,
-                created_by: null,
-                created_at: "",
-                updated_at: "",
-              }
-            : undefined,
+          : undefined,
         contentType,
         freeText: freeTextPrompt,
         recentFeedbacks: feedbackRes.data ?? [],
@@ -966,8 +967,8 @@ INSTRUCOES FINAIS:
         .from("generated_contents")
         .insert({
           source_type: payload.source as "base_only" | "references_only" | "both" | "free_text",
-          playbook_id: playbookId || selectedPlaybooks[0]?.id || null,
-          story_id: storyId || selectedStories[0]?.id || null,
+          playbook_id: primaryPb?.id || null,
+          story_id: primarySt?.id || null,
           free_text_input: payload.freeTopic || null,
           content_type: contentType,
           format_id: null,
