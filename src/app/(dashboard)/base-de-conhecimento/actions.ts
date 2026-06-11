@@ -46,7 +46,7 @@ export async function getPlaybooks() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("playbooks")
-    .select("*, theme:themes(*)")
+    .select("*, theme:themes!playbooks_theme_id_fkey(*)")
     .order("updated_at", { ascending: false });
   if (error) throw error;
   return data;
@@ -56,7 +56,7 @@ export async function getPlaybook(id: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("playbooks")
-    .select("*, theme:themes(*)")
+    .select("*, theme:themes!playbooks_theme_id_fkey(*)")
     .eq("id", id)
     .single();
   if (error) throw error;
@@ -243,7 +243,7 @@ export async function analyzePlaybookCompleteness(id: string) {
   const supabase = await createClient();
   const { data: playbook, error } = await supabase
     .from("playbooks")
-    .select("*, theme:themes(*)")
+    .select("*, theme:themes!playbooks_theme_id_fkey(*)")
     .eq("id", id)
     .single();
   if (error) throw error;
@@ -280,7 +280,7 @@ export async function getBookQuestions(playbookId: string) {
   const supabase = await createClient();
   const { data: playbook, error } = await supabase
     .from("playbooks")
-    .select("*, theme:themes(*)")
+    .select("*, theme:themes!playbooks_theme_id_fkey(*)")
     .eq("id", playbookId)
     .single();
   if (error) throw error;
@@ -337,7 +337,7 @@ export async function saveQuestionAnswer(
   // Return updated playbook
   const { data: updated } = await supabase
     .from("playbooks")
-    .select("*, theme:themes(*)")
+    .select("*, theme:themes!playbooks_theme_id_fkey(*)")
     .eq("id", playbookId)
     .single();
   return updated;
