@@ -1123,90 +1123,112 @@ export async function uploadImageToContent(
 
 /**
  * Refine/adjust generated content based on user instruction.
- * Uses Claude to modify the existing text following the user's direction.
- * Can optionally also regenerate the image prompt.
+ * Refines BOTH the caption text AND the image prompt (if one exists).
+ * Uses a single Claude call with structured JSON output for both.
  */
 export async function refineContent(
   contentId: string,
   currentText: string,
   instruction: string,
   contentType: string,
-  alsoRefinePrompt?: boolean,
+  _alsoRefinePrompt?: boolean,
   currentPrompt?: string | null,
 ): Promise<{ text: string; imagePrompt?: string | null } | { error: string }> {
   try {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2000,
-      system: `Voce e um editor de conteudo para redes sociais. O usuario gerou um conteudo e quer fazer ajustes.
+    const hasPrompt = !!currentPrompt;
+
+    const systemPrompt = hasPrompt
+      ? `Voce e um editor de conteudo E de prompts de imagem para redes sociais.
+O usuario gerou um conteudo com legenda + prompt de imagem e quer fazer ajustes.
+
+Voce DEVE ajustar AMBOS: a legenda E o prompt de imagem, seguindo a instrucao do usuario.
+
+Responda em JSON valido com esta estrutura exata:
+{"text": "legenda ajustada aqui", "imagePrompt": "prompt de imagem ajustado aqui em INGLES"}
+
+REGRAS PARA A LEGENDA:
+- Faca EXATAMENTE o que o usuario pedir
+- Mantenha tom/estilo original a menos que peca pra mudar
+- Texto pronto para copiar e colar na rede social
+
+REGRAS PARA O PROMPT DE IMAGEM:
+- O prompt de imagem SEMPRE deve ser em INGLES
+- Se o usuario pedir mudanca no design/visual/diagrama/estrutura, aplique a mudanca no prompt
+- Se o usuario pedir mudanca so no texto/legenda, mantenha o prompt mas ajuste detalhes de texto dentro do prompt pra ficar coerente
+- Mantenha o estilo visual: fundo preto, vermelho (#E31B23) como cor principal, highlight box vermelho no titulo, tipografia bold, @pedrorabelo no footer
+
+Responda APENAS com o JSON, nada antes ou depois.`
+      : `Voce e um editor de conteudo para redes sociais. O usuario gerou um conteudo e quer fazer ajustes.
+
+Responda em JSON valido: {"text": "legenda ajustada aqui"}
 
 REGRAS:
-- Faca EXATAMENTE o que o usuario pedir, nada mais
-- Mantenha o tom, estilo e estrutura original a menos que ele peca pra mudar
-- Responda APENAS com o texto final editado, sem explicacoes, sem "Aqui esta:", sem markdown
-- O texto deve estar pronto para copiar e colar na rede social
-- Mantenha hashtags se ja existiam, a menos que peca pra remover
-- Mantenha emojis se ja existiam, a menos que peca pra remover
-- Se o usuario pedir algo sobre design, imagem, visual, piramide, diagrama, prompt — ajuste a LEGENDA para refletir o novo conceito visual (o prompt de imagem sera ajustado separadamente)`,
-      messages: [
-        {
-          role: 'user',
-          content: `CONTEUDO ATUAL (${contentType}):\n---\n${currentText}\n---\n\nINSTRUCAO DO USUARIO: ${instruction}\n\nResponda APENAS com o texto ajustado, nada mais.`,
-        },
-      ],
+- Faca EXATAMENTE o que o usuario pedir
+- Mantenha tom/estilo original a menos que peca pra mudar
+- Texto pronto para copiar e colar na rede social
+
+Responda APENAS com o JSON, nada antes ou depois.`;
+
+    const userMessage = hasPrompt
+      ? `LEGENDA ATUAL (${contentType}):\n---\n${currentText}\n---\n\nPROMPT DE IMAGEM ATUAL:\n---\n${currentPrompt}\n---\n\nINSTRUCAO DO USUARIO: ${instruction}`
+      : `CONTEUDO ATUAL (${contentType}):\n---\n${currentText}\n---\n\nINSTRUCAO DO USUARIO: ${instruction}`;
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 3000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
     });
 
     const textBlock = response.content.find((b) => b.type === 'text');
-    const refinedText = textBlock?.text?.trim() || '';
+    const rawResponse = textBlock?.text?.trim() || '';
 
-    if (!refinedText) {
-      return { error: 'Claude nao retornou texto' };
+    if (!rawResponse) {
+      return { error: 'Claude nao retornou resposta' };
+    }
+
+    // Parse JSON response
+    let refinedText = currentText;
+    let refinedPrompt: string | null = null;
+
+    try {
+      // Try to extract JSON from the response (handle markdown code blocks too)
+      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        refinedText = parsed.text || currentText;
+        refinedPrompt = parsed.imagePrompt || null;
+      } else {
+        // Fallback: use raw response as text
+        refinedText = rawResponse;
+      }
+    } catch {
+      // JSON parse failed — use raw response as text
+      refinedText = rawResponse;
     }
 
     // Save to DB
     const supabase = await createClient();
+    const updateData: Record<string, string | null> = { content_text: refinedText };
+    if (refinedPrompt) {
+      updateData.image_prompt = refinedPrompt;
+    }
     await supabase
       .from('generated_contents')
-      .update({ content_text: refinedText })
+      .update(updateData)
       .eq('id', contentId);
-
-    // Also refine image prompt if requested
-    let refinedPrompt: string | null = null;
-    if (alsoRefinePrompt && currentPrompt) {
-      const promptResponse = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1500,
-        system: `Voce e um editor de prompts para geracao de imagens. Ajuste o prompt de imagem conforme a instrucao do usuario. Responda APENAS com o prompt ajustado em ingles, nada mais.`,
-        messages: [
-          {
-            role: 'user',
-            content: `PROMPT ATUAL:\n---\n${currentPrompt}\n---\n\nINSTRUCAO: ${instruction}\n\nResponda APENAS com o prompt ajustado.`,
-          },
-        ],
-      });
-
-      const promptBlock = promptResponse.content.find((b) => b.type === 'text');
-      refinedPrompt = promptBlock?.text?.trim() || null;
-
-      if (refinedPrompt) {
-        await supabase
-          .from('generated_contents')
-          .update({ image_prompt: refinedPrompt })
-          .eq('id', contentId);
-      }
-    }
 
     // Log cost
     const { logApiCost } = await import('@/lib/ai/client');
-    const inputTokens = response.usage?.input_tokens ?? 500;
-    const outputTokens = response.usage?.output_tokens ?? 300;
+    const inputTokens = response.usage?.input_tokens ?? 800;
+    const outputTokens = response.usage?.output_tokens ?? 500;
     const cost = (inputTokens / 1_000_000) * 3.0 + (outputTokens / 1_000_000) * 15.0;
-    logApiCost('anthropic', 'claude-sonnet-4', cost, { input_tokens: inputTokens, output_tokens: outputTokens });
+    logApiCost('anthropic', 'claude-sonnet-4-6', cost, { input_tokens: inputTokens, output_tokens: outputTokens });
 
-    log.info(`[Refine] Content ${contentId} refined: "${instruction.slice(0, 50)}..."`);
+    log.info(`[Refine] Content ${contentId} refined (prompt: ${refinedPrompt ? 'yes' : 'no'}): "${instruction.slice(0, 50)}..."`);
     revalidatePath(PATH);
 
     return { text: refinedText, imagePrompt: refinedPrompt };

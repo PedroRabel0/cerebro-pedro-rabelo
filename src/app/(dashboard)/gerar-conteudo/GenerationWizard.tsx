@@ -1185,18 +1185,21 @@ function ResultCard({
                 setRefining(true);
                 const res = await refineContent(
                   result.id, text, userMsg, result.contentType,
-                  !!result.imagePrompt, result.imagePrompt,
+                  true, result.imagePrompt,
                 );
                 if ("error" in res) {
                   setRefineHistory((prev) => [...prev, { role: "ai", text: `Erro: ${res.error}` }]);
                 } else {
                   setText(res.text);
-                  setRefineHistory((prev) => [...prev, { role: "ai", text: "Pronto, ajustei." }]);
+                  if (res.imagePrompt) {
+                    result.imagePrompt = res.imagePrompt;
+                  }
+                  setRefineHistory((prev) => [...prev, { role: "ai", text: res.imagePrompt ? "Pronto, ajustei texto e prompt de imagem." : "Pronto, ajustei." }]);
                 }
                 setRefining(false);
               }
             }}
-            placeholder="Ex: encurta, muda o tom, tira hashtags..."
+            placeholder="Ex: encurta, muda o tom, tira hashtags, muda o design..."
             disabled={refining}
             className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none disabled:opacity-50"
           />
@@ -1209,13 +1212,16 @@ function ResultCard({
               setRefining(true);
               const res = await refineContent(
                 result.id, text, userMsg, result.contentType,
-                !!result.imagePrompt, result.imagePrompt,
+                true, result.imagePrompt,
               );
               if ("error" in res) {
                 setRefineHistory((prev) => [...prev, { role: "ai", text: `Erro: ${res.error}` }]);
               } else {
                 setText(res.text);
-                setRefineHistory((prev) => [...prev, { role: "ai", text: "Pronto, ajustei." }]);
+                if (res.imagePrompt) {
+                  result.imagePrompt = res.imagePrompt;
+                }
+                setRefineHistory((prev) => [...prev, { role: "ai", text: res.imagePrompt ? "Pronto, ajustei texto e prompt de imagem." : "Pronto, ajustei." }]);
               }
               setRefining(false);
             }}

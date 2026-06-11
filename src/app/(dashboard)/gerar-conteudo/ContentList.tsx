@@ -433,14 +433,14 @@ function RefineChat({
       currentText,
       userMsg,
       contentType,
-      !!currentPrompt,
+      true,
       currentPrompt,
     );
 
     if ("error" in res) {
       setHistory((prev) => [...prev, { role: "ai", text: `Erro: ${res.error}` }]);
     } else {
-      setHistory((prev) => [...prev, { role: "ai", text: "Pronto, ajustei o conteudo." }]);
+      setHistory((prev) => [...prev, { role: "ai", text: res.imagePrompt ? "Pronto, ajustei texto e prompt de imagem." : "Pronto, ajustei o conteudo." }]);
       onRefined(res.text, res.imagePrompt);
     }
     setRefining(false);

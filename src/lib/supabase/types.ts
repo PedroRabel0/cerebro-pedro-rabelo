@@ -22,16 +22,83 @@ export interface Theme {
   name: string;
   description: string | null;
   color: string | null;
+  parent_id?: string | null; // null = tema raiz; preenchido = subtema. Máx 2 níveis
+  ordem?: number;
   created_at: string;
   updated_at: string;
+  subtemas?: Theme[]; // populated by joins
 }
+
+// --- Playbook: estrutura decontextualizada ---
+
+export interface PlaybookPasso {
+  titulo: string;
+  como_executar: string[];
+}
+
+export interface PlaybookExemplo {
+  texto: string;
+  tipo: "vivido_por_voce" | "caso_de_terceiro";
+  proveniencia: "pedro" | "outros";
+}
+
+export interface PlaybookEstrutura {
+  quando_aplica?: string;
+  erro_comum?: string;
+  principio?: string;
+  passos?: PlaybookPasso[];
+  por_que_importa?: string;
+  exemplos?: PlaybookExemplo[];
+}
+
+export interface TrechoFonte {
+  citacao_verbatim: string;
+  timestamp?: string;
+}
+
+export type ProvenanciaFonteTipo = "granola" | "youtube" | "texto";
+export type ProvenanciaLevel = "dito_por_voce" | "sintetizado" | "fonte_externa";
+export type ProvenanciaAutor = "pedro" | "outros";
+
+export interface PlaybookProveniencia {
+  fonte_input_id?: string | null;
+  fonte_tipo?: ProvenanciaFonteTipo;
+  trechos_fonte?: TrechoFonte[];
+  nivel?: ProvenanciaLevel;
+  autor?: ProvenanciaAutor;
+}
+
+export interface PlaybookRelacoes {
+  faz_parte_de?: string[];
+  relacionado_a?: string[];
+  historias_relacionadas?: string[];
+}
+
+export type PerguntaStatus = "aberta" | "respondida";
+
+export interface PerguntaAberta {
+  campo_alvo: string;
+  pergunta: string;
+  trecho_gatilho: string;
+  status: PerguntaStatus;
+}
+
+export type PlaybookStatus = "rascunho" | "revisado" | "publicado";
 
 export interface Playbook {
   id: string;
   theme_id: string | null;
+  subtema_id?: string | null;
   title: string;
   subtitle: string | null;
-  body_markdown: string | null;
+  body_markdown: string | null; // mantido (legado)
+  // Novos campos estruturados (opcionais — DB tem defaults)
+  estrutura?: PlaybookEstrutura;
+  proveniencia?: PlaybookProveniencia;
+  relacoes?: PlaybookRelacoes;
+  perguntas_abertas?: PerguntaAberta[];
+  status?: PlaybookStatus;
+  // Campos legado de completude (mantidos para compatibilidade)
   completeness_score: number;
   has_example: boolean;
   has_story: boolean;
@@ -43,6 +110,7 @@ export interface Playbook {
   created_at: string;
   updated_at: string;
   theme?: Theme;
+  subtema?: Theme;
 }
 
 export interface Story {
@@ -59,6 +127,35 @@ export interface Story {
   created_at: string;
   updated_at: string;
   themes?: Theme[];
+}
+
+// --- História Pessoal (standalone) — formato Epiphany Bridge ---
+
+export interface EstruturaEpiphany {
+  backstory?: string;
+  desejo_externo?: string;
+  desejo_interno?: string;
+  parede?: string;
+  epifania?: string;
+  plano?: string;
+  conflito?: string;
+  conquista?: string;
+  transformacao?: string;
+}
+
+export interface HistoriaPessoal {
+  id: string;
+  titulo: string;
+  corpo_longo: string | null;
+  estrutura_epiphany: EstruturaEpiphany;
+  proveniencia: PlaybookProveniencia; // autor SEMPRE "pedro"
+  completude: number; // 0-100
+  perguntas_abertas: PerguntaAberta[];
+  tema_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  tema?: Theme;
 }
 
 export interface ReferenceProfile {
@@ -114,7 +211,20 @@ export interface Capture {
 }
 
 export type ProposalType = "playbook" | "story" | "question" | "instagram_carousel" | "linkedin_post" | "x_thread";
-export type ProposalStatus = "pending" | "approved" | "rejected";
+export type ProposalStatus = "pending" | "approved" | "rejected" | "edited";
+export type ProposalDecisao = "NOVO" | "COMPLEMENTA" | "DUPLICATA";
+
+export interface ProposalDiff {
+  campo: string;
+  atual: string;
+  proposto: string;
+}
+
+export interface ProposalItemAfetado {
+  id: string;
+  titulo: string;
+  por_que: string;
+}
 
 export interface Proposal {
   id: string;
@@ -128,12 +238,22 @@ export interface Proposal {
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string;
+  // Campos legado (content generation)
   caption?: string;
   hashtags?: string[];
   hook?: string;
   cta?: string;
   slides?: string[];
   platform?: string;
+  // Novos campos da reconciliação (opcionais — DB tem defaults)
+  decisao?: ProposalDecisao | null;
+  playbook_alvo_id?: string | null;
+  tema_sugerido?: string | null;
+  subtema_sugerido?: string | null;
+  diff?: ProposalDiff[];
+  itens_afetados?: ProposalItemAfetado[];
+  resumo_para_pedro?: string | null;
+  candidato?: Record<string, unknown>; // playbook/história no schema novo
 }
 
 export type ActivityActor = "ia" | "pedro" | "henrique";
