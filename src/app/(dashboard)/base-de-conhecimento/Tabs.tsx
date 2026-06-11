@@ -6,7 +6,8 @@ import PlaybookList from "./PlaybookList";
 import StoryList from "./StoryList";
 import ThemeManager from "./ThemeManager";
 import UniversalInput from "@/components/UniversalInput";
-import { BookOpen, BookMarked, Zap, Users, User } from "lucide-react";
+import { migrateAllPlaybooks } from "./actions";
+import { BookOpen, BookMarked, Zap, Users, User, RefreshCw, Loader2 } from "lucide-react";
 
 type MainTab = "pedro" | "outros" | "alimentar";
 type SubTab = "playbooks" | "historias";
@@ -22,6 +23,29 @@ export default function Tabs({
 }) {
   const [mainTab, setMainTab] = useState<MainTab>("pedro");
   const [subTab, setSubTab] = useState<SubTab>("playbooks");
+  const [migrating, setMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<{ total: number; migrated: number; skipped: number; errors: string[] } | null>(null);
+
+  // Conta quantos playbooks legados existem (sem estrutura.principio)
+  const legacyCount = playbooks.filter((p) => {
+    if (!p.body_markdown || p.body_markdown.length < 20) return false;
+    const est = p.estrutura as Record<string, unknown> | null;
+    if (est?.principio && typeof est.principio === "string" && (est.principio as string).length > 5) return false;
+    return true;
+  }).length;
+
+  async function handleMigrate() {
+    if (migrating) return;
+    setMigrating(true);
+    setMigrationResult(null);
+    try {
+      const result = await migrateAllPlaybooks();
+      setMigrationResult(result);
+    } catch (err) {
+      console.error("Migration failed:", err);
+    }
+    setMigrating(false);
+  }
 
   // Split by created_by
   const pedroPlaybooks = playbooks.filter(
@@ -151,6 +175,51 @@ export default function Tabs({
                 )}
               </span>
             </div>
+
+            {/* Migration banner — only shows when legacy playbooks exist */}
+            {subTab === "playbooks" && legacyCount > 0 && (
+              <div className="mb-4 rounded-xl border border-amber/20 bg-amber/5 p-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-text font-medium">
+                    {legacyCount} playbook{legacyCount > 1 ? "s" : ""} legado{legacyCount > 1 ? "s" : ""} sem estrutura
+                  </p>
+                  <p className="text-[11px] text-text-muted">
+                    Migre para o novo formato com princípio, passos e proveniência.
+                  </p>
+                </div>
+                <button
+                  onClick={handleMigrate}
+                  disabled={migrating}
+                  className="flex items-center gap-1.5 rounded-lg bg-amber/15 px-3 py-1.5 font-mono text-[11px] font-bold text-amber transition hover:bg-amber/25 disabled:opacity-50 shrink-0"
+                >
+                  {migrating ? (
+                    <><Loader2 className="h-3 w-3 animate-spin" /> Migrando...</>
+                  ) : (
+                    <><RefreshCw className="h-3 w-3" /> Migrar todos</>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Migration result */}
+            {migrationResult && (
+              <div className="mb-4 rounded-xl border border-green/20 bg-green/5 p-3">
+                <p className="text-xs text-green font-medium">
+                  Migração concluída: {migrationResult.migrated} migrados, {migrationResult.skipped} já OK
+                  {migrationResult.errors.length > 0 && `, ${migrationResult.errors.length} erros`}
+                </p>
+                {migrationResult.errors.length > 0 && (
+                  <details className="mt-1">
+                    <summary className="text-[10px] text-text-muted cursor-pointer">Ver erros</summary>
+                    <ul className="mt-1 space-y-0.5">
+                      {migrationResult.errors.map((e, i) => (
+                        <li key={i} className="text-[10px] text-red">{e}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
 
             {subTab === "playbooks" ? (
               <PlaybookList playbooks={activePlaybooks} themes={themes} />

@@ -5,6 +5,10 @@ import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { analyzeCompleteness, generateBookQuestions } from "@/lib/ai";
+import { getClient, logCost, parseJSON } from "@/lib/ai/client";
+import { updatePlaybookEmbedding } from "@/lib/ai/embeddings";
+import { calculateCompletude, generateGapQuestions } from "@/lib/ai/kb-pipeline";
+import type { PlaybookEstrutura } from "@/lib/supabase/types";
 
 // --- Themes ---
 
@@ -310,4 +314,203 @@ export async function saveQuestionAnswer(
     .eq("id", playbookId)
     .single();
   return updated;
+}
+
+// ============================================================
+// Fase 4 — Migração de playbooks legados para schema v2
+// ============================================================
+
+const MIGRATION_PROMPT = `Voce recebe um playbook legado (titulo + body_markdown) e o converte para o schema estruturado.
+NAO invente informacao. SOMENTE reestruture o que ja esta escrito.
+
+SAIDA (JSON valido):
+{
+  "estrutura": {
+    "quando_aplica": "extraia do texto ou null",
+    "erro_comum": "extraia do texto ou null",
+    "principio": "a tese central em 1-2 frases",
+    "passos": [{"titulo": "nome do passo", "como_executar": ["sub-item concreto"]}],
+    "por_que_importa": "extraia do texto ou null",
+    "exemplos": [{"texto": "...", "tipo": "vivido_por_voce|caso_de_terceiro", "proveniencia": "pedro|outros"}]
+  },
+  "proveniencia": {
+    "nivel": "dito_por_voce|sintetizado",
+    "autor": "pedro|outros"
+  }
+}
+
+Regras:
+- principio e OBRIGATORIO (extraia a ideia central)
+- passos: se o texto tem lista ou etapas, converta. Se nao, crie 1-2 passos resumidos.
+- quando_aplica: quando usar este playbook. Se o texto nao diz, infira do contexto ou null.
+- erro_comum: se mencionado, extraia. Se nao, null.
+- exemplos: se ha casos/historias no texto, extraia. Se nao, array vazio.
+- NAO adicione informacao que nao esta no texto original.
+Responda SOMENTE com o JSON.`;
+
+/**
+ * Migra UM playbook legado para o schema v2 (Haiku — barato).
+ * Retorna o id do playbook migrado ou erro.
+ */
+export async function migratePlaybookToV2(playbookId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+
+  const { data: playbook, error: fetchError } = await supabase
+    .from("playbooks")
+    .select("*")
+    .eq("id", playbookId)
+    .single();
+
+  if (fetchError || !playbook) return { success: false, error: "Playbook não encontrado" };
+
+  // Já migrado? Skip
+  if (playbook.estrutura && typeof playbook.estrutura === "object") {
+    const est = playbook.estrutura as Record<string, unknown>;
+    if (est.principio && typeof est.principio === "string" && est.principio.length > 5) {
+      log.info(`[Migration] Playbook "${playbook.title}" já migrado — skip`);
+      return { success: true };
+    }
+  }
+
+  const bodyText = playbook.body_markdown || "";
+  if (bodyText.length < 20) {
+    log.info(`[Migration] Playbook "${playbook.title}" sem body — skip`);
+    return { success: true };
+  }
+
+  try {
+    const client = getClient();
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2000,
+      system: MIGRATION_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: `PLAYBOOK LEGADO:\nTítulo: ${playbook.title}\nSubtítulo: ${playbook.subtitle || "(sem subtítulo)"}\n\nConteúdo:\n${bodyText.slice(0, 8000)}`,
+        },
+      ],
+    });
+
+    logCost(
+      "claude-haiku-4-5-20251001",
+      response.usage.input_tokens,
+      response.usage.output_tokens,
+    );
+
+    const text = response.content[0].type === "text" ? response.content[0].text : "";
+    const parsed = parseJSON<{ estrutura: PlaybookEstrutura; proveniencia: Record<string, unknown> }>(text);
+
+    if (!parsed || !parsed.estrutura) {
+      log.error(`[Migration] Parse failed for "${playbook.title}". Raw: ${text.slice(0, 300)}`);
+      return { success: false, error: "Falha ao parsear resposta" };
+    }
+
+    const completude = calculateCompletude(parsed.estrutura);
+
+    // Update playbook com dados estruturados
+    const { error: updateError } = await supabase
+      .from("playbooks")
+      .update({
+        estrutura: parsed.estrutura,
+        proveniencia: parsed.proveniencia || {},
+        status: "rascunho",
+        completeness_score: completude,
+        has_example: !!(parsed.estrutura.exemplos && parsed.estrutura.exemplos.length > 0),
+        has_origin: !!(parsed.proveniencia?.trechos_fonte),
+      })
+      .eq("id", playbookId);
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    // Gera embedding em background
+    const principio = parsed.estrutura.principio || "";
+    updatePlaybookEmbedding(playbookId, playbook.title, principio).catch(() => {});
+
+    // Gera perguntas gap-driven em background
+    generateGapQuestions({
+      titulo: playbook.title,
+      estrutura: parsed.estrutura,
+      completude,
+    }).then(async (result) => {
+      if (!("error" in result) && result.perguntas.length > 0) {
+        await supabase.from("playbooks").update({
+          perguntas_abertas: result.perguntas,
+        }).eq("id", playbookId);
+      }
+    }).catch(() => {});
+
+    log.info(`[Migration] "${playbook.title}" migrado — completude: ${completude}%`);
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erro desconhecido";
+    log.error(`[Migration] Erro em "${playbook.title}": ${msg}`);
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Migra TODOS os playbooks legados (sem estrutura) para o schema v2.
+ * Processa um por vez para não sobrecarregar a API.
+ * Retorna progresso: { total, migrated, errors }.
+ */
+export async function migrateAllPlaybooks(): Promise<{
+  total: number;
+  migrated: number;
+  skipped: number;
+  errors: string[];
+}> {
+  const supabase = await createClient();
+
+  const { data: playbooks, error } = await supabase
+    .from("playbooks")
+    .select("id, title, estrutura, body_markdown")
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  if (!playbooks) return { total: 0, migrated: 0, skipped: 0, errors: [] };
+
+  // Filtra os que precisam migrar (sem estrutura.principio preenchido)
+  const needMigration = playbooks.filter((p) => {
+    if (!p.body_markdown || p.body_markdown.length < 20) return false;
+    const est = p.estrutura as Record<string, unknown> | null;
+    if (est?.principio && typeof est.principio === "string" && est.principio.length > 5) return false;
+    return true;
+  });
+
+  log.info(`[Migration] ${needMigration.length} de ${playbooks.length} playbooks precisam migrar`);
+
+  let migrated = 0;
+  const errors: string[] = [];
+
+  for (const pb of needMigration) {
+    const result = await migratePlaybookToV2(pb.id);
+    if (result.success) {
+      migrated++;
+    } else {
+      errors.push(`${pb.title}: ${result.error}`);
+    }
+    // Pequena pausa para não bater rate limit
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  // Log final
+  await supabase.from("activity_log").insert({
+    actor: "ia",
+    action: `Migração KB v2: ${migrated}/${needMigration.length} playbooks migrados${errors.length > 0 ? `, ${errors.length} erros` : ""}`,
+    entity_type: "playbook",
+    entity_title: "Migração em lote",
+  });
+
+  revalidatePath("/base-de-conhecimento");
+
+  log.info(`[Migration] Completa: ${migrated} migrados, ${playbooks.length - needMigration.length} já OK, ${errors.length} erros`);
+  return {
+    total: playbooks.length,
+    migrated,
+    skipped: playbooks.length - needMigration.length,
+    errors,
+  };
 }
