@@ -5,6 +5,8 @@ import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { processCapture } from "@/lib/ai";
+import { updatePlaybookEmbedding } from "@/lib/ai/embeddings";
+import { generateGapQuestions, calculateCompletude } from "@/lib/ai/kb-pipeline";
 
 const PATH = "/insights-pedro";
 
@@ -105,6 +107,55 @@ export async function updateProposalStatus(
   revalidatePath(PATH);
 }
 
+async function createNewPlaybook(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  proposal: Record<string, unknown>,
+  candidato: Record<string, unknown>,
+  createdBy: string,
+) {
+  const estrutura = candidato.estrutura as Record<string, unknown> || {};
+  const completude = calculateCompletude(estrutura as any);
+
+  const { data: newPlaybook, error: insertError } = await supabase.from("playbooks").insert({
+    title: proposal.title as string,
+    subtitle: (candidato.subtitulo as string) || null,
+    body_markdown: proposal.content_markdown as string,
+    theme_id: (proposal.suggested_theme_id as string) || null,
+    estrutura: candidato.estrutura || {},
+    proveniencia: candidato.proveniencia || {},
+    relacoes: candidato.relacoes || {},
+    perguntas_abertas: [],
+    status: "rascunho",
+    completeness_score: completude,
+    has_example: !!(estrutura.exemplos && (estrutura.exemplos as unknown[]).length > 0),
+    has_story: false,
+    has_origin: !!(candidato.proveniencia && (candidato.proveniencia as Record<string, unknown>).trechos_fonte),
+    has_counterexample: false,
+    created_by: createdBy,
+  }).select("id").single();
+
+  if (insertError) throw insertError;
+
+  if (newPlaybook) {
+    // Generate embedding in background (don't block approval)
+    const principio = (estrutura.principio as string) || "";
+    updatePlaybookEmbedding(newPlaybook.id, proposal.title as string, principio).catch(() => {});
+
+    // Generate gap questions in background
+    generateGapQuestions({
+      titulo: proposal.title as string,
+      estrutura: estrutura as any,
+      completude,
+    }).then(async (result) => {
+      if (!("error" in result) && result.perguntas.length > 0) {
+        await supabase.from("playbooks").update({
+          perguntas_abertas: result.perguntas,
+        }).eq("id", newPlaybook.id);
+      }
+    }).catch(() => {});
+  }
+}
+
 export async function approveProposal(
   proposalId: string,
   origin: "pedro" | "outros" = "pedro"
@@ -124,25 +175,88 @@ export async function approveProposal(
   const createdBy = origin === "pedro" ? "pedro" : "outros";
 
   if (proposal.type === "playbook") {
-    const { error: insertError } = await supabase.from("playbooks").insert({
-      title: proposal.title,
-      body_markdown: proposal.content_markdown,
-      completeness_score: 0,
-      has_example: false,
-      has_story: false,
-      has_origin: false,
-      has_counterexample: false,
-      created_by: createdBy,
-    });
-    if (insertError) throw insertError;
+    const candidato = proposal.candidato as Record<string, unknown> | null;
+    const hasStructured = candidato && candidato.estrutura;
+
+    if (hasStructured && proposal.decisao === "COMPLEMENTA" && proposal.playbook_alvo_id) {
+      // COMPLEMENTA: merge into existing playbook
+      const { data: existing } = await supabase
+        .from("playbooks")
+        .select("*")
+        .eq("id", proposal.playbook_alvo_id)
+        .single();
+
+      if (existing) {
+        // Merge: keep existing fields, add new data from candidato
+        const mergedEstrutura = {
+          ...(existing.estrutura as Record<string, unknown> || {}),
+          ...(candidato.estrutura as Record<string, unknown> || {}),
+        };
+        const mergedRelacoes = {
+          ...(existing.relacoes as Record<string, unknown> || {}),
+          ...(candidato.relacoes as Record<string, unknown> || {}),
+        };
+        const completude = calculateCompletude(mergedEstrutura as any);
+
+        await supabase.from("playbooks").update({
+          estrutura: mergedEstrutura,
+          relacoes: mergedRelacoes,
+          proveniencia: candidato.proveniencia || existing.proveniencia,
+          completeness_score: completude,
+          version_previous: existing.version_current || { body_markdown: existing.body_markdown },
+          version_current: { estrutura: mergedEstrutura, updated_via: "complementa" },
+          body_markdown: proposal.content_markdown || existing.body_markdown,
+        }).eq("id", proposal.playbook_alvo_id);
+
+        // Update embedding with merged data
+        const principio = (mergedEstrutura as any)?.principio || "";
+        updatePlaybookEmbedding(proposal.playbook_alvo_id, existing.title, principio).catch(() => {});
+      } else {
+        // Fallback: target not found, create new
+        await createNewPlaybook(supabase, proposal, candidato, createdBy);
+      }
+    } else if (hasStructured) {
+      // NOVO or DUPLICATA approved anyway: create new structured playbook
+      await createNewPlaybook(supabase, proposal, candidato, createdBy);
+    } else {
+      // Legacy proposal (no candidato): create flat playbook
+      const { error: insertError } = await supabase.from("playbooks").insert({
+        title: proposal.title,
+        body_markdown: proposal.content_markdown,
+        completeness_score: 0,
+        has_example: false,
+        has_story: false,
+        has_origin: false,
+        has_counterexample: false,
+        created_by: createdBy,
+      });
+      if (insertError) throw insertError;
+    }
   } else if (proposal.type === "story") {
-    const { error: insertError } = await supabase.from("stories").insert({
+    const candidato = proposal.candidato as Record<string, unknown> | null;
+    const hasEpiphany = candidato && candidato.estrutura_epiphany;
+
+    if (hasEpiphany) {
+      // New: create as historia_pessoal (Epiphany Bridge format)
+      const { error: insertError } = await supabase.from("historias_pessoais").insert({
+        titulo: proposal.title,
+        corpo_longo: (candidato.corpo_longo as string) || proposal.content_markdown,
+        estrutura_epiphany: candidato.estrutura_epiphany || {},
+        proveniencia: candidato.proveniencia || {},
+        completude: 50,
+        perguntas_abertas: [],
+      });
+      if (insertError) throw insertError;
+    }
+
+    // Also create in legacy stories table for backward compatibility
+    const { error: storyError } = await supabase.from("stories").insert({
       title: proposal.title,
       body_markdown: proposal.content_markdown,
       tags: proposal.suggested_tags || [],
       created_by: createdBy,
     });
-    if (insertError) throw insertError;
+    if (storyError) throw storyError;
   }
 
   // 3. Update proposal status

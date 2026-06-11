@@ -17,6 +17,12 @@ import {
   HelpCircle,
   MessageSquare,
   ArrowRight,
+  GitMerge,
+  Plus,
+  Copy,
+  FileText,
+  Link2,
+  Target,
 } from "lucide-react";
 
 const proposalTypeConfig: Record<
@@ -39,6 +45,135 @@ const proposalTypeConfig: Record<
     Icon: HelpCircle,
   },
 };
+
+const decisaoConfig: Record<string, { label: string; className: string; Icon: typeof Plus; desc: string }> = {
+  NOVO: {
+    label: "Novo",
+    className: "bg-green/10 text-green border-green/20",
+    Icon: Plus,
+    desc: "Conhecimento novo — não existe nada parecido na base",
+  },
+  COMPLEMENTA: {
+    label: "Complementa",
+    className: "bg-blue/10 text-blue border-blue/20",
+    Icon: GitMerge,
+    desc: "Complementa um playbook existente com novos dados",
+  },
+  DUPLICATA: {
+    label: "Duplicata",
+    className: "bg-amber/10 text-amber border-amber/20",
+    Icon: Copy,
+    desc: "Já existe na base — não acrescenta nada relevante",
+  },
+};
+
+function EnrichedProposalInfo({ proposal }: { proposal: Proposal }) {
+  const decisao = String(proposal.decisao || "NOVO");
+  const dc = decisaoConfig[decisao] || decisaoConfig.NOVO;
+  const resumo = proposal.resumo_para_pedro ? String(proposal.resumo_para_pedro) : null;
+  const tema = proposal.tema_sugerido ? String(proposal.tema_sugerido) : null;
+  const subtema = proposal.subtema_sugerido ? String(proposal.subtema_sugerido) : null;
+  const diffItems = Array.isArray(proposal.diff) ? proposal.diff as Array<{campo: string; atual: string; proposto: string}> : [];
+  const candidato = (proposal.candidato && typeof proposal.candidato === "object") ? proposal.candidato as Record<string, unknown> : null;
+  const estrutura = candidato?.estrutura as Record<string, unknown> | null;
+  const completude = candidato?.completude as number | undefined;
+  const relacoes = candidato?.relacoes as Record<string, unknown> | null;
+  const fazParte = Array.isArray(relacoes?.faz_parte_de) ? relacoes.faz_parte_de as string[] : [];
+  const relacionado = Array.isArray(relacoes?.relacionado_a) ? relacoes.relacionado_a as string[] : [];
+
+  return (
+    <div className="space-y-2">
+      {/* Decision badge */}
+      <div className={`flex items-start gap-2 rounded-lg border p-2.5 ${dc.className}`}>
+        <dc.Icon className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[11px] font-bold uppercase">{dc.label}</span>
+            {tema && (
+              <span className="rounded-full bg-surface/80 px-2 py-0.5 font-mono text-[10px] text-text-muted">
+                {tema}{subtema ? ` › ${subtema}` : ""}
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] mt-0.5 opacity-80">{dc.desc}</p>
+        </div>
+      </div>
+
+      {/* Resumo para Pedro */}
+      {resumo && (
+        <div className="flex items-start gap-2 rounded-lg bg-surface/50 border border-border/50 p-2.5">
+          <Target className="h-3.5 w-3.5 text-accent mt-0.5 shrink-0" />
+          <p className="text-[11px] text-text-secondary leading-relaxed">{resumo}</p>
+        </div>
+      )}
+
+      {/* Diff view for COMPLEMENTA */}
+      {decisao === "COMPLEMENTA" && diffItems.length > 0 && (
+        <div className="rounded-lg border border-blue/20 bg-blue/5 p-2.5 space-y-1.5">
+          <span className="font-mono text-[10px] font-bold uppercase text-blue">Campos alterados:</span>
+          {diffItems.map((d, i) => (
+            <div key={i} className="text-[11px] space-y-0.5">
+              <span className="font-mono text-text-muted">{d.campo}:</span>
+              {d.atual && (
+                <div className="pl-3 text-red/70 line-through">{d.atual.slice(0, 120)}{d.atual.length > 120 ? "..." : ""}</div>
+              )}
+              <div className="pl-3 text-green">{d.proposto.slice(0, 120)}{d.proposto.length > 120 ? "..." : ""}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Structured preview */}
+      {estrutura && (
+        <div className="rounded-lg border border-border/50 bg-surface/30 p-2.5 space-y-1.5">
+          <span className="font-mono text-[10px] font-bold uppercase text-text-muted flex items-center gap-1">
+            <FileText className="h-3 w-3" /> Estrutura extraída
+          </span>
+          <div className="text-[11px] space-y-1">
+            {!!estrutura.principio && (
+              <div><span className="font-semibold text-accent">Princípio:</span> <span className="text-text-secondary">{String(estrutura.principio).slice(0, 200)}</span></div>
+            )}
+            {!!estrutura.quando_aplica && (
+              <div><span className="font-semibold text-text-muted">Quando:</span> <span className="text-text-secondary">{String(estrutura.quando_aplica).slice(0, 150)}</span></div>
+            )}
+            {!!estrutura.erro_comum && (
+              <div><span className="font-semibold text-red/70">Erro comum:</span> <span className="text-text-secondary">{String(estrutura.erro_comum).slice(0, 150)}</span></div>
+            )}
+            {!!estrutura.passos && Array.isArray(estrutura.passos) && (
+              <div><span className="font-semibold text-text-muted">Passos:</span> <span className="text-text-secondary">{(estrutura.passos as {titulo: string}[]).map(p => p.titulo).join(" → ")}</span></div>
+            )}
+            {completude !== undefined && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="font-mono text-[10px] text-text-muted">Completude:</span>
+                <div className="h-1.5 w-20 rounded-full bg-surface">
+                  <div className={`h-1.5 rounded-full ${completude >= 80 ? "bg-green" : completude >= 50 ? "bg-blue" : "bg-accent"}`} style={{ width: `${completude}%` }} />
+                </div>
+                <span className="font-mono text-[10px] text-text-muted">{completude}%</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Relations */}
+      {(fazParte.length > 0 || relacionado.length > 0) && (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <Link2 className="h-3 w-3 text-text-muted" />
+          {fazParte.length > 0 && (
+            <span className="rounded-full bg-purple/10 text-purple border border-purple/20 px-2 py-0.5 font-mono text-[10px]">
+              Parte de {fazParte.length} playbook{fazParte.length > 1 ? "s" : ""}
+            </span>
+          )}
+          {relacionado.length > 0 && (
+            <span className="rounded-full bg-accent/10 text-accent border border-accent/20 px-2 py-0.5 font-mono text-[10px]">
+              {relacionado.length} relacionado{relacionado.length > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ProposalCard({
   proposal,
@@ -131,6 +266,9 @@ function ProposalCard({
         {/* Title */}
         <h4 className="text-sm font-semibold text-text">{proposal.title}</h4>
 
+        {/* Decision badge + resumo (only for v2 pipeline proposals) */}
+        {proposal.decisao ? <EnrichedProposalInfo proposal={proposal} /> : null}
+
         {/* Full content — always visible so user can read before approving */}
         <div>
           <button
@@ -196,6 +334,16 @@ function ProposalCard({
               De outros
             </button>
           </div>
+
+          {/* DUPLICATA warning */}
+          {proposal.decisao === "DUPLICATA" && (
+            <div className="rounded-lg bg-amber/10 border border-amber/20 px-3 py-2 flex items-center gap-2">
+              <Copy className="h-3.5 w-3.5 text-amber shrink-0" />
+              <p className="text-[11px] text-amber">
+                A IA marcou como duplicata. Aprovar mesmo assim criará um novo item na base.
+              </p>
+            </div>
+          )}
 
           {/* Buttons */}
           <div className="flex gap-2">

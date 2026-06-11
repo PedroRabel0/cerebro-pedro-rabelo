@@ -253,6 +253,13 @@ export default function PlaybookList({
                           {p.theme.name}
                         </span>
                       )}
+                      {p.status && p.status !== "rascunho" && (
+                        <span className={`inline-block rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${
+                          p.status === "publicado" ? "bg-green/15 text-green" : "bg-blue/15 text-blue"
+                        }`}>
+                          {p.status === "publicado" ? "Publicado" : "Revisado"}
+                        </span>
+                      )}
                       {isBookReady && (
                         <span className="inline-block rounded-full bg-green/20 px-2 py-0.5 font-mono text-[10px] font-bold text-green">
                           Pronto pro Livro
@@ -264,7 +271,7 @@ export default function PlaybookList({
                         {p.subtitle}
                       </p>
                     )}
-                    <CompletenessBar score={p.completeness_score} />
+                    <CompletenessBar score={p.estrutura?.principio ? Math.max(p.completeness_score, 30) : p.completeness_score} />
                   </button>
                   <div className="ml-3 flex shrink-0 gap-1">
                     {/* Toggle origin: Pedro ↔ Outros */}
@@ -305,13 +312,175 @@ export default function PlaybookList({
 
                 {isExpanded && (
                   <div className="border-t border-border px-4 pb-4">
-                    {p.body_markdown && (
-                      <div className="mt-3 rounded-lg bg-surface p-3">
-                        <pre className="whitespace-pre-wrap text-xs text-text-secondary font-sans leading-relaxed">
-                          {p.body_markdown}
-                        </pre>
+                    {/* Structured playbook view (v2) */}
+                    {p.estrutura && p.estrutura.principio ? (
+                      <div className="mt-3 space-y-3">
+                        {/* Status + Proveniência badge row */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {p.status && (
+                            <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${
+                              p.status === "publicado" ? "bg-green/15 text-green" :
+                              p.status === "revisado" ? "bg-blue/15 text-blue" :
+                              "bg-surface text-text-muted"
+                            }`}>
+                              {p.status}
+                            </span>
+                          )}
+                          {p.proveniencia?.nivel && (
+                            <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] ${
+                              p.proveniencia.nivel === "dito_por_voce" ? "bg-green/10 text-green" :
+                              p.proveniencia.nivel === "fonte_externa" ? "bg-purple/10 text-purple" :
+                              "bg-surface text-text-muted"
+                            }`}>
+                              {p.proveniencia.nivel === "dito_por_voce" ? "Dito pelo Pedro" :
+                               p.proveniencia.nivel === "fonte_externa" ? "Fonte externa" :
+                               "Sintetizado"}
+                            </span>
+                          )}
+                          {p.proveniencia?.autor && p.proveniencia.autor !== "pedro" && (
+                            <span className="rounded-full bg-amber/10 text-amber px-2 py-0.5 font-mono text-[10px]">
+                              Autor: {p.proveniencia.autor}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Princípio (hero) */}
+                        {p.estrutura.principio && (
+                          <div className="rounded-lg border border-accent/20 bg-accent/5 p-3">
+                            <span className="font-mono text-[10px] font-bold uppercase text-accent">Princípio</span>
+                            <p className="mt-1 text-sm text-text leading-relaxed">{p.estrutura.principio}</p>
+                          </div>
+                        )}
+
+                        {/* Quando aplica + Erro comum (side by side on desktop) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {p.estrutura.quando_aplica && (
+                            <div className="rounded-lg bg-surface p-3">
+                              <span className="font-mono text-[10px] font-bold uppercase text-text-muted">Quando Aplicar</span>
+                              <p className="mt-1 text-xs text-text-secondary leading-relaxed">{p.estrutura.quando_aplica}</p>
+                            </div>
+                          )}
+                          {p.estrutura.erro_comum && (
+                            <div className="rounded-lg bg-red/5 border border-red/10 p-3">
+                              <span className="font-mono text-[10px] font-bold uppercase text-red/70">Erro Comum</span>
+                              <p className="mt-1 text-xs text-text-secondary leading-relaxed">{p.estrutura.erro_comum}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Passos */}
+                        {p.estrutura.passos && p.estrutura.passos.length > 0 && (
+                          <div className="rounded-lg bg-surface p-3 space-y-2">
+                            <span className="font-mono text-[10px] font-bold uppercase text-text-muted">Passos</span>
+                            {p.estrutura.passos.map((passo, i) => (
+                              <div key={i} className="flex gap-3">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/15 font-mono text-[10px] font-bold text-accent">
+                                  {i + 1}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-text">{passo.titulo}</p>
+                                  {passo.como_executar && passo.como_executar.length > 0 && (
+                                    <ul className="mt-0.5 space-y-0.5">
+                                      {passo.como_executar.map((item, j) => (
+                                        <li key={j} className="text-[11px] text-text-secondary pl-1 before:content-['·'] before:mr-1.5 before:text-text-muted">
+                                          {item}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Por que importa */}
+                        {p.estrutura.por_que_importa && (
+                          <div className="rounded-lg bg-surface p-3">
+                            <span className="font-mono text-[10px] font-bold uppercase text-text-muted">Por que Importa</span>
+                            <p className="mt-1 text-xs text-text-secondary leading-relaxed">{p.estrutura.por_que_importa}</p>
+                          </div>
+                        )}
+
+                        {/* Exemplos */}
+                        {p.estrutura.exemplos && p.estrutura.exemplos.length > 0 && (
+                          <div className="rounded-lg bg-surface p-3 space-y-1.5">
+                            <span className="font-mono text-[10px] font-bold uppercase text-text-muted">Exemplos</span>
+                            {p.estrutura.exemplos.map((ex, i) => (
+                              <div key={i} className="flex items-start gap-2 text-xs">
+                                <span className={`shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[9px] ${
+                                  ex.tipo === "vivido_por_voce" ? "bg-green/10 text-green" : "bg-blue/10 text-blue"
+                                }`}>
+                                  {ex.tipo === "vivido_por_voce" ? "Vivido" : "Terceiro"}
+                                </span>
+                                <p className="text-text-secondary">{ex.texto}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Proveniência — trechos fonte */}
+                        {p.proveniencia?.trechos_fonte && p.proveniencia.trechos_fonte.length > 0 && (
+                          <details className="rounded-lg bg-surface p-3">
+                            <summary className="font-mono text-[10px] font-bold uppercase text-text-muted cursor-pointer">
+                              Fontes ({p.proveniencia.trechos_fonte.length} trecho{p.proveniencia.trechos_fonte.length > 1 ? "s" : ""})
+                            </summary>
+                            <div className="mt-2 space-y-1.5">
+                              {p.proveniencia.trechos_fonte.map((t, i) => (
+                                <blockquote key={i} className="border-l-2 border-accent/30 pl-2 text-[11px] text-text-muted italic">
+                                  &ldquo;{t.citacao_verbatim}&rdquo;
+                                  {t.timestamp && <span className="ml-1 not-italic text-[10px] text-accent/60">[{t.timestamp}]</span>}
+                                </blockquote>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+
+                        {/* Relações */}
+                        {p.relacoes && ((p.relacoes.faz_parte_de?.length || 0) > 0 || (p.relacoes.relacionado_a?.length || 0) > 0) && (
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            {(p.relacoes.faz_parte_de?.length || 0) > 0 && (
+                              <span className="rounded-full bg-purple/10 text-purple border border-purple/20 px-2 py-0.5 font-mono text-[10px]">
+                                Parte de {p.relacoes.faz_parte_de!.length} playbook{p.relacoes.faz_parte_de!.length > 1 ? "s" : ""}
+                              </span>
+                            )}
+                            {(p.relacoes.relacionado_a?.length || 0) > 0 && (
+                              <span className="rounded-full bg-accent/10 text-accent border border-accent/20 px-2 py-0.5 font-mono text-[10px]">
+                                {p.relacoes.relacionado_a!.length} relacionado{p.relacoes.relacionado_a!.length > 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Perguntas abertas */}
+                        {p.perguntas_abertas && p.perguntas_abertas.filter(q => q.status === "aberta").length > 0 && (
+                          <div className="rounded-lg border border-amber/20 bg-amber/5 p-3 space-y-1.5">
+                            <span className="font-mono text-[10px] font-bold uppercase text-amber">
+                              Lacunas ({p.perguntas_abertas.filter(q => q.status === "aberta").length})
+                            </span>
+                            {p.perguntas_abertas.filter(q => q.status === "aberta").slice(0, 3).map((q, i) => (
+                              <div key={i} className="text-[11px]">
+                                <p className="text-text-secondary">{q.pergunta}</p>
+                                <p className="text-[10px] text-text-muted mt-0.5">Campo: {q.campo_alvo}</p>
+                              </div>
+                            ))}
+                            {p.perguntas_abertas.filter(q => q.status === "aberta").length > 3 && (
+                              <p className="text-[10px] text-amber">+{p.perguntas_abertas.filter(q => q.status === "aberta").length - 3} mais</p>
+                            )}
+                          </div>
+                        )}
                       </div>
+                    ) : (
+                      /* Legacy body_markdown fallback */
+                      p.body_markdown && (
+                        <div className="mt-3 rounded-lg bg-surface p-3">
+                          <pre className="whitespace-pre-wrap text-xs text-text-secondary font-sans leading-relaxed">
+                            {p.body_markdown}
+                          </pre>
+                        </div>
+                      )
                     )}
+
                     {diffId === p.id && p.version_previous && (
                       <DiffView
                         versionCurrent={p.version_current}
