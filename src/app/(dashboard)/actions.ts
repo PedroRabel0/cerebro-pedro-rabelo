@@ -5,6 +5,8 @@ import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { processUniversalInput } from "@/lib/ai/universal";
+import { runFullPipeline, calculateCompletude } from "@/lib/ai/kb-pipeline";
+import type { PipelineResult, EnrichedProposal } from "@/lib/ai/kb-pipeline";
 import { scrapeInstagramPost } from "@/lib/ai/apify";
 import { analyzeDNA } from "@/lib/ai";
 import { getClient, logCost } from "@/lib/ai/client";
@@ -399,64 +401,175 @@ export async function submitUniversalInput(
     };
   }
 
-  // 5. AI Processing (Claude) — the main bottleneck
+  // 5. AI Processing — Pipeline KB v2 (extração + reconciliação + linkagem)
   try {
-    const result = await processUniversalInput(aiInput);
+    const pipelineResult = await runFullPipeline(aiInput, sourceType);
 
-    if ("error" in result) {
-      log.error("[Universal] AI processing failed:" + " " + String(result.error));
+    if ("error" in pipelineResult) {
+      log.error("[Universal] KB Pipeline failed:" + " " + String(pipelineResult.error));
+      // Fallback: tenta pipeline legado
+      log.info("[Universal] Tentando pipeline legado como fallback...");
+      const legacyResult = await processUniversalInput(aiInput);
+      if ("error" in legacyResult) {
+        revalidatePath("/");
+        return { captureId: capture.id, status: "saved_without_ai" as const, instagramData };
+      }
+      // Salva propostas legadas (sem campos novos)
+      const originTag = origin === "outros" ? "origem:outros" : "origem:pedro";
+      await Promise.all([
+        supabase.from("captures").update({
+          title: legacyResult.title,
+          context: `${originTag} | ${legacyResult.summary}`,
+          status: "processed",
+          speaker_verified: legacyResult.speaker_verified,
+        }).eq("id", capture.id),
+        legacyResult.proposals.length > 0
+          ? supabase.from("proposals").insert(
+              legacyResult.proposals.map((p) => ({
+                capture_id: capture.id,
+                type: p.type as "playbook" | "story" | "question",
+                title: p.title,
+                content_markdown: p.content_markdown,
+                suggested_tags: [originTag, ...(p.suggested_tags || [])],
+                status: "pending",
+              }))
+            )
+          : Promise.resolve(),
+      ]);
       revalidatePath("/");
-      return { captureId: capture.id, status: "saved_without_ai" as const, instagramData };
+      revalidatePath("/insights-pedro");
+      return {
+        captureId: capture.id,
+        status: "processed" as const,
+        result: legacyResult,
+        instagramData,
+        origin,
+      };
     }
 
-    // Save all DB operations in PARALLEL (not sequential)
+    // Pipeline v2 sucesso — salvar propostas ENRIQUECIDAS
+    const originTag = origin === "outros" ? "origem:outros" : "origem:pedro";
+
+    // Monta rows de propostas com os novos campos
+    const proposalRows = pipelineResult.enriched_proposals.map((ep: EnrichedProposal) => {
+      // Monta content_markdown legado a partir da estrutura (para UI existente)
+      const estrutura = ep.candidato.estrutura;
+      const markdownParts: string[] = [];
+      if (estrutura.principio) markdownParts.push(`## Princípio\n\n${estrutura.principio}`);
+      if (estrutura.quando_aplica) markdownParts.push(`## Quando Aplicar\n\n${estrutura.quando_aplica}`);
+      if (estrutura.erro_comum) markdownParts.push(`## Erro Comum\n\n${estrutura.erro_comum}`);
+      if (estrutura.passos && estrutura.passos.length > 0) {
+        const stepsText = estrutura.passos.map((p, i) =>
+          `${i + 1}. **${p.titulo}**\n${(p.como_executar || []).map(s => `   - ${s}`).join('\n')}`
+        ).join('\n\n');
+        markdownParts.push(`## Passos\n\n${stepsText}`);
+      }
+      if (estrutura.por_que_importa) markdownParts.push(`## Por que Importa\n\n${estrutura.por_que_importa}`);
+      if (estrutura.exemplos && estrutura.exemplos.length > 0) {
+        const exText = estrutura.exemplos.map(e => `- ${e.texto} *(${e.tipo})*`).join('\n');
+        markdownParts.push(`## Exemplos\n\n${exText}`);
+      }
+      const contentMarkdown = markdownParts.join('\n\n');
+
+      return {
+        capture_id: capture.id,
+        type: "playbook" as const,
+        title: ep.candidato.titulo,
+        content_markdown: contentMarkdown,
+        suggested_tags: [originTag, ...(pipelineResult.extracted_themes || [])],
+        status: "pending",
+        // Novos campos da reconciliação
+        decisao: ep.reconciliation.decisao,
+        playbook_alvo_id: ep.reconciliation.playbook_alvo || null,
+        tema_sugerido: ep.reconciliation.tema_sugerido,
+        subtema_sugerido: ep.reconciliation.subtema_sugerido,
+        diff: ep.reconciliation.diff,
+        itens_afetados: ep.reconciliation.itens_afetados,
+        resumo_para_pedro: ep.reconciliation.resumo_para_pedro,
+        // Candidato completo no schema novo
+        candidato: {
+          titulo: ep.candidato.titulo,
+          subtitulo: ep.candidato.subtitulo || null,
+          estrutura: ep.candidato.estrutura,
+          proveniencia: ep.candidato.proveniencia,
+          relacoes: {
+            faz_parte_de: ep.reconciliation.faz_parte_de,
+            relacionado_a: ep.reconciliation.relacionado_a,
+          },
+          completude: ep.completude,
+        },
+      };
+    });
+
+    // Monta rows de histórias pessoais como propostas (tipo "story")
+    const historiaRows = pipelineResult.historias_pessoais.map((h) => ({
+      capture_id: capture.id,
+      type: "story" as const,
+      title: h.titulo,
+      content_markdown: h.corpo_longo,
+      suggested_tags: [originTag, "historia-pessoal"],
+      status: "pending",
+      decisao: "NOVO" as const,
+      resumo_para_pedro: `Nova história pessoal: "${h.titulo}"`,
+      candidato: {
+        titulo: h.titulo,
+        corpo_longo: h.corpo_longo,
+        estrutura_epiphany: h.estrutura_epiphany,
+        proveniencia: h.proveniencia,
+      },
+    }));
+
+    const allRows = [...proposalRows, ...historiaRows];
+    const totalProposals = allRows.length;
+
+    // Salva tudo em paralelo
     await Promise.all([
-      (async () => {
-        const originTag = origin === "outros" ? "origem:outros" : "origem:pedro";
-        await supabase
-          .from("captures")
-          .update({
-            title: result.title,
-            context: `${originTag} | ${result.summary}`,
-            status: "processed",
-            speaker_verified: result.speaker_verified,
-          })
-          .eq("id", capture.id);
-      })(),
-      (async () => {
-        if (result.proposals.length > 0) {
-          // Tag proposals with origin so Insights knows the default
-          const originTag = origin === "outros" ? "origem:outros" : "origem:pedro";
-          const proposalRows = result.proposals.map((p) => ({
-            capture_id: capture.id,
-            type: p.type as "playbook" | "story" | "question",
-            title: p.title,
-            content_markdown: p.content_markdown,
-            suggested_tags: [originTag, ...(p.suggested_tags || [])],
-            status: "pending",
-          }));
-          await supabase.from("proposals").insert(proposalRows);
-        }
-      })(),
-      (async () => {
-        await supabase.from("activity_log").insert({
-          actor: "ia",
-          action: `Processou input e gerou ${result.proposals.length} proposta(s)`,
-          entity_type: "capture",
-          entity_id: capture.id,
-          entity_title: result.title,
-        });
-      })(),
+      supabase.from("captures").update({
+        title: pipelineResult.title,
+        context: `${originTag} | ${pipelineResult.summary}`,
+        status: "processed",
+        speaker_verified: pipelineResult.speaker_verified,
+      }).eq("id", capture.id),
+      totalProposals > 0
+        ? supabase.from("proposals").insert(allRows)
+        : Promise.resolve(),
+      supabase.from("activity_log").insert({
+        actor: "ia",
+        action: `Pipeline KB v2: ${totalProposals} proposta(s) ` +
+          `(${proposalRows.filter(r => r.decisao === 'NOVO').length} novos, ` +
+          `${proposalRows.filter(r => r.decisao === 'COMPLEMENTA').length} complementam, ` +
+          `${proposalRows.filter(r => r.decisao === 'DUPLICATA').length} duplicatas)`,
+        entity_type: "capture",
+        entity_id: capture.id,
+        entity_title: pipelineResult.title,
+      }),
     ]);
 
     revalidatePath("/");
     revalidatePath("/insights-pedro");
     revalidatePath("/base-de-conhecimento");
 
+    // Retorna resultado compatível com a UI existente
+    const legacyProposals = allRows.map((r) => ({
+      type: r.type,
+      title: r.title,
+      content_markdown: r.content_markdown || "",
+      suggested_tags: r.suggested_tags,
+    }));
+
     return {
       captureId: capture.id,
       status: "processed" as const,
-      result,
+      result: {
+        detected_type: pipelineResult.detected_type,
+        title: pipelineResult.title,
+        summary: pipelineResult.summary,
+        source_url: isUrl ? input.trim() : null,
+        raw_content: input,
+        proposals: legacyProposals,
+        extracted_themes: pipelineResult.extracted_themes,
+        speaker_verified: pipelineResult.speaker_verified,
+      },
       instagramData,
       origin,
     };
