@@ -495,21 +495,124 @@ export async function getThemes() {
   return data;
 }
 
+// --- AI Topic Suggestions ---
+
+export async function suggestTopics(): Promise<{ topics: string[] } | { error: string }> {
+  const supabase = await createClient();
+
+  try {
+    // Carrega playbooks e stories recentes para contexto
+    const [pbRes, stRes, identityRes] = await Promise.all([
+      supabase
+        .from("playbooks")
+        .select("title, body_markdown")
+        .order("updated_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("stories")
+        .select("title, summary")
+        .order("updated_at", { ascending: false })
+        .limit(10),
+      supabase.from("identity").select("*").limit(1).single(),
+    ]);
+
+    const playbooks = pbRes.data ?? [];
+    const stories = stRes.data ?? [];
+
+    const pbTitles = playbooks.map((p) => p.title).join("\n- ");
+    const stTitles = stories.map((s) => `${s.title}: ${s.summary || ""}`).join("\n- ");
+
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const pedroCtx = identityRes.data
+      ? `Tom: ${identityRes.data.tone_descriptors || ""}, Posicionamento: ${identityRes.data.positioning || ""}`
+      : "Criador de conteudo sobre marketing e empreendedorismo.";
+
+    const response = await client.messages.create({
+      model: "claude-haiku-4-20250414",
+      max_tokens: 1000,
+      messages: [
+        {
+          role: "user",
+          content: `Voce e o assistente de conteudo do Pedro Rabelo.
+Identidade: ${pedroCtx}
+
+Playbooks na base:
+- ${pbTitles || "nenhum"}
+
+Historias na base:
+- ${stTitles || "nenhuma"}
+
+Gere 8 sugestoes de temas para posts de redes sociais. As sugestoes devem:
+1. Cruzar playbooks diferentes quando fizer sentido (ex: "Como usar IA para melhorar vendas no e-commerce")
+2. Explorar angulos unicos dos playbooks existentes
+3. Conectar historias pessoais com playbooks
+4. Ser especificas e prontas pra virar post (nao genericas)
+5. Ter no maximo 15 palavras cada
+
+Responda APENAS com um JSON: {"topics": ["tema 1", "tema 2", ...]}`,
+        },
+      ],
+    });
+
+    // Log cost
+    const { logApiCost } = await import("@/lib/ai/client");
+    const cost =
+      (response.usage.input_tokens / 1_000_000) * 0.8 +
+      (response.usage.output_tokens / 1_000_000) * 4.0;
+    logApiCost("anthropic", "claude-haiku-4-20250414", cost, {
+      input_tokens: response.usage.input_tokens,
+      output_tokens: response.usage.output_tokens,
+    });
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    const raw = textBlock?.text?.trim() || "";
+
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.topics && Array.isArray(parsed.topics)) {
+          return { topics: parsed.topics.slice(0, 8) };
+        }
+      }
+    } catch {
+      // parse failed
+    }
+
+    return { error: "Nao consegui gerar sugestoes" };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    log.error("[SuggestTopics] Error: " + message);
+    return { error: `Falha ao sugerir temas: ${message}` };
+  }
+}
+
 // --- Wizard Content Generation ---
 
 export interface WizardPayload {
   source: string;
-  topicMode: string;
-  playbookId?: string;
-  storyId?: string;
-  freeTopic?: string;
+  topic: string;          // tema livre digitado pelo usuário
   recorte?: string;
-  pullStory: string;
-  pullStoryId?: string;
   audience?: string;
   extraContext?: string;
   contentTypes: string[];
   typeDetails: Record<string, Record<string, string>>;
+  // legacy fields (ignorados no novo fluxo)
+  topicMode?: string;
+  playbookId?: string;
+  storyId?: string;
+  freeTopic?: string;
+  pullStory?: string;
+  pullStoryId?: string;
+}
+
+export interface StorySuggestion {
+  id: string;
+  title: string;
+  summary: string | null;
+  suggestion: string; // como a história caberia no post
 }
 
 export interface WizardResult {
@@ -518,7 +621,8 @@ export interface WizardResult {
   content: string;
   sourceMap: Record<string, unknown> | null;
   imagePrompt?: string | null;
-  source: "base_only" | "references_only" | "both" | "free_text";
+  source: "base_only" | "references_only" | "both";
+  storySuggestions?: StorySuggestion[];
 }
 
 export async function createWizardContent(
@@ -531,30 +635,15 @@ export async function createWizardContent(
   }
 
   try {
-    const playbookId = payload.playbookId || null;
-    const storyId = payload.storyId || payload.pullStoryId || null;
+    // Novo fluxo: topic-first — usuário digita o tema, IA busca tudo
+    const topicText = payload.topic || payload.freeTopic || "conteudo";
 
-    // Primeiro, carrega playbook/story selecionados (se houver) para montar o tópico
-    const [playbookRes, storyRes] = await Promise.all([
-      playbookId
-        ? supabase.from("playbooks").select("*").eq("id", playbookId).single()
-        : Promise.resolve({ data: null }),
-      storyId
-        ? supabase.from("stories").select("*").eq("id", storyId).single()
-        : Promise.resolve({ data: null }),
-    ]);
-
-    // Tópico: texto livre OU título do playbook selecionado
-    const topicText = payload.freeTopic || playbookRes.data?.title || "conteudo";
-
-    // Busca semântica + identity + feedback + rules em paralelo
+    // Busca semântica na base toda: playbooks + stories relevantes
     const [knowledge, identityRes, feedbackRes, wizardRulesRes] =
       await Promise.all([
         findRelevantKnowledge(topicText, {
           maxPlaybooks: 6,
-          maxStories: payload.pullStory === "no" ? 0 : 3,
-          playbookId: playbookId || undefined,
-          storyId: storyId || undefined,
+          maxStories: 6, // busca mais stories para poder sugerir depois
         }),
         supabase.from("identity").select("*").limit(1).single(),
         supabase
@@ -909,11 +998,12 @@ INSTRUCOES FINAIS:
 6. 1 ideia central por post. Não tente cobrir tudo.
 7. O conteúdo deve soar como Pedro Rabelo falando, não como IA gerando texto
 8. NÃO inclua meta-comentários ("aqui está a legenda", "segue o conteúdo")
-9. PRONTO PRA COPIAR E COLAR — sem placeholders, sem adaptações necessárias`;
+9. PRONTO PRA COPIAR E COLAR — sem placeholders, sem adaptações necessárias
+10. UNICIDADE OBRIGATÓRIA: Mesmo que o tema seja identico a algo já gerado antes, o conteudo DEVE ser completamente diferente. Varie o angulo, o hook, os exemplos, a estrutura narrativa e o CTA. Use um recorte inesperado do tema, traga dados diferentes, conte de outra perspectiva. NUNCA repita patterns anteriores — cada geração é única. Use o timestamp ${Date.now()} como seed de variação.`;
 
-      // Seleciona o playbook/story principal (selecionado pelo user ou primeiro semântico)
-      const primaryPb = playbookRes.data || knowledge.playbooks[0];
-      const primarySt = storyRes.data || knowledge.stories[0];
+      // Seleciona o playbook/story principal da busca semântica
+      const primaryPb = knowledge.playbooks[0];
+      const primarySt = knowledge.stories[0];
 
       const result = await generateContent({
         identity: identityRes.data,
@@ -966,10 +1056,10 @@ INSTRUCOES FINAIS:
       const { data: inserted, error: insertError } = await supabase
         .from("generated_contents")
         .insert({
-          source_type: payload.source as "base_only" | "references_only" | "both" | "free_text",
+          source_type: payload.source as "base_only" | "references_only" | "both",
           playbook_id: primaryPb?.id || null,
           story_id: primarySt?.id || null,
-          free_text_input: payload.freeTopic || null,
+          free_text_input: topicText,
           content_type: contentType,
           format_id: null,
           content_text: result.content_text,
@@ -979,7 +1069,7 @@ INSTRUCOES FINAIS:
             details,
             audience: payload.audience,
             recorte: payload.recorte,
-            pullStory: payload.pullStory,
+            topic: topicText,
           },
           status: "draft",
         })
@@ -1003,13 +1093,27 @@ INSTRUCOES FINAIS:
         log.error("[AI] Image prompt error:" + " " + String(e));
       }
 
+      // Montar sugestões de histórias que NÃO foram usadas no conteúdo principal
+      const usedStoryId = primarySt?.id;
+      const extraStories = knowledge.stories
+        .filter((s) => s.id !== usedStoryId)
+        .slice(0, 4);
+
+      const storySuggestions: StorySuggestion[] = extraStories.map((s) => ({
+        id: s.id,
+        title: s.title,
+        summary: s.summary || s.body_markdown?.slice(0, 150) || null,
+        suggestion: `Essa história sobre "${s.title}" caberia neste post. Você pode adicioná-la na legenda como exemplo real ou case pessoal.`,
+      }));
+
       results.push({
         id: inserted.id,
         contentType: contentType as ContentType,
         content: result.content_text,
         sourceMap: result.source_map,
         imagePrompt,
-        source: payload.source as "base_only" | "references_only" | "both" | "free_text",
+        source: payload.source as "base_only" | "references_only" | "both",
+        storySuggestions: storySuggestions.length > 0 ? storySuggestions : undefined,
       });
     }
 
@@ -1293,6 +1397,88 @@ export async function removeContentImage(
     const message = err instanceof Error ? err.message : "Erro desconhecido";
     log.error("[RemoveImage] Error: " + message);
     return { error: `Falha ao remover imagem: ${message}` };
+  }
+}
+
+/**
+ * Incorpora uma história sugerida no conteúdo gerado.
+ * Usa Claude para reescrever o texto incluindo a história naturalmente.
+ */
+export async function addStoryToContent(
+  contentId: string,
+  storyId: string,
+  currentText: string,
+  contentType: string,
+): Promise<{ text: string } | { error: string }> {
+  const supabase = await createClient();
+
+  try {
+    // Carrega a história completa
+    const { data: story } = await supabase
+      .from("stories")
+      .select("title, summary, body_markdown")
+      .eq("id", storyId)
+      .single();
+
+    if (!story) return { error: "História não encontrada" };
+
+    const storyContext = `TÍTULO: ${story.title}\nRESUMO: ${story.summary || ""}\nDETALHE: ${(story.body_markdown || "").slice(0, 1500)}`;
+
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 3000,
+      system: `Você é um editor de conteúdo para redes sociais do Pedro Rabelo.
+O usuário gerou um post e quer ADICIONAR uma história pessoal/case nele.
+
+REGRAS:
+- Incorpore a história de forma NATURAL no conteúdo (preferencialmente na legenda)
+- Mantenha o tom e estilo original
+- A história deve enriquecer o post, não parecer forçada
+- Se for carousel/thread, pode adicionar na legenda ou como slide/tweet extra
+- Mantenha o conteúdo pronto para copiar e colar
+- TUDO em português brasileiro
+
+Responda APENAS com o conteúdo atualizado. Nada antes, nada depois.`,
+      messages: [
+        {
+          role: "user",
+          content: `CONTEÚDO ATUAL (${contentType}):\n---\n${currentText}\n---\n\nHISTÓRIA PARA ADICIONAR:\n---\n${storyContext}\n---\n\nIncorpore essa história no post de forma natural.`,
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    const refined = textBlock?.text?.trim();
+
+    if (!refined) return { error: "IA não retornou resposta" };
+
+    // Salva no banco
+    await supabase
+      .from("generated_contents")
+      .update({ content_text: refined, story_id: storyId })
+      .eq("id", contentId);
+
+    // Log cost
+    const { logApiCost } = await import("@/lib/ai/client");
+    const cost =
+      (response.usage.input_tokens / 1_000_000) * 3.0 +
+      (response.usage.output_tokens / 1_000_000) * 15.0;
+    logApiCost("anthropic", "claude-sonnet-4-6", cost, {
+      input_tokens: response.usage.input_tokens,
+      output_tokens: response.usage.output_tokens,
+    });
+
+    log.info(`[AddStory] Story "${story.title}" added to content ${contentId}`);
+    revalidatePath(PATH);
+
+    return { text: refined };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    log.error("[AddStory] Error: " + message);
+    return { error: `Falha ao adicionar história: ${message}` };
   }
 }
 

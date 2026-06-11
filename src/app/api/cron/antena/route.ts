@@ -1,5 +1,5 @@
 ﻿export const dynamic = "force-dynamic";
-export const maxDuration = 300; // 5 minutes for batch processing
+export const maxDuration = 60; // Hobby plan max
 
 import { createClient } from "@/lib/supabase/server";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";

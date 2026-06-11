@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useEffect, useCallback } from "react";
 import type { ContentType } from "@/lib/supabase/types";
-import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent, refineContent } from "./actions";
+import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent, refineContent, addStoryToContent, suggestTopics } from "./actions";
+import type { StorySuggestion } from "./actions";
 import SlideDesigner from "@/components/SlideDesigner";
 import {
   Sparkles,
@@ -19,6 +20,8 @@ import {
   Image as ImageIcon,
   Upload,
   Send,
+  BookMarked,
+  Plus,
 } from "lucide-react";
 
 // --------------- constants ---------------
@@ -38,16 +41,8 @@ const SOURCE_OPTIONS = [
   { value: "both", label: "Pedro + referencias" },
 ] as const;
 
-const TOPIC_MODES = [
-  { value: "from_base", label: "Escolher da base" },
-  { value: "free_text", label: "Escrever livremente" },
-] as const;
-
-const PULL_STORY_OPTIONS = [
-  { value: "ai_suggests", label: "IA sugere" },
-  { value: "choose", label: "Escolher" },
-  { value: "no", label: "Nao" },
-] as const;
+// Topic mode e pull story removidos — agora o fluxo é sempre topic-first
+// A IA busca tudo da base e sugere histórias automaticamente
 
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: "instagram_reel", label: "Instagram Reels" },
@@ -117,19 +112,12 @@ interface StoryOption {
 }
 
 type SourceType = "base_only" | "references_only" | "both";
-type TopicMode = "from_base" | "free_text";
-type PullStory = "ai_suggests" | "choose" | "no";
 
 interface WizardState {
   // Step 1
   source: SourceType;
-  topicMode: TopicMode;
-  selectedPlaybookId: string;
-  selectedStoryId: string;
-  freeTopic: string;
+  topic: string;        // tema livre digitado pelo usuário
   recorte: string;
-  pullStory: PullStory;
-  selectedStoryForPull: string;
   audience: string;
   extraContext: string;
   // Step 2
@@ -140,13 +128,8 @@ interface WizardState {
 
 const initialState: WizardState = {
   source: "base_only",
-  topicMode: "from_base",
-  selectedPlaybookId: "",
-  selectedStoryId: "",
-  freeTopic: "",
+  topic: "",
   recorte: "",
-  pullStory: "ai_suggests",
-  selectedStoryForPull: "",
   audience: "",
   extraContext: "",
   selectedTypes: [],
@@ -805,7 +788,8 @@ interface GenerationResult {
   content: string;
   sourceMap: Record<string, unknown> | null;
   imagePrompt?: string | null;
-  source?: "base_only" | "references_only" | "both" | "free_text";
+  source?: "base_only" | "references_only" | "both";
+  storySuggestions?: StorySuggestion[];
 }
 
 const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
@@ -868,7 +852,7 @@ function CarouselDesignPreview({
   const parsed = parseCarouselSlides(content);
   const details = wizardState.typeDetails["instagram_carousel"] || {};
   const title =
-    wizardState.freeTopic ||
+    wizardState.topic ||
     wizardState.recorte ||
     "Carousel";
 
@@ -957,6 +941,8 @@ function ResultCard({
   const [refineInput, setRefineInput] = useState("");
   const [refining, setRefining] = useState(false);
   const [refineHistory, setRefineHistory] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [addingStoryId, setAddingStoryId] = useState<string | null>(null);
+  const [addedStoryIds, setAddedStoryIds] = useState<Set<string>>(new Set());
 
   async function handleCopy() {
     await navigator.clipboard.writeText(text);
@@ -1240,6 +1226,68 @@ function ResultCard({
         </div>
       )}
 
+      {/* Story suggestions — histórias que cabem neste post */}
+      {result.storySuggestions && result.storySuggestions.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-amber/20 bg-amber/5 p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <BookMarked className="h-3.5 w-3.5 text-amber" />
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-amber">
+              Historias que cabem neste post
+            </span>
+          </div>
+          {result.storySuggestions.map((story) => {
+            const isAdded = addedStoryIds.has(story.id);
+            const isAdding = addingStoryId === story.id;
+            return (
+              <div
+                key={story.id}
+                className={`flex items-start gap-3 rounded-lg p-2.5 transition ${
+                  isAdded ? "bg-green/10 border border-green/20" : "bg-card/50 border border-border/50"
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-text">{story.title}</p>
+                  {story.summary && (
+                    <p className="mt-0.5 text-[11px] text-text-muted line-clamp-2">{story.summary}</p>
+                  )}
+                  <p className="mt-1 text-[11px] text-amber italic">
+                    {isAdded ? "Historia adicionada ao post!" : story.suggestion}
+                  </p>
+                </div>
+                {!isAdded && (
+                  <button
+                    onClick={async () => {
+                      setAddingStoryId(story.id);
+                      const res = await addStoryToContent(result.id, story.id, text, result.contentType);
+                      if (!("error" in res)) {
+                        setText(res.text);
+                        setAddedStoryIds((prev) => new Set(prev).add(story.id));
+                      }
+                      setAddingStoryId(null);
+                    }}
+                    disabled={isAdding || addingStoryId !== null}
+                    className="flex shrink-0 items-center gap-1 rounded-lg bg-amber/15 px-2.5 py-1.5 font-mono text-[10px] font-bold text-amber transition hover:bg-amber/25 disabled:opacity-50"
+                  >
+                    {isAdding ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Plus className="h-3 w-3" />
+                    )}
+                    {isAdding ? "Adicionando..." : "Adicionar"}
+                  </button>
+                )}
+                {isAdded && (
+                  <span className="flex shrink-0 items-center gap-1 rounded-lg bg-green/15 px-2.5 py-1.5 font-mono text-[10px] font-bold text-green">
+                    <Check className="h-3 w-3" />
+                    Adicionada
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
           onClick={onRegenerate}
@@ -1309,7 +1357,7 @@ function ResultCard({
 
 export default function GenerationWizard({
   playbooks,
-  stories,
+  stories: _stories,
 }: {
   playbooks: PlaybookOption[];
   stories: StoryOption[];
@@ -1323,6 +1371,28 @@ export default function GenerationWizard({
   const [activeDetailTab, setActiveDetailTab] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [aiTopics, setAiTopics] = useState<string[]>([]);
+  const [loadingAiTopics, setLoadingAiTopics] = useState(false);
+  const [topicMode, setTopicMode] = useState<"suggestions" | "custom">("suggestions");
+  const [aiTopicsLoaded, setAiTopicsLoaded] = useState(false);
+
+  // Auto-load AI suggestions on first render
+  const loadAiTopics = useCallback(async () => {
+    if (aiTopicsLoaded || loadingAiTopics) return;
+    setLoadingAiTopics(true);
+    const res = await suggestTopics();
+    if (!("error" in res)) {
+      setAiTopics(res.topics);
+    }
+    setAiTopicsLoaded(true);
+    setLoadingAiTopics(false);
+  }, [aiTopicsLoaded, loadingAiTopics]);
+
+  useEffect(() => {
+    if (step === "source" && !aiTopicsLoaded) {
+      loadAiTopics();
+    }
+  }, [step, aiTopicsLoaded, loadAiTopics]);
 
   const stepIdx = STEPS.indexOf(step);
 
@@ -1366,17 +1436,10 @@ export default function GenerationWizard({
     }
   }
 
-  // If no playbooks exist, force free_text mode
-  const effectiveTopicMode =
-    state.topicMode === "from_base" && playbooks.length === 0
-      ? "free_text"
-      : state.topicMode;
-
   const canNext = useMemo(() => {
     switch (step) {
       case "source":
-        if (effectiveTopicMode === "from_base") return !!state.selectedPlaybookId;
-        return state.freeTopic.trim().length > 0;
+        return state.topic.trim().length > 0;
       case "types":
         return state.selectedTypes.length > 0;
       case "details":
@@ -1384,7 +1447,7 @@ export default function GenerationWizard({
       default:
         return false;
     }
-  }, [step, effectiveTopicMode, state.selectedPlaybookId, state.freeTopic, state.selectedTypes]);
+  }, [step, state.topic, state.selectedTypes]);
 
   function goNext() {
     const i = STEPS.indexOf(step);
@@ -1409,13 +1472,8 @@ export default function GenerationWizard({
       try {
         const payload = {
           source: state.source,
-          topicMode: state.topicMode,
-          playbookId: state.selectedPlaybookId || undefined,
-          storyId: state.selectedStoryId || undefined,
-          freeTopic: state.freeTopic || undefined,
+          topic: state.topic,
           recorte: state.recorte || undefined,
-          pullStory: state.pullStory,
-          pullStoryId: state.selectedStoryForPull || undefined,
           audience: state.audience || undefined,
           extraContext: state.extraContext || undefined,
           contentTypes: state.selectedTypes,
@@ -1444,13 +1502,8 @@ export default function GenerationWizard({
     try {
       const payload = {
         source: state.source,
-        topicMode: state.topicMode,
-        playbookId: state.selectedPlaybookId || undefined,
-        storyId: state.selectedStoryId || undefined,
-        freeTopic: state.freeTopic || undefined,
+        topic: state.topic,
         recorte: state.recorte || undefined,
-        pullStory: state.pullStory,
-        pullStoryId: state.selectedStoryForPull || undefined,
         audience: state.audience || undefined,
         extraContext: state.extraContext || undefined,
         contentTypes: [contentType],
@@ -1502,48 +1555,124 @@ export default function GenerationWizard({
           />
         </div>
 
+        {/* Sobre o que quer falar — toggle entre sugestões e custom */}
         <div>
-          <FieldLabel>Topico</FieldLabel>
-          <PillSelect
-            options={[...TOPIC_MODES]}
-            value={state.topicMode}
-            onChange={(v) => updateState("topicMode", v as TopicMode)}
-          />
-        </div>
+          <FieldLabel>Sobre o que quer falar?</FieldLabel>
+          <div className="flex gap-1 rounded-xl bg-surface p-1 mb-3">
+            <button
+              type="button"
+              onClick={() => setTopicMode("suggestions")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-[11px] transition-all ${
+                topicMode === "suggestions"
+                  ? "bg-card text-accent shadow-sm font-bold"
+                  : "text-text-muted hover:text-text"
+              }`}
+            >
+              <Sparkles className="h-3 w-3" />
+              IA sugere
+            </button>
+            <button
+              type="button"
+              onClick={() => setTopicMode("custom")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-[11px] transition-all ${
+                topicMode === "custom"
+                  ? "bg-card text-accent shadow-sm font-bold"
+                  : "text-text-muted hover:text-text"
+              }`}
+            >
+              <Pencil className="h-3 w-3" />
+              Escrever meu tema
+            </button>
+          </div>
 
-        {effectiveTopicMode === "from_base" ? (
-          <div className="space-y-4">
-            <SelectField
-              label="Playbook"
-              value={state.selectedPlaybookId}
-              onChange={(v) => updateState("selectedPlaybookId", v)}
-              options={playbooks.map((p) => ({ value: p.id, label: p.title }))}
-              placeholder="Selecione um playbook..."
-            />
-            <SelectField
-              label="Historia (opcional)"
-              value={state.selectedStoryId}
-              onChange={(v) => updateState("selectedStoryId", v)}
-              options={stories.map((s) => ({ value: s.id, label: s.title }))}
-              placeholder="Nenhuma"
-            />
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {playbooks.length === 0 && state.topicMode === "from_base" && (
-              <div className="rounded-xl border border-accent/20 bg-accent/5 px-3 py-2 text-xs text-accent">
-                Nenhum playbook na base ainda. Escreva o topico livremente.
-              </div>
-            )}
-            <TextField
-              label="Escreva o topico"
-              value={state.freeTopic}
-              onChange={(v) => updateState("freeTopic", v)}
-              placeholder="Ex: Post sobre frameworks de decisao, Thread sobre como lidar com incerteza..."
-              rows={3}
-            />
-          </div>
-        )}
+          {topicMode === "suggestions" ? (
+            <div className="space-y-3">
+              {/* Loading state */}
+              {loadingAiTopics && aiTopics.length === 0 && (
+                <div className="flex items-center gap-3 rounded-xl border border-accent/20 bg-accent/5 px-4 py-6 justify-center">
+                  <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                  <span className="text-sm text-accent">Analisando sua base e criando sugestoes...</span>
+                </div>
+              )}
+
+              {/* Topic cards */}
+              {aiTopics.length > 0 && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {aiTopics.map((topic, i) => {
+                    const isSelected = state.topic === topic;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => updateState("topic", isSelected ? "" : topic)}
+                        className={`group flex items-start gap-3 rounded-xl border p-3 text-left transition-all ${
+                          isSelected
+                            ? "border-accent bg-accent/10 shadow-sm shadow-accent/10"
+                            : "border-border bg-card hover:border-accent/40 hover:bg-card/80"
+                        }`}
+                      >
+                        <div
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                            isSelected
+                              ? "border-accent bg-accent"
+                              : "border-text-muted group-hover:border-accent/50"
+                          }`}
+                        >
+                          {isSelected && <Check className="h-3 w-3 text-bg" />}
+                        </div>
+                        <span className={`text-sm leading-snug ${isSelected ? "text-text font-medium" : "text-text-muted group-hover:text-text"}`}>
+                          {topic}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Refresh button */}
+              {aiTopics.length > 0 && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setLoadingAiTopics(true);
+                    const res = await suggestTopics();
+                    if (!("error" in res)) {
+                      setAiTopics(res.topics);
+                      updateState("topic", "");
+                    }
+                    setLoadingAiTopics(false);
+                  }}
+                  disabled={loadingAiTopics}
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-[10px] text-text-muted transition hover:text-accent hover:bg-accent/5 disabled:opacity-50"
+                >
+                  {loadingAiTopics ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-3 w-3" />
+                  )}
+                  {loadingAiTopics ? "Gerando novas ideias..." : "Gerar novas sugestoes"}
+                </button>
+              )}
+
+              <p className="text-[11px] text-text-muted">
+                Mesmo escolhendo o mesmo tema varias vezes, o conteudo gerado sera sempre diferente.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <textarea
+                value={state.topic}
+                onChange={(e) => updateState("topic", e.target.value)}
+                placeholder="Ex: venda de empresa, TikTok Shop, como escalar e-commerce, IA para vendas..."
+                rows={3}
+                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none resize-none"
+              />
+              <p className="mt-1.5 text-[11px] text-text-muted">
+                A IA vai cruzar todos os playbooks e historias da base sobre esse tema.
+              </p>
+            </div>
+          )}
+        </div>
 
         <TextField
           label="Recorte especifico (opcional)"
@@ -1551,25 +1680,6 @@ export default function GenerationWizard({
           onChange={(v) => updateState("recorte", v)}
           placeholder="Angulo ou recorte especifico"
         />
-
-        <div>
-          <FieldLabel>Puxar historia?</FieldLabel>
-          <PillSelect
-            options={[...PULL_STORY_OPTIONS]}
-            value={state.pullStory}
-            onChange={(v) => updateState("pullStory", v as PullStory)}
-          />
-        </div>
-
-        {state.pullStory === "choose" && (
-          <SelectField
-            label="Escolher historia"
-            value={state.selectedStoryForPull}
-            onChange={(v) => updateState("selectedStoryForPull", v)}
-            options={stories.map((s) => ({ value: s.id, label: s.title }))}
-            placeholder="Selecione uma historia..."
-          />
-        )}
 
         <TextField
           label="Pra quem e (opcional)"
