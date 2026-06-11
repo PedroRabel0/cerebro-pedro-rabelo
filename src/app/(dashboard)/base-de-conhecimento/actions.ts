@@ -122,12 +122,20 @@ export async function deletePlaybook(id: string) {
 
 export async function getHistoriasPessoais() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("historias_pessoais")
-    .select("*, tema:themes(*)")
-    .order("updated_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  try {
+    const { data, error } = await supabase
+      .from("historias_pessoais")
+      .select("*, tema:themes(*)")
+      .order("updated_at", { ascending: false });
+    if (error) {
+      // Tabela pode não existir ainda (migração SQL pendente) — retorna vazio
+      log.error("[KB] getHistoriasPessoais error: " + error.message);
+      return [];
+    }
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function deleteHistoriaPessoal(id: string) {

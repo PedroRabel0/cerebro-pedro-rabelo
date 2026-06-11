@@ -15,14 +15,15 @@ import {
 } from "lucide-react";
 
 export default async function BaseDeConhecimentoPage() {
-  const [playbooks, stories, historiasPessoais, themes, stats, activityFeed] = await Promise.all([
+  const [playbooks, stories, historiasPessoaisResult, themes, stats, activityFeed] = await Promise.all([
     getPlaybooks(),
     getStories(),
-    getHistoriasPessoais(),
+    getHistoriasPessoais().catch(() => []),
     getThemes(),
     getDashboardStats(),
     getActivityFeed(),
   ]);
+  const historiasPessoais = historiasPessoaisResult ?? [];
 
   const statItems = [
     { label: "Inputs", value: stats.captures, Icon: Inbox, color: "text-blue", gradient: "stat-blue", href: "/insights-pedro" },
