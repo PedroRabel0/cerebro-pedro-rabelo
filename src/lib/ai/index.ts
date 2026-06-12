@@ -93,9 +93,10 @@ export async function generateContent(
       recentFeedbacks: params.recentFeedbacks,
     });
 
+    const needsMoreTokens = params.contentType === 'instagram_carousel_educativo';
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: needsMoreTokens ? 8192 : 4096,
       system: [
         {
           type: 'text' as const,

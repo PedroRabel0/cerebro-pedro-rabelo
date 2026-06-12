@@ -1151,19 +1151,21 @@ INSTRUCOES FINAIS:
 
       if (insertError) throw insertError;
 
-      // Generate image prompt inline so it's included in results
+      // Generate image prompt inline (skip for carousel_educativo — it embeds its own design prompt)
       let imagePrompt: string | null = null;
-      try {
-        const promptResult = await generateImagePrompt(result.content_text, contentType);
-        if (!("error" in promptResult)) {
-          imagePrompt = promptResult.image_prompt;
-          await supabase
-            .from("generated_contents")
-            .update({ image_prompt: imagePrompt, image_model: "prompt-only" })
-            .eq("id", inserted.id);
+      if (contentType !== "instagram_carousel_educativo") {
+        try {
+          const promptResult = await generateImagePrompt(result.content_text, contentType);
+          if (!("error" in promptResult)) {
+            imagePrompt = promptResult.image_prompt;
+            await supabase
+              .from("generated_contents")
+              .update({ image_prompt: imagePrompt, image_model: "prompt-only" })
+              .eq("id", inserted.id);
+          }
+        } catch (e) {
+          log.error("[AI] Image prompt error:" + " " + String(e));
         }
-      } catch (e) {
-        log.error("[AI] Image prompt error:" + " " + String(e));
       }
 
       // Montar sugestões de histórias que NÃO foram usadas no conteúdo principal

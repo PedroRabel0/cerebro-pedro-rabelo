@@ -1578,8 +1578,12 @@ export default function GenerationWizard({
           setResults(res.results);
           setStep("result");
         }
-      } catch {
-        setError("Erro inesperado ao gerar conteudo.");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[GenerationWizard] Error:", msg);
+        setError(msg.includes("timeout") || msg.includes("504")
+          ? "A geracao demorou demais. Tente novamente com menos tipos selecionados."
+          : `Erro ao gerar conteudo: ${msg.slice(0, 200)}`);
       } finally {
         clearInterval(timer);
         setGenerating(false);
