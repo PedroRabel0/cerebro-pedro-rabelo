@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useTransition, useEffect, useCallback } from "react";
+import { useState, useMemo, useTransition } from "react";
 import type { ContentType } from "@/lib/supabase/types";
-import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent, refineContent, addStoryToContent, suggestTopics } from "./actions";
+import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent, refineContent, addStoryToContent } from "./actions";
 import type { StorySuggestion } from "./actions";
 import SlideDesigner from "@/components/SlideDesigner";
 import {
@@ -41,8 +41,11 @@ const SOURCE_OPTIONS = [
   { value: "both", label: "Pedro + referencias" },
 ] as const;
 
-// Topic mode e pull story removidos — agora o fluxo é sempre topic-first
-// A IA busca tudo da base e sugere histórias automaticamente
+const STOP_WORDS = new Set([
+  "como", "para", "que", "com", "por", "uma", "seu", "sua", "dos", "das",
+  "nos", "nas", "mais", "sem", "sobre", "entre", "cada", "quando", "onde",
+  "the", "and", "for", "with", "from", "this", "that", "are", "was", "not",
+]);
 
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: "instagram_reel", label: "Instagram Reels" },
@@ -1371,28 +1374,28 @@ export default function GenerationWizard({
   const [activeDetailTab, setActiveDetailTab] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [aiTopics, setAiTopics] = useState<string[]>([]);
-  const [loadingAiTopics, setLoadingAiTopics] = useState(false);
-  const [topicMode, setTopicMode] = useState<"suggestions" | "custom">("suggestions");
-  const [aiTopicsLoaded, setAiTopicsLoaded] = useState(false);
+  const [customTopic, setCustomTopic] = useState(false);
 
-  // Auto-load AI suggestions on first render
-  const loadAiTopics = useCallback(async () => {
-    if (aiTopicsLoaded || loadingAiTopics) return;
-    setLoadingAiTopics(true);
-    const res = await suggestTopics();
-    if (!("error" in res)) {
-      setAiTopics(res.topics);
+  const themeOptions = useMemo(() => {
+    const raw = playbooks.map((p) => p.title);
+    const themes = new Map<string, number>();
+    for (const title of raw) {
+      const words = title
+        .replace(/[:\-–—|/\\,]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 2)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      for (const w of words) {
+        if (STOP_WORDS.has(w.toLowerCase())) continue;
+        themes.set(w, (themes.get(w) || 0) + 1);
+      }
     }
-    setAiTopicsLoaded(true);
-    setLoadingAiTopics(false);
-  }, [aiTopicsLoaded, loadingAiTopics]);
-
-  useEffect(() => {
-    if (step === "source" && !aiTopicsLoaded) {
-      loadAiTopics();
-    }
-  }, [step, aiTopicsLoaded, loadAiTopics]);
+    const sorted = [...themes.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([t]) => t);
+    if (sorted.length >= 8) return sorted.slice(0, 12);
+    return sorted.length > 0 ? sorted : raw.slice(0, 12);
+  }, [playbooks]);
 
   const stepIdx = STEPS.indexOf(step);
 
@@ -1555,123 +1558,62 @@ export default function GenerationWizard({
           />
         </div>
 
-        {/* Sobre o que quer falar — toggle entre sugestões e custom */}
+        {/* Temas */}
         <div>
-          <FieldLabel>Sobre o que quer falar?</FieldLabel>
-          <div className="flex gap-1 rounded-xl bg-surface p-1 mb-3">
+          <FieldLabel>Temas</FieldLabel>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {themeOptions.map((theme) => {
+              const isSelected = state.topic === theme;
+              return (
+                <button
+                  key={theme}
+                  type="button"
+                  onClick={() => {
+                    setCustomTopic(false);
+                    updateState("topic", isSelected ? "" : theme);
+                  }}
+                  className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${
+                    isSelected
+                      ? "border-accent bg-accent/15 text-accent shadow-sm"
+                      : "border-border bg-card text-text-muted hover:border-accent/40 hover:text-text"
+                  }`}
+                >
+                  {theme}
+                </button>
+              );
+            })}
+            {/* Outro tema (custom) */}
             <button
               type="button"
-              onClick={() => setTopicMode("suggestions")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-[11px] transition-all ${
-                topicMode === "suggestions"
-                  ? "bg-card text-accent shadow-sm font-bold"
-                  : "text-text-muted hover:text-text"
+              onClick={() => {
+                setCustomTopic(true);
+                updateState("topic", "");
+              }}
+              className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${
+                customTopic
+                  ? "border-accent bg-accent/15 text-accent shadow-sm"
+                  : "border-dashed border-border bg-card text-text-muted hover:border-accent/40 hover:text-text"
               }`}
             >
-              <Sparkles className="h-3 w-3" />
-              IA sugere
-            </button>
-            <button
-              type="button"
-              onClick={() => setTopicMode("custom")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-[11px] transition-all ${
-                topicMode === "custom"
-                  ? "bg-card text-accent shadow-sm font-bold"
-                  : "text-text-muted hover:text-text"
-              }`}
-            >
-              <Pencil className="h-3 w-3" />
-              Escrever meu tema
+              <Plus className="h-3.5 w-3.5" />
+              Outro
             </button>
           </div>
 
-          {topicMode === "suggestions" ? (
-            <div className="space-y-3">
-              {/* Loading state */}
-              {loadingAiTopics && aiTopics.length === 0 && (
-                <div className="flex items-center gap-3 rounded-xl border border-accent/20 bg-accent/5 px-4 py-6 justify-center">
-                  <Loader2 className="h-4 w-4 animate-spin text-accent" />
-                  <span className="text-sm text-accent">Analisando sua base e criando sugestoes...</span>
-                </div>
-              )}
-
-              {/* Topic cards */}
-              {aiTopics.length > 0 && (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {aiTopics.map((topic, i) => {
-                    const isSelected = state.topic === topic;
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => updateState("topic", isSelected ? "" : topic)}
-                        className={`group flex items-start gap-3 rounded-xl border p-3 text-left transition-all ${
-                          isSelected
-                            ? "border-accent bg-accent/10 shadow-sm shadow-accent/10"
-                            : "border-border bg-card hover:border-accent/40 hover:bg-card/80"
-                        }`}
-                      >
-                        <div
-                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
-                            isSelected
-                              ? "border-accent bg-accent"
-                              : "border-text-muted group-hover:border-accent/50"
-                          }`}
-                        >
-                          {isSelected && <Check className="h-3 w-3 text-bg" />}
-                        </div>
-                        <span className={`text-sm leading-snug ${isSelected ? "text-text font-medium" : "text-text-muted group-hover:text-text"}`}>
-                          {topic}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Refresh button */}
-              {aiTopics.length > 0 && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setLoadingAiTopics(true);
-                    const res = await suggestTopics();
-                    if (!("error" in res)) {
-                      setAiTopics(res.topics);
-                      updateState("topic", "");
-                    }
-                    setLoadingAiTopics(false);
-                  }}
-                  disabled={loadingAiTopics}
-                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-[10px] text-text-muted transition hover:text-accent hover:bg-accent/5 disabled:opacity-50"
-                >
-                  {loadingAiTopics ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <RotateCcw className="h-3 w-3" />
-                  )}
-                  {loadingAiTopics ? "Gerando novas ideias..." : "Gerar novas sugestoes"}
-                </button>
-              )}
-
-              <p className="text-[11px] text-text-muted">
-                Mesmo escolhendo o mesmo tema varias vezes, o conteudo gerado sera sempre diferente.
-              </p>
-            </div>
-          ) : (
-            <div>
-              <textarea
-                value={state.topic}
-                onChange={(e) => updateState("topic", e.target.value)}
-                placeholder="Ex: venda de empresa, TikTok Shop, como escalar e-commerce, IA para vendas..."
-                rows={3}
-                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none resize-none"
-              />
-              <p className="mt-1.5 text-[11px] text-text-muted">
-                A IA vai cruzar todos os playbooks e historias da base sobre esse tema.
-              </p>
-            </div>
+          {customTopic && (
+            <textarea
+              autoFocus
+              value={state.topic}
+              onChange={(e) => updateState("topic", e.target.value)}
+              placeholder="Digite seu tema..."
+              rows={2}
+              className="mt-2 w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none resize-none"
+            />
           )}
+
+          <p className="mt-2 text-[11px] text-text-muted">
+            Mesmo escolhendo o mesmo tema varias vezes, o conteudo sera sempre diferente.
+          </p>
         </div>
 
         <TextField
