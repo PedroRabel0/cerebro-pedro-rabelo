@@ -7,13 +7,14 @@ import {
   getPlaybooks,
   getStories,
 } from "./actions";
+import { getThemes } from "@/app/(dashboard)/base-de-conhecimento/actions";
 import { getHooks } from "@/app/(dashboard)/hooks/actions";
 import { getRepurposeableContents } from "@/app/(dashboard)/repurpose/actions";
 import Tabs from "./Tabs";
 import { Sparkles } from "lucide-react";
 
 export default async function GerarConteudoPage() {
-  const [formats, contents, playbooks, stories, hooks, repurposeContents] =
+  const [formats, contents, playbooks, stories, hooks, repurposeContents, themes] =
     await Promise.all([
       getFormats(),
       getGeneratedContents(),
@@ -21,6 +22,7 @@ export default async function GerarConteudoPage() {
       getStories(),
       getHooks(),
       getRepurposeableContents(),
+      getThemes(),
     ]);
 
   return (
@@ -46,6 +48,7 @@ export default async function GerarConteudoPage() {
         contents={contents}
         playbooks={playbooks}
         stories={stories}
+        themes={themes}
         initialHooks={hooks}
         repurposeContents={repurposeContents}
       />

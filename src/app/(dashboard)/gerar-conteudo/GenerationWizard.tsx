@@ -109,6 +109,12 @@ interface StoryOption {
   title: string;
 }
 
+interface ThemeOption {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
 type SourceType = "base_only" | "references_only" | "both";
 
 interface WizardState {
@@ -1356,9 +1362,11 @@ function ResultCard({
 export default function GenerationWizard({
   playbooks,
   stories: _stories,
+  themes,
 }: {
   playbooks: PlaybookOption[];
   stories: StoryOption[];
+  themes: ThemeOption[];
 }) {
   const [step, setStep] = useState<WizardStep>("source");
   const [state, setState] = useState<WizardState>(initialState);
@@ -1532,77 +1540,63 @@ export default function GenerationWizard({
           />
         </div>
 
-        {/* Temas da base */}
+        {/* Temas macro da base de conhecimento */}
         <div>
           <FieldLabel>Sobre o que quer falar?</FieldLabel>
-          <div className="flex flex-col gap-2">
-            {playbooks.slice(0, 15).map((pb) => {
-              const isSelected = !customTopic && state.topic === pb.title;
-              return (
-                <button
-                  key={pb.id}
-                  type="button"
-                  onClick={() => {
-                    setCustomTopic(false);
-                    updateState("topic", isSelected ? "" : pb.title);
-                  }}
-                  className={`group flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
-                    isSelected
-                      ? "border-accent bg-accent/10 shadow-sm shadow-accent/10"
-                      : "border-border bg-card hover:border-accent/40"
-                  }`}
-                >
-                  <div
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
-                      isSelected
-                        ? "border-accent bg-accent"
-                        : "border-text-muted/40 group-hover:border-accent/50"
-                    }`}
-                  >
-                    {isSelected && <Check className="h-3 w-3 text-bg" />}
-                  </div>
-                  <span
-                    className={`text-sm ${
-                      isSelected ? "text-text font-medium" : "text-text-muted group-hover:text-text"
-                    }`}
-                  >
-                    {pb.title}
-                  </span>
-                </button>
-              );
-            })}
 
-            {/* Escrever meu proprio tema */}
-            <button
-              type="button"
-              onClick={() => {
-                setCustomTopic(true);
-                updateState("topic", "");
-              }}
-              className={`group flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
-                customTopic
-                  ? "border-accent bg-accent/10 shadow-sm shadow-accent/10"
-                  : "border-dashed border-border bg-card hover:border-accent/40"
-              }`}
-            >
-              <div
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+          {themes.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {themes.map((theme) => {
+                const isSelected = !customTopic && state.topic === theme.name;
+                const color = theme.color || "#d4783c";
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => {
+                      setCustomTopic(false);
+                      updateState("topic", isSelected ? "" : theme.name);
+                    }}
+                    className={`rounded-xl border-2 px-4 py-3 text-center text-sm font-medium transition-all ${
+                      isSelected
+                        ? "shadow-sm"
+                        : "border-border bg-card text-text-muted hover:text-text"
+                    }`}
+                    style={
+                      isSelected
+                        ? { borderColor: color, backgroundColor: color + "18", color }
+                        : undefined
+                    }
+                  >
+                    {theme.name}
+                  </button>
+                );
+              })}
+
+              {/* Outro tema */}
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomTopic(true);
+                  updateState("topic", "");
+                }}
+                className={`flex items-center justify-center gap-1.5 rounded-xl border-2 px-4 py-3 text-sm font-medium transition-all ${
                   customTopic
-                    ? "border-accent bg-accent"
-                    : "border-text-muted/40 group-hover:border-accent/50"
+                    ? "border-accent bg-accent/10 text-accent shadow-sm"
+                    : "border-dashed border-border bg-card text-text-muted hover:border-accent/40 hover:text-text"
                 }`}
               >
-                {customTopic ? <Check className="h-3 w-3 text-bg" /> : <Plus className="h-3 w-3 text-text-muted" />}
-              </div>
-              <span
-                className={`text-sm ${
-                  customTopic ? "text-text font-medium" : "text-text-muted group-hover:text-text"
-                }`}
-              >
-                Escrever meu proprio tema
-              </span>
-            </button>
-          </div>
+                <Plus className="h-3.5 w-3.5" />
+                Outro tema
+              </button>
+            </div>
+          )}
+
+          {themes.length === 0 && (
+            <p className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-text-muted">
+              Nenhum tema cadastrado. Adicione temas na Base de Conhecimento.
+            </p>
+          )}
 
           {customTopic && (
             <textarea
@@ -1611,7 +1605,7 @@ export default function GenerationWizard({
               onChange={(e) => updateState("topic", e.target.value)}
               placeholder="Ex: venda de empresa, TikTok Shop, como escalar e-commerce..."
               rows={2}
-              className="mt-2 w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none resize-none"
+              className="mt-3 w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none resize-none"
             />
           )}
 

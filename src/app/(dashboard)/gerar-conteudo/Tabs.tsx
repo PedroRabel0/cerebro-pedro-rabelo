@@ -33,6 +33,12 @@ interface StoryOption {
   title: string;
 }
 
+interface ThemeOption {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
 interface RepurposeContent {
   id: string;
   content_type: string;
@@ -46,6 +52,7 @@ export default function Tabs({
   contents,
   playbooks,
   stories,
+  themes,
   initialHooks,
   repurposeContents,
 }: {
@@ -53,6 +60,7 @@ export default function Tabs({
   contents: GeneratedContent[];
   playbooks: PlaybookOption[];
   stories: StoryOption[];
+  themes: ThemeOption[];
   initialHooks: Hook[];
   repurposeContents: RepurposeContent[];
 }) {
@@ -78,7 +86,7 @@ export default function Tabs({
       </div>
 
       {tab === "novo" && (
-        <GenerationWizard playbooks={playbooks} stories={stories} />
+        <GenerationWizard playbooks={playbooks} stories={stories} themes={themes} />
       )}
       {tab === "hooks" && <HooksBank initialHooks={initialHooks} />}
       {tab === "repurpose" && (
