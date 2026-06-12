@@ -45,6 +45,7 @@ const SOURCE_OPTIONS = [
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: "instagram_reel", label: "Instagram Reels" },
   { value: "instagram_carousel", label: "Instagram Carousel" },
+  { value: "instagram_carousel_educativo", label: "Carrossel Educativo" },
   { value: "instagram_static", label: "Instagram Estatico" },
   { value: "youtube_long", label: "YouTube Longo" },
   { value: "youtube_short", label: "YouTube Short" },
@@ -95,6 +96,12 @@ const ESTRUTURA_YT_OPTIONS = [
   { value: "problema_solucao", label: "Problema/Solucao" },
   { value: "tutorial", label: "Tutorial" },
   { value: "reagindo", label: "Reagindo" },
+];
+
+const TOM_EDUCATIVO_OPTIONS = [
+  { value: "provocativo", label: "Provocativo" },
+  { value: "didatico", label: "Didatico" },
+  { value: "opinativo", label: "Opinativo" },
 ];
 
 // --------------- types ---------------
@@ -371,6 +378,46 @@ function InstagramCarouselFields({
           onChange={(v) => update("imagem_capa", v)}
         />
       </div>
+    </div>
+  );
+}
+
+function CarrosselEducativoFields({
+  details,
+  update,
+}: {
+  details: Record<string, string>;
+  update: (k: string, v: string) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <NumberField
+        label="Slides de conteudo"
+        value={details.num_slides || "6"}
+        onChange={(v) => update("num_slides", v)}
+        min={4}
+        max={8}
+      />
+      <div>
+        <FieldLabel>Tom</FieldLabel>
+        <PillSelect
+          options={TOM_EDUCATIVO_OPTIONS}
+          value={(details.tom as string) || "provocativo"}
+          onChange={(v) => update("tom", v)}
+        />
+      </div>
+      <TextField
+        label="Gancho da capa (opcional)"
+        value={details.gancho || ""}
+        onChange={(v) => update("gancho", v)}
+        placeholder="Frase provocativa para o slide 1 — se vazio, a IA cria"
+      />
+      <TextField
+        label="CTA final (opcional)"
+        value={details.cta || ""}
+        onChange={(v) => update("cta", v)}
+        placeholder="Chamada para acao do ultimo slide"
+      />
     </div>
   );
 }
@@ -761,6 +808,8 @@ function TypeDetailFields({
   switch (type) {
     case "instagram_carousel":
       return <InstagramCarouselFields details={details} update={update} />;
+    case "instagram_carousel_educativo":
+      return <CarrosselEducativoFields details={details} update={update} />;
     case "linkedin_post":
       return <LinkedinPostFields details={details} update={update} />;
     case "x_thread":
@@ -921,6 +970,48 @@ function ImagePromptDisplay({ prompt }: { prompt: string }) {
   );
 }
 
+function DesignPromptSection({ prompt }: { prompt: string }) {
+  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-accent/20 bg-accent/5 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-accent" />
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-accent">
+            Prompt de Design — Copie e cole no Claude
+          </span>
+        </div>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 rounded-lg bg-accent/15 px-3 py-1.5 font-mono text-[11px] font-bold text-accent transition hover:bg-accent/25"
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? "Copiado!" : "Copiar Prompt"}
+        </button>
+      </div>
+      <div className={`rounded-lg bg-card border border-border p-3 text-xs text-text-muted leading-relaxed whitespace-pre-wrap ${expanded ? "" : "max-h-32 overflow-hidden"}`}>
+        {prompt}
+      </div>
+      {!expanded && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="mt-2 font-mono text-[11px] text-accent hover:text-accent/80"
+        >
+          Ver prompt completo →
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ResultCard({
   result,
   onRegenerate,
@@ -1009,18 +1100,32 @@ function ResultCard({
         </div>
       </div>
 
-      {editing ? (
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="w-full rounded-xl border border-accent/30 bg-card px-4 py-3 text-sm text-text leading-relaxed focus:border-accent focus:outline-none resize-none min-h-[120px]"
-          rows={8}
-        />
-      ) : (
-        <div className="rounded-xl bg-surface/50 px-4 py-3 whitespace-pre-wrap text-sm text-text leading-relaxed">
-          {text}
-        </div>
-      )}
+      {(() => {
+        const hasDesignPrompt = result.contentType === "instagram_carousel_educativo" && text.includes("---PROMPT DE DESIGN---");
+        const contentText = hasDesignPrompt ? text.split("---PROMPT DE DESIGN---")[0].trim() : text;
+        const designPrompt = hasDesignPrompt ? text.split("---PROMPT DE DESIGN---")[1].trim() : null;
+
+        return (
+          <>
+            {editing ? (
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="w-full rounded-xl border border-accent/30 bg-card px-4 py-3 text-sm text-text leading-relaxed focus:border-accent focus:outline-none resize-none min-h-[120px]"
+                rows={8}
+              />
+            ) : (
+              <div className="rounded-xl bg-surface/50 px-4 py-3 whitespace-pre-wrap text-sm text-text leading-relaxed">
+                {contentText}
+              </div>
+            )}
+
+            {designPrompt && !editing && (
+              <DesignPromptSection prompt={designPrompt} />
+            )}
+          </>
+        );
+      })()}
 
       <SourceMapDisplay sourceMap={result.sourceMap} />
 

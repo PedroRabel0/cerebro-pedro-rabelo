@@ -942,6 +942,79 @@ ${details.texto_post ? `   Tema/base: "${details.texto_post}"` : ""}
 
 Tom: conversa direta, como se falasse 1:1 com alguém. Sem enrolação.`;
           break;
+        case "instagram_carousel_educativo":
+          typeInstructions = `FORMATO: Carrossel Educativo para Instagram (${details.num_slides || "6"} slides de conteudo)
+TOM: ${details.tom || "provocativo"}
+
+VOCE ESTA GERANDO UM CARROSSEL NO ESTILO "GUIA EDUCATIVO" — texto clean, direto, opinativo.
+Referencia visual: posts da Misa Antonini. Fundo branco, tipografia limpa, negritos estrategicos.
+
+ESTRUTURA OBRIGATORIA:
+
+**[SLIDE 1 - CAPA]:**
+${details.gancho ? `Use como base: "${details.gancho}"` : "Crie um titulo provocativo (2-5 palavras) que pare o scroll — pergunta, afirmacao forte ou dilema."}
+- Titulo grande e provocativo
+- Subtitulo (1 linha explicando o que o carrossel entrega)
+
+**[SLIDE 2 - INTRO]:**
+- 3-4 paragrafos curtos contextualizando o tema
+- Use **negrito** nas palavras-chave para escaneabilidade
+- Mostre o conflito/tensao do tema
+- Termine com: "Ja salva esse carrossel para visitar sempre que precisar."
+
+**[SLIDE 3] a [SLIDE ${(parseInt(details.num_slides) || 6) + 2}] — CONTEUDO:**
+Cada slide DEVE seguir EXATAMENTE esta estrutura:
+
+TITULO: [Nome do conceito/perfil/etapa — curto e memoravel, tipo "O Genio Solitario"]
+DESCRICAO: [2-3 linhas descrevendo o conceito]
+VEREDITO: [Conclusao curta e direta — 1 frase bold, ex: "Demite.", "Investe.", "Escala agora."]
+EXPLICACAO: [3-5 linhas aprofundando o raciocinio com **negritos** nos pontos-chave. Este bloco sera exibido em fundo cinza claro.]
+
+Regras para os slides de conteudo:
+- Cada slide = 1 conceito/item/perfil. NUNCA misture dois.
+- O TITULO deve ser memoravel e unico (nao numere com "1.", "2." — de nomes proprios)
+- O VEREDITO deve ser curto e opinativo
+- A EXPLICACAO deve convencer com argumentos, nao apenas afirmar
+
+**[SLIDE FINAL - CTA]:**
+- Pergunta reflexiva sobre o tema
+${details.cta ? `- CTA: "${details.cta}"` : '- CTA: "Salve esse conteudo para visitar novamente quando precisar."'}
+
+INSTRUCOES DO FORMATO:
+1. Cada slide deve funcionar sozinho — alguem que ve so aquele slide entende o ponto
+2. Tom de quem JA FEZ, nao de quem esta ensinando teoria
+3. Opinioes fortes > conselhos genericos
+4. NUNCA repita o mesmo conteudo em slides diferentes
+5. Formate com marcadores claros: [SLIDE 1 - CAPA], [SLIDE 2 - INTRO], [SLIDE 3], etc.
+
+Apos TODO o conteudo dos slides, gere uma secao separada:
+
+---PROMPT DE DESIGN---
+Crie um carrossel de Instagram com ${(parseInt(details.num_slides) || 6) + 3} slides no formato 1080x1350px.
+
+ESTILO VISUAL:
+- Fundo branco/creme claro (#FAFAF8)
+- Borda fina sutil ao redor (1px, #E5E5E5)
+- Tipografia sans-serif limpa (Inter ou similar)
+- Texto preto (#1A1A1A) com destaques em negrito
+- Blocos de explicacao com fundo cinza claro (#F5F5F5) e padding generoso
+- Muito espaco em branco — design respirado, nao apertado
+- Sem icones coloridos, sem gradientes, sem elementos graficos extras
+- Estilo minimalista editorial
+
+HEADER (todos os slides):
+- Avatar circular do autor (Pedro Rabelo) no topo esquerdo
+- Nome: "Pedro Rabelo" + handle "@pedrorabelo"
+
+[Inclua o conteudo de cada slide aqui, copiando exatamente o que foi gerado acima]
+
+REGRAS:
+- Mantenha consistencia visual entre TODOS os slides
+- O titulo da capa deve ser o maior elemento tipografico
+- Vereditos devem ter destaque visual (negrito, tamanho maior)
+- Blocos de explicacao em box cinza claro
+- Cada slide deve ser legivel sem zoom no celular`;
+          break;
       }
 
       // Build source-specific instructions
