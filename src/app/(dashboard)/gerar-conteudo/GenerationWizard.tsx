@@ -41,11 +41,6 @@ const SOURCE_OPTIONS = [
   { value: "both", label: "Pedro + referencias" },
 ] as const;
 
-const STOP_WORDS = new Set([
-  "como", "para", "que", "com", "por", "uma", "seu", "sua", "dos", "das",
-  "nos", "nas", "mais", "sem", "sobre", "entre", "cada", "quando", "onde",
-  "the", "and", "for", "with", "from", "this", "that", "are", "was", "not",
-]);
 
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: "instagram_reel", label: "Instagram Reels" },
@@ -1376,27 +1371,6 @@ export default function GenerationWizard({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [customTopic, setCustomTopic] = useState(false);
 
-  const themeOptions = useMemo(() => {
-    const raw = playbooks.map((p) => p.title);
-    const themes = new Map<string, number>();
-    for (const title of raw) {
-      const words = title
-        .replace(/[:\-–—|/\\,]/g, " ")
-        .split(/\s+/)
-        .filter((w) => w.length > 2)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-      for (const w of words) {
-        if (STOP_WORDS.has(w.toLowerCase())) continue;
-        themes.set(w, (themes.get(w) || 0) + 1);
-      }
-    }
-    const sorted = [...themes.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([t]) => t);
-    if (sorted.length >= 8) return sorted.slice(0, 12);
-    return sorted.length > 0 ? sorted : raw.slice(0, 12);
-  }, [playbooks]);
-
   const stepIdx = STEPS.indexOf(step);
 
   function updateState<K extends keyof WizardState>(key: K, val: WizardState[K]) {
@@ -1558,45 +1532,75 @@ export default function GenerationWizard({
           />
         </div>
 
-        {/* Temas */}
+        {/* Temas da base */}
         <div>
-          <FieldLabel>Temas</FieldLabel>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {themeOptions.map((theme) => {
-              const isSelected = state.topic === theme;
+          <FieldLabel>Sobre o que quer falar?</FieldLabel>
+          <div className="flex flex-col gap-2">
+            {playbooks.slice(0, 15).map((pb) => {
+              const isSelected = !customTopic && state.topic === pb.title;
               return (
                 <button
-                  key={theme}
+                  key={pb.id}
                   type="button"
                   onClick={() => {
                     setCustomTopic(false);
-                    updateState("topic", isSelected ? "" : theme);
+                    updateState("topic", isSelected ? "" : pb.title);
                   }}
-                  className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${
+                  className={`group flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
                     isSelected
-                      ? "border-accent bg-accent/15 text-accent shadow-sm"
-                      : "border-border bg-card text-text-muted hover:border-accent/40 hover:text-text"
+                      ? "border-accent bg-accent/10 shadow-sm shadow-accent/10"
+                      : "border-border bg-card hover:border-accent/40"
                   }`}
                 >
-                  {theme}
+                  <div
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                      isSelected
+                        ? "border-accent bg-accent"
+                        : "border-text-muted/40 group-hover:border-accent/50"
+                    }`}
+                  >
+                    {isSelected && <Check className="h-3 w-3 text-bg" />}
+                  </div>
+                  <span
+                    className={`text-sm ${
+                      isSelected ? "text-text font-medium" : "text-text-muted group-hover:text-text"
+                    }`}
+                  >
+                    {pb.title}
+                  </span>
                 </button>
               );
             })}
-            {/* Outro tema (custom) */}
+
+            {/* Escrever meu proprio tema */}
             <button
               type="button"
               onClick={() => {
                 setCustomTopic(true);
                 updateState("topic", "");
               }}
-              className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${
+              className={`group flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
                 customTopic
-                  ? "border-accent bg-accent/15 text-accent shadow-sm"
-                  : "border-dashed border-border bg-card text-text-muted hover:border-accent/40 hover:text-text"
+                  ? "border-accent bg-accent/10 shadow-sm shadow-accent/10"
+                  : "border-dashed border-border bg-card hover:border-accent/40"
               }`}
             >
-              <Plus className="h-3.5 w-3.5" />
-              Outro
+              <div
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                  customTopic
+                    ? "border-accent bg-accent"
+                    : "border-text-muted/40 group-hover:border-accent/50"
+                }`}
+              >
+                {customTopic ? <Check className="h-3 w-3 text-bg" /> : <Plus className="h-3 w-3 text-text-muted" />}
+              </div>
+              <span
+                className={`text-sm ${
+                  customTopic ? "text-text font-medium" : "text-text-muted group-hover:text-text"
+                }`}
+              >
+                Escrever meu proprio tema
+              </span>
             </button>
           </div>
 
@@ -1605,14 +1609,14 @@ export default function GenerationWizard({
               autoFocus
               value={state.topic}
               onChange={(e) => updateState("topic", e.target.value)}
-              placeholder="Digite seu tema..."
+              placeholder="Ex: venda de empresa, TikTok Shop, como escalar e-commerce..."
               rows={2}
               className="mt-2 w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none resize-none"
             />
           )}
 
           <p className="mt-2 text-[11px] text-text-muted">
-            Mesmo escolhendo o mesmo tema varias vezes, o conteudo sera sempre diferente.
+            A IA cruza todos os dados da base sobre o tema escolhido. Mesmo repetindo, o conteudo sera sempre diferente.
           </p>
         </div>
 
