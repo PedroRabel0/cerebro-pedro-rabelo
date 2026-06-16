@@ -1103,28 +1103,35 @@ INSTRUCOES FINAIS:
         const totalSlides = (parseInt(details.num_slides) || 6) + 3;
         result.content_text += `\n\n---PROMPT DE DESIGN---\nCrie um carrossel de Instagram com ${totalSlides} slides no formato 1080x1350px.
 
-ESTILO VISUAL:
-- Fundo branco/creme claro (#FAFAF8)
-- Borda fina sutil ao redor (1px, #E5E5E5)
-- Tipografia sans-serif limpa (Inter ou similar)
-- Texto preto (#1A1A1A) com destaques em negrito
-- Blocos de explicacao com fundo cinza claro (#F5F5F5) e padding generoso
-- Muito espaco em branco — design respirado, nao apertado
-- Sem icones coloridos, sem gradientes, sem elementos graficos extras
-- Estilo minimalista editorial
+ESTILO VISUAL (paleta VERMELHO + PRETO):
+- Fundo preto (#0A0A0A) como base de todos os slides
+- Vermelho (#E31B23) como cor de destaque, acentos e vereditos
+- Tipografia sans-serif bold (Inter ou similar), texto branco (#FFFFFF)
+- Palavras-chave e vereditos em vermelho (#E31B23) ou dentro de box vermelho
+- Blocos de explicacao com fundo cinza escuro (#1A1A1A) e padding generoso
+- Contraste alto, visual de autoridade e impacto — "para o scroll"
+- Design editorial moderno, sem poluicao visual
 
 HEADER (todos os slides):
-- Avatar circular do autor (Pedro Rabelo) no topo esquerdo
-- Nome: "Pedro Rabelo" + handle "@pedrorabelo"
+- Foto REAL do Pedro Rabelo como avatar circular no topo esquerdo
+- Use exatamente esta foto: https://segundo-cerebro-weld.vercel.app/pedro-rabelo.jpg
+- Nome: "Pedro Rabelo" + handle "@pedrorabelo" em branco, ao lado do avatar
+
+IMAGENS DE CONTEUDO (importante):
+- Em CADA slide de conteudo, inclua uma imagem, foto ou ilustracao que se conecte com o tema daquele slide
+- Use metaforas visuais, fotos contextuais ou graficos que reforcem a mensagem
+- Mantenha as imagens no clima vermelho/preto para consistencia (pode aplicar overlay vermelho/escuro)
+- A capa pode ter uma imagem de fundo forte com overlay escuro para o titulo se destacar
 
 CONTEUDO DE CADA SLIDE:
 ${result.content_text.split("---PROMPT DE DESIGN---")[0].trim()}
 
 REGRAS:
-- Mantenha consistencia visual entre TODOS os slides
+- Mantenha consistencia visual entre TODOS os slides (preto + vermelho)
 - O titulo da capa deve ser o maior elemento tipografico
-- Vereditos devem ter destaque visual (negrito, tamanho maior)
-- Blocos de explicacao em box cinza claro
+- Vereditos devem ter destaque visual em vermelho (negrito, tamanho maior)
+- Blocos de explicacao em box cinza escuro (#1A1A1A)
+- Use a foto real do Pedro no header de todos os slides
 - Cada slide deve ser legivel sem zoom no celular`;
       }
 
