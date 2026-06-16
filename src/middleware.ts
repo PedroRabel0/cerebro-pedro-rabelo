@@ -79,6 +79,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|login|auth|api).*)",
+    // Exclui assets estaticos do public/ (imagens) para que sejam servidos
+    // publicamente — ex: a foto do Pedro usada nos carrosseis.
+    "/((?!_next/static|_next/image|favicon.ico|login|auth|api|.*\\.(?:jpg|jpeg|png|gif|svg|webp|ico)$).*)",
   ],
 };
