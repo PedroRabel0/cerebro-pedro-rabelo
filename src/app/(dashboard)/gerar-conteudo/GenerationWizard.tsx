@@ -1012,6 +1012,28 @@ function DesignPromptSection({ prompt }: { prompt: string }) {
   );
 }
 
+const DESIGN_SEPARATOR = "---PROMPT DE DESIGN---";
+
+// When refining a carousel_educativo, the refine/addStory actions return only the
+// adjusted slide text (no design prompt). Re-attach the design block and keep the
+// embedded slide copy in sync with the new text so it isn't silently destroyed.
+function mergeCarouselDesignPrompt(oldFullText: string, newSlideText: string): string {
+  if (!oldFullText.includes(DESIGN_SEPARATOR)) return newSlideText;
+  const designBlock = oldFullText.split(DESIGN_SEPARATOR)[1] || "";
+  const SLIDES_MARKER = "CONTEUDO DE CADA SLIDE:";
+  if (designBlock.includes(SLIDES_MARKER)) {
+    const head = designBlock.split(SLIDES_MARKER)[0];
+    const afterSlides = designBlock.split(SLIDES_MARKER)[1] || "";
+    const tail = afterSlides.includes("REGRAS:")
+      ? "\n\nREGRAS:" + afterSlides.split("REGRAS:")[1]
+      : "";
+    const rebuilt = `${head}${SLIDES_MARKER}\n${newSlideText.trim()}${tail}`;
+    return `${newSlideText.trim()}\n\n${DESIGN_SEPARATOR}${rebuilt}`;
+  }
+  // Fallback: preserve the original design block unchanged rather than lose it.
+  return `${newSlideText.trim()}\n\n${DESIGN_SEPARATOR}${designBlock}`;
+}
+
 function ResultCard({
   result,
   onRegenerate,
@@ -1278,14 +1300,15 @@ function ResultCard({
                 setRefineHistory((prev) => [...prev, { role: "user", text: userMsg }]);
                 setRefineInput("");
                 setRefining(true);
+                const slideText = text.includes(DESIGN_SEPARATOR) ? text.split(DESIGN_SEPARATOR)[0].trim() : text;
                 const res = await refineContent(
-                  result.id, text, userMsg, result.contentType,
+                  result.id, slideText, userMsg, result.contentType,
                   true, result.imagePrompt,
                 );
                 if ("error" in res) {
                   setRefineHistory((prev) => [...prev, { role: "ai", text: `Erro: ${res.error}` }]);
                 } else {
-                  setText(res.text);
+                  setText(mergeCarouselDesignPrompt(text, res.text));
                   if (res.imagePrompt) {
                     result.imagePrompt = res.imagePrompt;
                   }
@@ -1305,14 +1328,15 @@ function ResultCard({
               setRefineHistory((prev) => [...prev, { role: "user", text: userMsg }]);
               setRefineInput("");
               setRefining(true);
+              const slideText = text.includes(DESIGN_SEPARATOR) ? text.split(DESIGN_SEPARATOR)[0].trim() : text;
               const res = await refineContent(
-                result.id, text, userMsg, result.contentType,
+                result.id, slideText, userMsg, result.contentType,
                 true, result.imagePrompt,
               );
               if ("error" in res) {
                 setRefineHistory((prev) => [...prev, { role: "ai", text: `Erro: ${res.error}` }]);
               } else {
-                setText(res.text);
+                setText(mergeCarouselDesignPrompt(text, res.text));
                 if (res.imagePrompt) {
                   result.imagePrompt = res.imagePrompt;
                 }
@@ -1367,9 +1391,10 @@ function ResultCard({
                   <button
                     onClick={async () => {
                       setAddingStoryId(story.id);
-                      const res = await addStoryToContent(result.id, story.id, text, result.contentType);
+                      const slideText = text.includes(DESIGN_SEPARATOR) ? text.split(DESIGN_SEPARATOR)[0].trim() : text;
+                      const res = await addStoryToContent(result.id, story.id, slideText, result.contentType);
                       if (!("error" in res)) {
-                        setText(res.text);
+                        setText(mergeCarouselDesignPrompt(text, res.text));
                         setAddedStoryIds((prev) => new Set(prev).add(story.id));
                       }
                       setAddingStoryId(null);

@@ -5,6 +5,11 @@ import { log } from '@/lib/logger';
 export function getClient(): Anthropic {
   return new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
+    // Vercel Hobby caps functions at 60s. Fail fast (50s) with a catchable error
+    // instead of being silently reaped mid-request. maxRetries: 0 because a single
+    // SDK retry (default 2) on a ~30s call deterministically exceeds the 60s budget.
+    timeout: 50_000,
+    maxRetries: 0,
   });
 }
 

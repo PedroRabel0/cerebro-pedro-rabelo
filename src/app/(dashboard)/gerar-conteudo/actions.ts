@@ -523,7 +523,7 @@ export async function suggestTopics(): Promise<{ topics: string[] } | { error: s
     const stTitles = stories.map((s) => `${s.title}: ${s.summary || ""}`).join("\n- ");
 
     const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 50_000, maxRetries: 0 });
 
     const pedroCtx = identityRes.data
       ? `Tom: ${identityRes.data.tone_descriptors || ""}, Posicionamento: ${identityRes.data.positioning || ""}`
@@ -1319,7 +1319,7 @@ export async function refineContent(
 ): Promise<{ text: string; imagePrompt?: string | null } | { error: string }> {
   try {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 50_000, maxRetries: 0 });
 
     const hasPrompt = !!currentPrompt;
 
@@ -1503,7 +1503,7 @@ export async function addStoryToContent(
     const storyContext = `TÍTULO: ${story.title}\nRESUMO: ${story.summary || ""}\nDETALHE: ${(story.body_markdown || "").slice(0, 1500)}`;
 
     const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 50_000, maxRetries: 0 });
 
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",

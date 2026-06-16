@@ -8,7 +8,14 @@ const EMBEDDING_DIMENSIONS = 1536;
 const COST_PER_MILLION_TOKENS = 0.02;
 
 function getOpenAI(): OpenAI {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // Embedding runs on the critical path before the Anthropic call inside the 60s
+  // Vercel budget. Bound it tightly so a slow OpenAI response can't eat the budget;
+  // on timeout, findSimilarPlaybooks falls back to keyword matching.
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: 15_000,
+    maxRetries: 1,
+  });
 }
 
 /**
