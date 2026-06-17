@@ -1,11 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import { Upload } from "lucide-react";
-import { getExternalUploads } from "./actions";
+import { getExternalUploads, getLinkableContents } from "./actions";
 import UploadExterno from "./UploadExterno";
 
 export default async function UploadExternoPage() {
-  const uploads = await getExternalUploads();
+  const [uploads, linkable] = await Promise.all([
+    getExternalUploads(),
+    getLinkableContents(),
+  ]);
 
   return (
     <div>
@@ -25,7 +28,7 @@ export default async function UploadExternoPage() {
         </div>
       </div>
 
-      <UploadExterno existingUploads={uploads} />
+      <UploadExterno existingUploads={uploads} linkableContents={linkable} />
     </div>
   );
 }
