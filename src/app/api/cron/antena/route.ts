@@ -4,16 +4,13 @@ export const maxDuration = 60; // Hobby plan max
 import { createClient } from "@/lib/supabase/server";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";
 import { analyzeDNA } from "@/lib/ai";
+import { isAuthorizedCron } from "@/lib/api-guards";
 
 import { log } from '@/lib/logger';
 export async function GET(request: Request) {
-  // Verify cron secret or Vercel cron header
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    const vercelCron = request.headers.get("x-vercel-cron");
-    if (!vercelCron) {
-      return new Response("Unauthorized", { status: 401 });
-    }
+  // Auth: exige Bearer CRON_SECRET (Vercel injeta automaticamente nos crons).
+  if (!isAuthorizedCron(request)) {
+    return new Response("Unauthorized", { status: 401 });
   }
 
   const supabase = await createClient();

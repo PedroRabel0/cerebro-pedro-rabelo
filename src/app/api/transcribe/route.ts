@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { log } from "@/lib/logger";
 import { logApiCost } from "@/lib/ai/client";
+import { getSessionUser, rateLimit } from "@/lib/api-guards";
 
 // Known Whisper hallucination phrases — these appear when audio has silence/noise
 const HALLUCINATION_PHRASES = [
@@ -46,6 +47,19 @@ function isHallucination(text: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  // Rotas /api sao excluidas do middleware de auth — checar sessao aqui para
+  // impedir abuso anonimo da chave OpenAI Whisper.
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!rateLimit(`transcribe:${user.id}`, 20, 60_000)) {
+    return NextResponse.json(
+      { error: "Muitas requisicoes. Aguarde um momento." },
+      { status: 429 }
+    );
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
