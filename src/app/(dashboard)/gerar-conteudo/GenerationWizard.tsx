@@ -4,6 +4,7 @@ import { useState, useMemo, useTransition } from "react";
 import type { ContentType } from "@/lib/supabase/types";
 import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent, refineContent, addStoryToContent } from "./actions";
 import type { StorySuggestion } from "./actions";
+import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
 import {
   Sparkles,
@@ -1075,18 +1076,29 @@ function ResultCard({
     setImageError(null);
 
     try {
-      const formData = new FormData();
-      for (let i = 0; i < files.length; i++) {
-        formData.append("images", files[i]);
+      // PDFs viram slides (imagens) no navegador; imagens passam direto
+      const { files: imageFiles, ignored } = await filesToImageFiles(files);
+      if (imageFiles.length === 0) {
+        setImageError(
+          ignored.length
+            ? "Arquivo nao suportado. Use PDF, PNG ou JPG."
+            : "Nenhuma imagem encontrada."
+        );
+        return;
       }
+      const formData = new FormData();
+      for (const f of imageFiles) formData.append("images", f);
       const res = await uploadImageToContent(result.id, formData);
       if ("error" in res) {
         setImageError(res.error);
       } else {
         setUploadedImageUrl(res.imageUrl);
       }
-    } catch {
-      setImageError("Erro ao fazer upload da imagem");
+    } catch (err) {
+      setImageError(
+        "Erro ao processar o arquivo: " +
+          (err instanceof Error ? err.message : "erro desconhecido")
+      );
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -1236,8 +1248,8 @@ function ResultCard({
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface/30 px-4 py-6 transition-colors hover:border-accent/40 hover:bg-surface/50">
             <input
               type="file"
-              accept="image/*"
-              multiple={result.contentType === "instagram_carousel"}
+              accept="application/pdf,image/*"
+              multiple={result.contentType.includes("carousel")}
               onChange={handleImageUpload}
               className="hidden"
               disabled={uploading}
@@ -1245,15 +1257,15 @@ function ResultCard({
             {uploading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin text-accent" />
-                <span className="font-mono text-xs text-accent">Subindo imagem...</span>
+                <span className="font-mono text-xs text-accent">Processando arquivo...</span>
               </>
             ) : (
               <>
                 <Upload className="h-4 w-4 text-text-muted" />
                 <span className="font-mono text-xs text-text-muted">
-                  {result.contentType === "instagram_carousel"
-                    ? "Upload das imagens do carrossel (múltiplas)"
-                    : "Upload da imagem do post (Claude Design, Canva, etc)"}
+                  {result.contentType.includes("carousel")
+                    ? "Upload do PDF ou imagens do carrossel"
+                    : "Upload do PDF/imagem do post (Claude Design, Canva, etc)"}
                 </span>
               </>
             )}

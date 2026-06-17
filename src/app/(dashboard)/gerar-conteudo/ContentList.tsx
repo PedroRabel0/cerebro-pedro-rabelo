@@ -12,6 +12,7 @@ import {
   refineContent,
 } from "./actions";
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
+import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
 import {
   MessageSquare,
@@ -349,18 +350,28 @@ function ImageUploader({
     setError(null);
 
     try {
-      const formData = new FormData();
-      for (let i = 0; i < files.length; i++) {
-        formData.append("images", files[i]);
+      // PDF do carrossel vira slides (imagens) no navegador; imagens passam direto
+      const { files: imageFiles, ignored } = await filesToImageFiles(files);
+      if (imageFiles.length === 0) {
+        setError(
+          ignored.length
+            ? "Arquivo nao suportado. Use PDF, PNG ou JPG."
+            : "Nenhuma imagem encontrada."
+        );
+        return;
       }
+      const formData = new FormData();
+      for (const f of imageFiles) formData.append("images", f);
       const res = await uploadImageToContent(contentId, formData);
       if ("error" in res) {
         setError(res.error);
       } else {
         onUploaded(res.imageUrl);
       }
-    } catch {
-      setError("Erro ao fazer upload");
+    } catch (err) {
+      setError(
+        "Erro ao processar: " + (err instanceof Error ? err.message : "erro desconhecido")
+      );
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -373,7 +384,7 @@ function ImageUploader({
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept="application/pdf,image/*"
           multiple={isCarousel}
           onChange={handleUpload}
           className="hidden"
@@ -382,15 +393,15 @@ function ImageUploader({
         {uploading ? (
           <>
             <Loader2 className="h-5 w-5 animate-spin text-accent" />
-            <span className="text-sm text-accent">Subindo...</span>
+            <span className="text-sm text-accent">Processando...</span>
           </>
         ) : (
           <>
             <Upload className="h-5 w-5 text-text-muted" />
             <span className="text-sm text-text-muted">
               {isCarousel
-                ? "Upload das imagens (múltiplas)"
-                : "Upload da imagem do post"}
+                ? "Upload do PDF ou imagens do carrossel"
+                : "Upload do PDF/imagem do post"}
             </span>
           </>
         )}
@@ -599,17 +610,20 @@ export default function ContentList({
                     <label className="flex cursor-pointer items-center gap-1 rounded-lg bg-black/70 px-2.5 py-1.5 font-mono text-[10px] text-white backdrop-blur-sm transition hover:bg-black/90">
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="application/pdf,image/*"
                         multiple={isCarousel}
                         onChange={async (e) => {
                           const files = e.target.files;
                           if (!files || files.length === 0) return;
+                          const { files: imageFiles } = await filesToImageFiles(files);
+                          if (imageFiles.length === 0) {
+                            e.target.value = "";
+                            return;
+                          }
                           // Remove old image first, then upload new
                           await removeContentImage(c.id);
                           const formData = new FormData();
-                          for (let i = 0; i < files.length; i++) {
-                            formData.append("images", files[i]);
-                          }
+                          for (const f of imageFiles) formData.append("images", f);
                           const res = await uploadImageToContent(c.id, formData);
                           if (!("error" in res)) {
                             setFreshImages((prev) => ({ ...prev, [c.id]: res.imageUrl }));

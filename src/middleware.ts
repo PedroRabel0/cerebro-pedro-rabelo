@@ -81,6 +81,6 @@ export const config = {
   matcher: [
     // Exclui assets estaticos do public/ (imagens) para que sejam servidos
     // publicamente — ex: a foto do Pedro usada nos carrosseis.
-    "/((?!_next/static|_next/image|favicon.ico|login|auth|api|.*\\.(?:jpg|jpeg|png|gif|svg|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|login|auth|api|.*\\.(?:jpg|jpeg|png|gif|svg|webp|ico|mjs|js)$).*)",
   ],
 };
