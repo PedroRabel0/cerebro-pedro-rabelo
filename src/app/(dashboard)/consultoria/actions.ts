@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { findSimilarPlaybooks } from "@/lib/ai/embeddings";
 import { buildContentGenerationSystemPrompt } from "@/lib/ai/prompts";
-import { isGoogleConnected, createCalendarEvent, createTimedCalendarEvent, listCalendars, listUpcomingEvents } from "@/lib/google-calendar";
+import { isGoogleConnected, createCalendarEvent, createTimedCalendarEvent, listCalendars, listUpcomingEvents, getCalendarEvent, patchCalendarEvent } from "@/lib/google-calendar";
 import { requireUser } from "@/lib/api-guards";
 import { log } from "@/lib/logger";
 import type {
@@ -792,6 +792,125 @@ export async function scheduleMeeting(
 
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
+}
+
+/**
+ * Edita um evento da agenda a partir de uma instrucao em portugues. A IA
+ * interpreta o texto ("passa pra terca 15h", "adiciona joao@x.com", "tira o
+ * Thiago") e a gente aplica no Google (horario e/ou convidados).
+ */
+export async function updateMeetingOnCalendar(
+  meetingId: string,
+  instruction: string
+): Promise<{ ok: true; summary: string } | { error: string }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  if (!instruction.trim()) return { error: "Escreva o que mudar." };
+
+  const { data: meeting } = await supabase
+    .from("consulting_meetings")
+    .select("*")
+    .eq("id", meetingId)
+    .single();
+  if (!meeting) return { error: "Reuniao nao encontrada." };
+  if (!meeting.google_event_id || !meeting.google_calendar_id) {
+    return { error: "Essa reuniao nao esta vinculada a um evento da agenda. Use 'Agendar' para criar uma." };
+  }
+
+  const current = await getCalendarEvent(user.id, meeting.google_calendar_id, meeting.google_event_id);
+  if (!current) return { error: "Nao consegui ler o evento na agenda." };
+
+  const { data: contactRows } = await supabase
+    .from("consulting_contacts")
+    .select("name, email")
+    .eq("company_id", meeting.company_id);
+  const contacts = (contactRows ?? []) as { name: string; email: string | null }[];
+
+  const today = new Date().toISOString().slice(0, 10);
+  const prompt = `Hoje e ${today}. Voce edita um evento de agenda a partir de uma instrucao em portugues.
+
+EVENTO ATUAL:
+- inicio: ${current.startDateTime}
+- convidados: ${current.attendees.join(", ") || "(nenhum)"}
+
+CONTATOS DA EMPRESA (nome -> email):
+${contacts.map((c) => `- ${c.name}: ${c.email || "(sem email)"}`).join("\n") || "(nenhum)"}
+
+INSTRUCAO: "${instruction}"
+
+Retorne APENAS um JSON com as mudancas (use null/[] no que NAO muda):
+{"new_date": "AAAA-MM-DD ou null", "new_time": "HH:MM ou null", "duration_min": numero ou null, "add_attendees": ["email"], "remove_attendees": ["email"]}
+
+Regras: calcule datas relativas a partir de hoje (ex: "terca que vem"). Para convidados, resolva nomes para emails usando os contatos acima ou os convidados atuais; se vier um email direto, use-o.`;
+
+  let parsed: {
+    new_date?: string | null;
+    new_time?: string | null;
+    duration_min?: number | null;
+    add_attendees?: string[];
+    remove_attendees?: string[];
+  } | null = null;
+  try {
+    const client = getClient();
+    const r = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 500,
+      messages: [{ role: "user", content: prompt }],
+    });
+    logCost("claude-sonnet-4-6", r.usage.input_tokens, r.usage.output_tokens);
+    const text = r.content[0].type === "text" ? r.content[0].text : "";
+    parsed = parseJSON(text);
+  } catch (err) {
+    return { error: `Falha ao interpretar: ${err instanceof Error ? err.message : "erro"}` };
+  }
+  if (!parsed) return { error: "Nao entendi a alteracao. Tente reescrever." };
+
+  const patch: { startDateTime?: string; endDateTime?: string; attendees?: string[] } = {};
+  const changes: string[] = [];
+
+  const newDate = parsed.new_date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.new_date) ? parsed.new_date : null;
+  const newTime = parsed.new_time && /^\d{2}:\d{2}$/.test(parsed.new_time) ? parsed.new_time : null;
+  if (newDate || newTime) {
+    const curDate = current.startDateTime.slice(0, 10);
+    const curTime = current.startDateTime.length > 10 ? current.startDateTime.slice(11, 16) : "09:00";
+    const date = newDate || curDate;
+    const time = newTime || curTime;
+    let durMin = parsed.duration_min || 60;
+    if (!parsed.duration_min && current.endDateTime && current.startDateTime) {
+      const s = new Date(current.startDateTime).getTime();
+      const e = new Date(current.endDateTime).getTime();
+      if (e > s) durMin = Math.round((e - s) / 60000);
+    }
+    const startD = new Date(`${date}T${time}:00Z`);
+    const endD = new Date(startD.getTime() + durMin * 60000);
+    patch.startDateTime = `${date}T${time}:00`;
+    patch.endDateTime = `${endD.getUTCFullYear()}-${pad2(endD.getUTCMonth() + 1)}-${pad2(endD.getUTCDate())}T${pad2(endD.getUTCHours())}:${pad2(endD.getUTCMinutes())}:00`;
+    changes.push(`horario -> ${date} ${time}`);
+  }
+
+  const add = (parsed.add_attendees ?? []).map((e) => e.trim()).filter((e) => /.+@.+\..+/.test(e));
+  const remove = (parsed.remove_attendees ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (add.length > 0 || remove.length > 0) {
+    let list = current.attendees.slice();
+    for (const a of add) if (!list.some((x) => x.toLowerCase() === a.toLowerCase())) list.push(a);
+    if (remove.length > 0) list = list.filter((e) => !remove.includes(e.toLowerCase()));
+    patch.attendees = list;
+    if (add.length) changes.push(`+${add.length} convidado(s)`);
+    if (remove.length) changes.push(`-${remove.length} convidado(s)`);
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return { error: "Nao identifiquei uma mudanca clara. Tente: \"passa pra terca 15h\" ou \"adiciona fulano@email.com\"." };
+  }
+
+  const res = await patchCalendarEvent(user.id, meeting.google_calendar_id, meeting.google_event_id, patch);
+  if ("error" in res) return { error: res.error };
+
+  if (patch.startDateTime) {
+    await supabase.from("consulting_meetings").update({ held_at: patch.startDateTime }).eq("id", meetingId);
+  }
+  revalidatePath(`${PATH}/${meeting.company_id}`);
+  return { ok: true, summary: changes.join(", ") };
 }
 
 /**

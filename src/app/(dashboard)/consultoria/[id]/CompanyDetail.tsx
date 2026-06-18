@@ -34,6 +34,7 @@ import {
   deleteMeeting,
   processMeeting,
   scheduleMeeting,
+  updateMeetingOnCalendar,
   createTask,
   updateTask,
   deleteTask,
@@ -478,6 +479,22 @@ function MeetingsSection({
     else { setMsg(`${res.created} tarefa(s) criada(s) — veja abaixo.`); onChange(); }
   }
 
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+  const [editResult, setEditResult] = useState<string | null>(null);
+
+  async function doEdit(mId: string) {
+    if (!editText.trim()) return;
+    setEditBusy(true); setEditResult(null);
+    const res = await updateMeetingOnCalendar(mId, editText);
+    setEditBusy(false);
+    if ("error" in res) { setEditResult("Erro: " + res.error); return; }
+    setEditResult("Feito: " + res.summary);
+    setEditText("");
+    onChange();
+  }
+
   return (
     <div className={card}>
       <div className="mb-3 flex items-center justify-between">
@@ -580,7 +597,35 @@ function MeetingsSection({
               </button>
             </div>
             {m.summary && <p className="mt-2 whitespace-pre-wrap rounded bg-surface/50 px-3 py-2 text-xs text-text-secondary">{m.summary}</p>}
-            {!m.transcript && <p className="mt-1 text-[11px] text-text-muted">Sem transcrição — edite a reunião pra colar.</p>}
+            {!m.transcript && !m.google_event_id && <p className="mt-1 text-[11px] text-text-muted">Sem transcrição — edite a reunião pra colar.</p>}
+            {m.google_event_id && (
+              <div className="mt-2">
+                {editId === m.id ? (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-2">
+                      <input
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && doEdit(m.id)}
+                        placeholder={'Ex: "passa pra terça 15h", "adiciona joao@x.com", "tira o Thiago"'}
+                        aria-label="Alteração na agenda"
+                        className={input}
+                        autoFocus
+                      />
+                      <button onClick={() => doEdit(m.id)} disabled={editBusy || !editText.trim()} aria-label="Aplicar alteração" className="rounded-lg bg-accent px-3 text-white hover:brightness-110 disabled:opacity-50">
+                        {editBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                      </button>
+                      <button onClick={() => { setEditId(null); setEditResult(null); setEditText(""); }} className="px-2 text-xs text-text-muted hover:text-text">Fechar</button>
+                    </div>
+                    {editResult && <p className={`text-[11px] ${editResult.startsWith("Erro") ? "text-red" : "text-green"}`}>{editResult}</p>}
+                  </div>
+                ) : (
+                  <button onClick={() => { setEditId(m.id); setEditResult(null); setEditText(""); }} className="flex items-center gap-1.5 text-[11px] text-accent hover:underline">
+                    <Wand2 className="h-3 w-3" /> Alterar na agenda
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         ))}
         {meetings.length === 0 && !adding && <p className="text-xs text-text-muted">Nenhuma reunião ainda. Cole a transcrição de uma reunião pra extrair as tarefas.</p>}

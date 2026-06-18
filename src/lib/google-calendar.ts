@@ -189,6 +189,59 @@ export async function createTimedCalendarEvent(
   return { ok: true, eventId: data.id };
 }
 
+/** Le um evento (para saber inicio/fim/convidados atuais antes de editar). */
+export async function getCalendarEvent(
+  userId: string,
+  calendarId: string,
+  eventId: string
+): Promise<{ startDateTime: string; endDateTime: string; attendees: string[]; summary: string } | null> {
+  const token = await getValidAccessToken(userId);
+  if (!token) return null;
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return null;
+  const e = (await res.json()) as {
+    summary?: string;
+    start?: { dateTime?: string; date?: string };
+    end?: { dateTime?: string; date?: string };
+    attendees?: { email?: string }[];
+  };
+  return {
+    startDateTime: e.start?.dateTime || e.start?.date || "",
+    endDateTime: e.end?.dateTime || e.end?.date || "",
+    attendees: (e.attendees ?? []).map((a) => a.email || "").filter(Boolean),
+    summary: e.summary || "",
+  };
+}
+
+/** Edita (PATCH) um evento: horario e/ou lista de convidados. */
+export async function patchCalendarEvent(
+  userId: string,
+  calendarId: string,
+  eventId: string,
+  patch: { startDateTime?: string; endDateTime?: string; timeZone?: string; attendees?: string[] }
+): Promise<{ ok: true } | { error: string }> {
+  const token = await getValidAccessToken(userId);
+  if (!token) return { error: "not_connected" };
+  const tz = patch.timeZone || "America/Sao_Paulo";
+  const body: Record<string, unknown> = {};
+  if (patch.startDateTime) body.start = { dateTime: patch.startDateTime, timeZone: tz };
+  if (patch.endDateTime) body.end = { dateTime: patch.endDateTime, timeZone: tz };
+  const hasGuests = !!patch.attendees;
+  if (hasGuests) body.attendees = patch.attendees!.map((email) => ({ email }));
+
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}${
+    hasGuests ? "?sendUpdates=all" : ""
+  }`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return { error: "Falha ao atualizar evento: " + (await res.text()).slice(0, 150) };
+  return { ok: true };
+}
+
 /** Lista as agendas em que o usuario pode ESCREVER (a dele + as compartilhadas). */
 export async function listCalendars(
   userId: string
