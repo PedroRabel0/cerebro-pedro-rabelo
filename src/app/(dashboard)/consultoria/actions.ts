@@ -732,6 +732,7 @@ export async function scheduleMeeting(
     durationMin?: number;
     recurrence?: "none" | "weekly" | "biweekly" | "monthly";
     calendarId?: string;
+    attendees?: string[]; // emails dos convidados
   }
 ): Promise<{ ok: true } | { error: string }> {
   const user = await requireUser();
@@ -759,6 +760,10 @@ export async function scheduleMeeting(
     .eq("id", companyId)
     .single();
 
+  const attendees = (input.attendees ?? [])
+    .map((e) => e.trim())
+    .filter((e) => /.+@.+\..+/.test(e));
+
   const res = await createTimedCalendarEvent(
     user.id,
     {
@@ -767,6 +772,7 @@ export async function scheduleMeeting(
       startDateTime,
       endDateTime,
       recurrence: rrule,
+      attendees,
     },
     input.calendarId || "primary"
   );

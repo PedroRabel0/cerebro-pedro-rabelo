@@ -123,7 +123,7 @@ export default function CompanyDetail({
         <RoadmapSection companyId={company.id} steps={data.steps} onChange={refresh} />
       </div>
 
-      <MeetingsSection companyId={company.id} meetings={data.meetings} googleConnected={googleConnected} calendars={calendars} onChange={refresh} />
+      <MeetingsSection companyId={company.id} meetings={data.meetings} contacts={data.contacts} googleConnected={googleConnected} calendars={calendars} onChange={refresh} />
       <TasksSection
         companyId={company.id}
         tasks={data.tasks}
@@ -410,12 +410,14 @@ function RoadmapSection({
 function MeetingsSection({
   companyId,
   meetings,
+  contacts,
   googleConnected,
   calendars,
   onChange,
 }: {
   companyId: string;
   meetings: CompanyDetailData["meetings"];
+  contacts: ConsultingContact[];
   googleConnected: boolean;
   calendars: { id: string; summary: string }[];
   onChange: () => void;
@@ -435,8 +437,18 @@ function MeetingsSection({
   const [sTime, setSTime] = useState("09:00");
   const [sRecur, setSRecur] = useState<"none" | "weekly" | "biweekly" | "monthly">("none");
   const [sCal, setSCal] = useState("primary");
+  const [sEmails, setSEmails] = useState("");
   const [sBusy, setSBusy] = useState(false);
   const [sErr, setSErr] = useState<string | null>(null);
+
+  const contactsWithEmail = contacts.filter((c) => c.email);
+  function addEmail(email: string) {
+    setSEmails((prev) => {
+      const list = prev.split(/[\s,;]+/).filter(Boolean);
+      if (list.includes(email)) return prev;
+      return [...list, email].join(", ");
+    });
+  }
 
   function add() {
     if (!title.trim()) return;
@@ -449,12 +461,13 @@ function MeetingsSection({
   async function doSchedule() {
     if (!sTitle.trim() || !sDate) return;
     setSBusy(true); setSErr(null);
+    const attendees = sEmails.split(/[\s,;]+/).map((e) => e.trim()).filter(Boolean);
     const res = await scheduleMeeting(companyId, {
-      title: sTitle, date: sDate, time: sTime, recurrence: sRecur, calendarId: sCal,
+      title: sTitle, date: sDate, time: sTime, recurrence: sRecur, calendarId: sCal, attendees,
     });
     setSBusy(false);
     if ("error" in res) { setSErr(res.error); return; }
-    setSTitle(""); setSDate(""); setSTime("09:00"); setSRecur("none"); setSched(false);
+    setSTitle(""); setSDate(""); setSTime("09:00"); setSRecur("none"); setSEmails(""); setSched(false);
     onChange();
   }
   async function process(id: string) {
@@ -502,6 +515,22 @@ function MeetingsSection({
               </select>
             )}
           </div>
+          <input value={sEmails} onChange={(e) => setSEmails(e.target.value)} placeholder="Emails dos convidados (separados por vírgula)" aria-label="Emails dos convidados" className={input} />
+          {contactsWithEmail.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-text-muted">Adicionar contato:</span>
+              {contactsWithEmail.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => addEmail(c.email as string)}
+                  className="rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted transition hover:border-accent/40 hover:text-text"
+                >
+                  + {c.name}
+                </button>
+              ))}
+            </div>
+          )}
           {sErr && <p className="text-xs text-red">{sErr}</p>}
           <div className="flex gap-2">
             <button onClick={doSchedule} disabled={!sTitle.trim() || !sDate || sBusy} className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50">

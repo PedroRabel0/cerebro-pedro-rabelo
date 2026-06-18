@@ -156,6 +156,7 @@ export async function createTimedCalendarEvent(
     endDateTime: string;
     timeZone?: string;
     recurrence?: string[]; // ex: ["RRULE:FREQ=WEEKLY"]
+    attendees?: string[]; // emails dos convidados
   },
   calendarId: string = "primary"
 ): Promise<{ ok: true; eventId: string } | { error: string }> {
@@ -171,8 +172,13 @@ export async function createTimedCalendarEvent(
     reminders: { useDefault: true },
   };
   if (ev.recurrence && ev.recurrence.length > 0) body.recurrence = ev.recurrence;
+  const hasGuests = !!ev.attendees && ev.attendees.length > 0;
+  if (hasGuests) body.attendees = ev.attendees!.map((email) => ({ email }));
 
-  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+  // sendUpdates=all => Google envia o convite por email aos convidados
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events${
+    hasGuests ? "?sendUpdates=all" : ""
+  }`;
   const res = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
