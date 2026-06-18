@@ -412,9 +412,9 @@ function MonthGrid({
   while (cells.length % 7 !== 0) cells.push(null);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
+    <div className="overflow-x-auto rounded-xl border border-border bg-card">
       {/* Weekday header */}
-      <div className="grid grid-cols-7 border-b border-border">
+      <div className="grid grid-cols-7 border-b border-border min-w-[680px]">
         {WEEKDAY_LABELS.map((label) => (
           <div
             key={label}
@@ -425,7 +425,7 @@ function MonthGrid({
         ))}
       </div>
       {/* Day cells */}
-      <div className="grid grid-cols-7">
+      <div className="grid grid-cols-7 min-w-[680px]">
         {cells.map((date, idx) => {
           if (!date) {
             return (
@@ -501,8 +501,8 @@ function WeekGrid({
   const weekDays = getWeekDays(currentDate);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="grid grid-cols-7">
+    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <div className="grid grid-cols-7 min-w-[680px]">
         {weekDays.map((date, idx) => {
           const key = formatDateKey(date);
           const dayEntries = entriesByDate[key] || [];

@@ -407,3 +407,17 @@ h3 { letter-spacing: -0.01em; }
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--border-light), transparent);
 }
+
+/* ========================================
+   Acessibilidade: respeitar reduce motion (WCAG 2.3.3)
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

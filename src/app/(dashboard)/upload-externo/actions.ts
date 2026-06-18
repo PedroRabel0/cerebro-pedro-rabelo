@@ -194,6 +194,10 @@ export async function saveDesignUpload(input: {
   }
 
   const firstUrl = slideUrls[0];
+  // Convencao unica: image_url guarda TODOS os slides como JSON array (igual ao
+  // uploadImageToContent), para que parseImageUrls() exiba o carrossel inteiro.
+  const imageUrlValue =
+    slideUrls.length > 1 ? JSON.stringify(slideUrls) : firstUrl;
   let contentId: string;
 
   if (linkedContentId) {
@@ -209,7 +213,7 @@ export async function saveDesignUpload(input: {
     const { error } = await supabase
       .from("generated_contents")
       .update({
-        image_url: firstUrl,
+        image_url: imageUrlValue,
         image_model: "external",
         content_text: caption || existing?.content_text || null,
         generation_params: { ...params, external_slides: slideUrls },
@@ -230,7 +234,7 @@ export async function saveDesignUpload(input: {
         free_text_input: "Upload de design (carrossel)",
         content_type: contentType,
         content_text: caption || null,
-        image_url: firstUrl,
+        image_url: imageUrlValue,
         image_model: "external",
         generation_params: { external_slides: slideUrls },
         status: "draft",

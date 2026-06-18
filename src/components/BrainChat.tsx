@@ -164,9 +164,10 @@ export default function BrainChat() {
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
+              aria-label="Fechar painel de conversas"
               className="rounded-lg p-1 text-text-muted hover:bg-surface hover:text-text transition-colors"
             >
-              <PanelLeftClose className="h-4 w-4" />
+              <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
 
@@ -194,7 +195,11 @@ export default function BrainChat() {
               {chats.map((chat) => (
                 <div
                   key={chat.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Abrir conversa: ${chat.title}`}
                   onClick={() => { setActiveChatId(chat.id); inputRef.current?.focus(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveChatId(chat.id); inputRef.current?.focus(); } }}
                   className={`group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-all ${
                     activeChatId === chat.id
                       ? "nav-item-active text-accent"
@@ -208,9 +213,10 @@ export default function BrainChat() {
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteChat(chat.id); }}
+                    aria-label={`Apagar conversa: ${chat.title}`}
                     className="shrink-0 rounded p-1 text-text-muted/30 opacity-0 transition-all hover:bg-red/10 hover:text-red group-hover:opacity-100"
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className="h-3 w-3" aria-hidden="true" />
                   </button>
                 </div>
               ))}
@@ -227,17 +233,19 @@ export default function BrainChat() {
           {!sidebarOpen && (
             <button
               onClick={() => setSidebarOpen(true)}
+              aria-label="Abrir painel de conversas"
               className="hidden md:flex rounded-lg p-1.5 text-text-muted hover:bg-surface hover:text-text transition-colors"
             >
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeft className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
           {/* Mobile menu */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Abrir menu de conversas"
             className="md:hidden rounded-lg p-1.5 text-text-muted hover:text-text"
           >
-            <PanelLeft className="h-4 w-4" />
+            <PanelLeft className="h-4 w-4" aria-hidden="true" />
           </button>
 
           <div className="flex items-center gap-2 flex-1">
@@ -257,7 +265,7 @@ export default function BrainChat() {
         </div>
 
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto" aria-live="polite" aria-atomic="false">
           <div className="mx-auto max-w-3xl px-4 py-6 md:px-8">
             {/* Empty: no chat */}
             {!activeChatId && messages.length === 0 && !loading && (
@@ -385,6 +393,7 @@ export default function BrainChat() {
                   onChange={handleTextareaInput}
                   onKeyDown={handleKeyDown}
                   placeholder={activeChatId ? "Pergunte ao Cerebro..." : "Crie uma conversa para comecar..."}
+                  aria-label="Mensagem para o Cerebro"
                   disabled={loading}
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm text-text placeholder:text-text-muted/50 focus:outline-none focus-visible:outline-none disabled:opacity-50"
@@ -397,9 +406,10 @@ export default function BrainChat() {
                 <button
                   type="submit"
                   disabled={loading || !input.trim()}
+                  aria-label="Enviar mensagem"
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent text-white transition-all hover:bg-accent-hover disabled:opacity-30 disabled:bg-surface disabled:text-text-muted"
                 >
-                  <Send className="h-3.5 w-3.5" />
+                  <Send className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
               <p className="mt-1.5 text-center font-mono text-[11px] text-text-muted/40">
@@ -423,8 +433,8 @@ export default function BrainChat() {
                   </div>
                   <span className="font-display text-sm font-bold text-text">Conversas</span>
                 </div>
-                <button onClick={() => setSidebarOpen(false)} className="rounded-lg p-1 text-text-muted hover:text-text">
-                  <PanelLeftClose className="h-4 w-4" />
+                <button onClick={() => setSidebarOpen(false)} aria-label="Fechar painel de conversas" className="rounded-lg p-1 text-text-muted hover:text-text">
+                  <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
               <div className="p-3">
@@ -434,16 +444,18 @@ export default function BrainChat() {
               </div>
               <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5">
                 {chats.map((chat) => (
-                  <div key={chat.id} onClick={() => { setActiveChatId(chat.id); setSidebarOpen(false); }}
+                  <div key={chat.id} role="button" tabIndex={0} aria-label={`Abrir conversa: ${chat.title}`}
+                    onClick={() => { setActiveChatId(chat.id); setSidebarOpen(false); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveChatId(chat.id); setSidebarOpen(false); } }}
                     className={`group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-all ${activeChatId === chat.id ? "nav-item-active text-accent" : "text-text-secondary hover:bg-surface/40"}`}>
                     <MessageSquare className={`h-3 w-3 shrink-0 ${activeChatId === chat.id ? "text-accent" : "text-text-muted/40"}`} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px]">{chat.title}</p>
                       <p className="font-mono text-[11px] text-text-muted/60">{relativeTime(chat.updated_at)}</p>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteChat(chat.id); }}
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteChat(chat.id); }} aria-label={`Apagar conversa: ${chat.title}`}
                       className="shrink-0 rounded p-1 text-text-muted/30 opacity-0 hover:bg-red/10 hover:text-red group-hover:opacity-100">
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-3 w-3" aria-hidden="true" />
                     </button>
                   </div>
                 ))}
