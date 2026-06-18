@@ -475,3 +475,83 @@ export interface TrendScan {
   per_profile_summary: { profile_id: string; handle: string; display_name: string; platform: string; posts_count: number; top_themes: string[]; avg_engagement: number; highlight: string }[];
   created_at: string;
 }
+
+// --- Consultoria ---
+export type ConsultingStatus = "ativa" | "pausada" | "concluida";
+export type ContractStatus = "sem_contrato" | "enviado" | "assinado";
+export type PaymentStatus = "em_dia" | "pendente" | "atrasado";
+export type ConsultingTaskStatus = "pendente" | "feita" | "cancelada";
+export type ConsultingDocKind = "contrato" | "proposta" | "outro";
+
+export interface ConsultingCompany {
+  id: string;
+  name: string;
+  sector: string | null;
+  goal: string | null;
+  status: ConsultingStatus;
+  contract_status: ContractStatus;
+  contract_value: number | null;
+  payment_status: PaymentStatus;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConsultingContact {
+  id: string;
+  company_id: string;
+  name: string;
+  role: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  is_primary: boolean;
+  consent: boolean;
+  created_at: string;
+}
+
+export interface ConsultingMeeting {
+  id: string;
+  company_id: string;
+  title: string;
+  held_at: string;
+  transcript: string | null;
+  summary: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ConsultingTask {
+  id: string;
+  company_id: string;
+  meeting_id: string | null;
+  contact_id: string | null;
+  description: string;
+  owner_name: string | null;
+  due_date: string | null;
+  remind_at: string | null;
+  status: ConsultingTaskStatus;
+  message_draft: string | null;
+  source: "manual" | "ai";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConsultingDocument {
+  id: string;
+  company_id: string;
+  name: string;
+  storage_path: string;
+  kind: ConsultingDocKind;
+  created_at: string;
+}
+
+export interface ConsultingStep {
+  id: string;
+  company_id: string;
+  title: string;
+  target_date: string | null;
+  status: "pendente" | "feita";
+  ordem: number;
+  created_at: string;
+}

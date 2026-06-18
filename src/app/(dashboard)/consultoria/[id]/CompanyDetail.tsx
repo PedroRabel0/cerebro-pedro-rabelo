@@ -1,0 +1,614 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Loader2,
+  Wand2,
+  MessageSquare,
+  Copy,
+  Check,
+  CalendarPlus,
+  FileText,
+  Upload,
+  ExternalLink,
+  User,
+  Mail,
+  CheckSquare,
+  Square,
+  Sparkles,
+} from "lucide-react";
+import { useConfirm } from "@/components/ConfirmProvider";
+import type { CompanyDetail as CompanyDetailData } from "../actions";
+import {
+  updateCompany,
+  createContact,
+  deleteContact,
+  createMeeting,
+  deleteMeeting,
+  processMeeting,
+  createTask,
+  updateTask,
+  deleteTask,
+  generateTaskMessage,
+  uploadDocument,
+  getDocumentUrl,
+  deleteDocument,
+  createStep,
+  toggleStep,
+  deleteStep,
+} from "../actions";
+import type { ConsultingContact, ConsultingTask } from "@/lib/supabase/types";
+
+const input =
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none";
+const card = "rounded-xl border border-border bg-card p-4";
+
+function waDigits(n: string | null | undefined): string {
+  return (n || "").replace(/\D/g, "");
+}
+function waLink(text: string, number?: string | null): string {
+  const t = encodeURIComponent(text);
+  const d = waDigits(number);
+  return d ? `https://wa.me/${d}?text=${t}` : `https://wa.me/?text=${t}`;
+}
+function gcalLink(title: string, dateStr: string | null, details: string): string {
+  const t = encodeURIComponent(title);
+  const det = encodeURIComponent(details);
+  if (!dateStr) return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${t}&details=${det}`;
+  const start = dateStr.replace(/-/g, "");
+  const dt = new Date(dateStr + "T00:00:00");
+  dt.setDate(dt.getDate() + 1);
+  const end = dt.toISOString().slice(0, 10).replace(/-/g, "");
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${t}&dates=${start}/${end}&details=${det}`;
+}
+
+function SectionTitle({ icon: Icon, children, count }: { icon: typeof User; children: React.ReactNode; count?: number }) {
+  return (
+    <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-text">
+      <Icon className="h-4 w-4 text-accent" />
+      {children}
+      {count !== undefined && <span className="text-xs font-normal text-text-muted">· {count}</span>}
+    </h2>
+  );
+}
+
+export default function CompanyDetail({ data }: { data: CompanyDetailData }) {
+  const { company } = data;
+  const router = useRouter();
+  const refresh = () => router.refresh();
+
+  return (
+    <div className="space-y-5">
+      <Link href="/consultoria" className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text">
+        <ArrowLeft className="h-4 w-4" /> Voltar
+      </Link>
+
+      <CompanyHeader company={company} onSaved={refresh} />
+      <ContractCard company={company} onSaved={refresh} />
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <ContactsSection companyId={company.id} contacts={data.contacts} onChange={refresh} />
+        <RoadmapSection companyId={company.id} steps={data.steps} onChange={refresh} />
+      </div>
+
+      <MeetingsSection companyId={company.id} meetings={data.meetings} onChange={refresh} />
+      <TasksSection companyId={company.id} tasks={data.tasks} contacts={data.contacts} onChange={refresh} />
+      <DocumentsSection companyId={company.id} documents={data.documents} onChange={refresh} />
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+
+function CompanyHeader({ company, onSaved }: { company: CompanyDetailData["company"]; onSaved: () => void }) {
+  const [, start] = useTransition();
+  const save = (fields: Parameters<typeof updateCompany>[1]) =>
+    start(async () => {
+      await updateCompany(company.id, fields);
+      onSaved();
+    });
+
+  return (
+    <div className={card}>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="flex-1 text-xl font-bold text-text">{company.name}</h1>
+        <select
+          value={company.status}
+          onChange={(e) => save({ status: e.target.value as typeof company.status })}
+          aria-label="Status da consultoria"
+          className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-text focus:border-accent focus:outline-none"
+        >
+          <option value="ativa">Ativa</option>
+          <option value="pausada">Pausada</option>
+          <option value="concluida">Concluída</option>
+        </select>
+      </div>
+      {company.sector && <p className="mt-1 text-xs text-text-muted">{company.sector}</p>}
+      <textarea
+        defaultValue={company.goal || ""}
+        onBlur={(e) => e.target.value !== (company.goal || "") && save({ goal: e.target.value })}
+        placeholder="Objetivo da consultoria..."
+        aria-label="Objetivo da consultoria"
+        rows={2}
+        className={`${input} mt-3 resize-none`}
+      />
+    </div>
+  );
+}
+
+function ContractCard({ company, onSaved }: { company: CompanyDetailData["company"]; onSaved: () => void }) {
+  const [, start] = useTransition();
+  const save = (fields: Parameters<typeof updateCompany>[1]) =>
+    start(async () => {
+      await updateCompany(company.id, fields);
+      onSaved();
+    });
+
+  return (
+    <div className={card}>
+      <SectionTitle icon={FileText}>Contrato &amp; pagamento</SectionTitle>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="text-xs text-text-muted">
+          Contrato
+          <select
+            value={company.contract_status}
+            onChange={(e) => save({ contract_status: e.target.value as typeof company.contract_status })}
+            aria-label="Status do contrato"
+            className={`${input} mt-1`}
+          >
+            <option value="sem_contrato">Sem contrato</option>
+            <option value="enviado">Enviado</option>
+            <option value="assinado">Assinado</option>
+          </select>
+        </label>
+        <label className="text-xs text-text-muted">
+          Valor (R$)
+          <input
+            type="number"
+            defaultValue={company.contract_value ?? ""}
+            onBlur={(e) => save({ contract_value: e.target.value ? Number(e.target.value) : null })}
+            aria-label="Valor do contrato"
+            className={`${input} mt-1`}
+          />
+        </label>
+        <label className="text-xs text-text-muted">
+          Pagamento
+          <select
+            value={company.payment_status}
+            onChange={(e) => save({ payment_status: e.target.value as typeof company.payment_status })}
+            aria-label="Status do pagamento"
+            className={`${input} mt-1`}
+          >
+            <option value="em_dia">Em dia</option>
+            <option value="pendente">Pendente</option>
+            <option value="atrasado">Atrasado</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function ContactsSection({
+  companyId,
+  contacts,
+  onChange,
+}: {
+  companyId: string;
+  contacts: ConsultingContact[];
+  onChange: () => void;
+}) {
+  const confirm = useConfirm();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [email, setEmail] = useState("");
+  const [, start] = useTransition();
+
+  function add() {
+    if (!name.trim()) return;
+    start(async () => {
+      await createContact(companyId, { name, role, whatsapp, email });
+      setName(""); setRole(""); setWhatsapp(""); setEmail(""); setAdding(false);
+      onChange();
+    });
+  }
+  async function remove(id: string, n: string) {
+    if (!(await confirm(`Apagar o contato ${n}?`))) return;
+    start(async () => { await deleteContact(id, companyId); onChange(); });
+  }
+
+  return (
+    <div className={card}>
+      <SectionTitle icon={User} count={contacts.length}>Contatos</SectionTitle>
+      <div className="space-y-2">
+        {contacts.map((c) => (
+          <div key={c.id} className="flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm text-text">{c.name} {c.role && <span className="text-text-muted">· {c.role}</span>}</p>
+              <p className="truncate text-[11px] text-text-muted">{c.whatsapp || "sem WhatsApp"}{c.email ? ` · ${c.email}` : ""}</p>
+            </div>
+            {c.whatsapp && (
+              <a href={waLink("Olá!", c.whatsapp)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp de ${c.name}`} className="rounded-lg p-1.5 text-green hover:bg-green/10">
+                <MessageSquare className="h-4 w-4" />
+              </a>
+            )}
+            <button onClick={() => remove(c.id, c.name)} aria-label={`Apagar ${c.name}`} className="rounded-lg p-1.5 text-text-muted hover:bg-red/10 hover:text-red">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+        {contacts.length === 0 && <p className="text-xs text-text-muted">Nenhum contato ainda.</p>}
+      </div>
+
+      {adding ? (
+        <div className="mt-3 space-y-2">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome" aria-label="Nome do contato" className={input} autoFocus />
+          <div className="grid grid-cols-2 gap-2">
+            <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Cargo" aria-label="Cargo" className={input} />
+            <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="WhatsApp (com DDD)" aria-label="WhatsApp" className={input} />
+          </div>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (opcional)" aria-label="Email" className={input} />
+          <div className="flex gap-2">
+            <button onClick={add} disabled={!name.trim()} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50">Adicionar</button>
+            <button onClick={() => setAdding(false)} className="px-2 py-1.5 text-xs text-text-muted hover:text-text">Cancelar</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)} className="mt-3 flex items-center gap-1.5 text-xs text-accent hover:underline">
+          <Plus className="h-3.5 w-3.5" /> Adicionar contato
+        </button>
+      )}
+    </div>
+  );
+}
+
+function RoadmapSection({
+  companyId,
+  steps,
+  onChange,
+}: {
+  companyId: string;
+  steps: CompanyDetailData["steps"];
+  onChange: () => void;
+}) {
+  const confirm = useConfirm();
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
+  const [, start] = useTransition();
+
+  function add() {
+    if (!title.trim()) return;
+    start(async () => { await createStep(companyId, { title, target_date: date || undefined }); setTitle(""); setDate(""); onChange(); });
+  }
+
+  return (
+    <div className={card}>
+      <SectionTitle icon={CheckSquare} count={steps.length}>Roadmap</SectionTitle>
+      <div className="space-y-1.5">
+        {steps.map((s) => (
+          <div key={s.id} className="flex items-center gap-2">
+            <button
+              onClick={() => start(async () => { await toggleStep(s.id, companyId, s.status !== "feita"); onChange(); })}
+              aria-label={s.status === "feita" ? "Marcar como pendente" : "Marcar como feito"}
+              className="text-text-muted hover:text-accent"
+            >
+              {s.status === "feita" ? <CheckSquare className="h-4 w-4 text-green" /> : <Square className="h-4 w-4" />}
+            </button>
+            <span className={`flex-1 text-sm ${s.status === "feita" ? "text-text-muted line-through" : "text-text"}`}>{s.title}</span>
+            {s.target_date && <span className="text-[11px] text-text-muted">{s.target_date}</span>}
+            <button
+              onClick={async () => { if (await confirm("Apagar este passo?")) start(async () => { await deleteStep(s.id, companyId); onChange(); }); }}
+              aria-label="Apagar passo"
+              className="rounded p-1 text-text-muted hover:text-red"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+        {steps.length === 0 && <p className="text-xs text-text-muted">Defina os passos do plano.</p>}
+      </div>
+      <div className="mt-3 flex gap-2">
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Novo passo" aria-label="Novo passo do roadmap" className={input} />
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Data-alvo do passo" className="rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text focus:border-accent focus:outline-none" />
+        <button onClick={add} disabled={!title.trim()} aria-label="Adicionar passo" className="rounded-lg bg-accent px-3 text-white hover:brightness-110 disabled:opacity-50"><Plus className="h-4 w-4" /></button>
+      </div>
+    </div>
+  );
+}
+
+function MeetingsSection({
+  companyId,
+  meetings,
+  onChange,
+}: {
+  companyId: string;
+  meetings: CompanyDetailData["meetings"];
+  onChange: () => void;
+}) {
+  const confirm = useConfirm();
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState("");
+  const [transcript, setTranscript] = useState("");
+  const [processing, setProcessing] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [, start] = useTransition();
+
+  function add() {
+    if (!title.trim()) return;
+    start(async () => {
+      await createMeeting(companyId, { title, transcript });
+      setTitle(""); setTranscript(""); setAdding(false); onChange();
+    });
+  }
+  async function process(id: string) {
+    setProcessing(id); setMsg(null);
+    const res = await processMeeting(id);
+    setProcessing(null);
+    if ("error" in res) setMsg(res.error);
+    else { setMsg(`${res.created} tarefa(s) criada(s) — veja abaixo.`); onChange(); }
+  }
+
+  return (
+    <div className={card}>
+      <div className="mb-3 flex items-center justify-between">
+        <SectionTitle icon={Sparkles} count={meetings.length}>Reuniões</SectionTitle>
+        {!adding && (
+          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 text-xs text-accent hover:underline">
+            <Plus className="h-3.5 w-3.5" /> Nova reunião
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="mb-4 space-y-2 rounded-lg border border-accent/30 bg-surface/40 p-3">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título da reunião (ex: Kickoff)" aria-label="Título da reunião" className={input} autoFocus />
+          <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Cole aqui a transcrição da reunião..." aria-label="Transcrição da reunião" rows={5} className={`${input} resize-none`} />
+          <div className="flex gap-2">
+            <button onClick={add} disabled={!title.trim()} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50">Salvar reunião</button>
+            <button onClick={() => setAdding(false)} className="px-2 py-1.5 text-xs text-text-muted hover:text-text">Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {msg && <p className="mb-3 rounded-lg bg-surface px-3 py-2 text-xs text-text-secondary">{msg}</p>}
+
+      <div className="space-y-3">
+        {meetings.map((m) => (
+          <div key={m.id} className="rounded-lg border border-border/60 p-3">
+            <div className="flex items-center gap-2">
+              <span className="flex-1 text-sm font-medium text-text">{m.title}</span>
+              <span className="text-[11px] text-text-muted">{new Date(m.held_at).toLocaleDateString("pt-BR")}</span>
+              {m.transcript && (
+                <button
+                  onClick={() => process(m.id)}
+                  disabled={processing === m.id}
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs text-text transition hover:border-accent/40 disabled:opacity-50"
+                >
+                  {processing === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                  Processar reunião
+                </button>
+              )}
+              <button onClick={async () => { if (await confirm("Apagar esta reunião?")) start(async () => { await deleteMeeting(m.id, companyId); onChange(); }); }} aria-label="Apagar reunião" className="rounded p-1 text-text-muted hover:text-red">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {m.summary && <p className="mt-2 whitespace-pre-wrap rounded bg-surface/50 px-3 py-2 text-xs text-text-secondary">{m.summary}</p>}
+            {!m.transcript && <p className="mt-1 text-[11px] text-text-muted">Sem transcrição — edite a reunião pra colar.</p>}
+          </div>
+        ))}
+        {meetings.length === 0 && !adding && <p className="text-xs text-text-muted">Nenhuma reunião ainda. Cole a transcrição de uma reunião pra extrair as tarefas.</p>}
+      </div>
+    </div>
+  );
+}
+
+function TasksSection({
+  companyId,
+  tasks,
+  contacts,
+  onChange,
+}: {
+  companyId: string;
+  tasks: ConsultingTask[];
+  contacts: ConsultingContact[];
+  onChange: () => void;
+}) {
+  const confirm = useConfirm();
+  const [desc, setDesc] = useState("");
+  const [owner, setOwner] = useState("");
+  const [due, setDue] = useState("");
+  const [, start] = useTransition();
+
+  function add() {
+    if (!desc.trim()) return;
+    start(async () => { await createTask(companyId, { description: desc, owner_name: owner, due_date: due || undefined }); setDesc(""); setOwner(""); setDue(""); onChange(); });
+  }
+
+  const pending = tasks.filter((t) => t.status !== "feita");
+  const done = tasks.filter((t) => t.status === "feita");
+
+  return (
+    <div className={card}>
+      <SectionTitle icon={CheckSquare} count={pending.length}>Tarefas</SectionTitle>
+
+      <div className="space-y-2">
+        {pending.map((t) => (
+          <TaskRow key={t.id} task={t} companyId={companyId} contacts={contacts} onChange={onChange} onDelete={async () => { if (await confirm("Apagar esta tarefa?")) start(async () => { await deleteTask(t.id, companyId); onChange(); }); }} />
+        ))}
+        {pending.length === 0 && <p className="text-xs text-text-muted">Nenhuma tarefa pendente.</p>}
+      </div>
+
+      <div className="mt-3 space-y-2 rounded-lg border border-border/60 p-3">
+        <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Nova tarefa" aria-label="Descrição da tarefa" className={input} />
+        <div className="flex gap-2">
+          <input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Responsável" aria-label="Responsável" className={input} />
+          <input type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="Prazo" className="rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text focus:border-accent focus:outline-none" />
+          <button onClick={add} disabled={!desc.trim()} aria-label="Adicionar tarefa" className="rounded-lg bg-accent px-3 text-white hover:brightness-110 disabled:opacity-50"><Plus className="h-4 w-4" /></button>
+        </div>
+      </div>
+
+      {done.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs text-text-muted">{done.length} concluída(s)</summary>
+          <div className="mt-2 space-y-1">
+            {done.map((t) => (
+              <div key={t.id} className="flex items-center gap-2 text-xs text-text-muted">
+                <button onClick={() => start(async () => { await updateTask(t.id, companyId, { status: "pendente" }); onChange(); })} aria-label="Reabrir tarefa"><CheckSquare className="h-3.5 w-3.5 text-green" /></button>
+                <span className="line-through">{t.description}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function TaskRow({
+  task,
+  companyId,
+  contacts,
+  onChange,
+  onDelete,
+}: {
+  task: ConsultingTask;
+  companyId: string;
+  contacts: ConsultingContact[];
+  onChange: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [gen, setGen] = useState(false);
+  const [message, setMessage] = useState<string | null>(task.message_draft);
+  const [copied, setCopied] = useState(false);
+  const [, start] = useTransition();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const overdue = task.due_date && task.due_date < today;
+  const ownerContact = contacts.find((c) => c.name === task.owner_name && c.whatsapp);
+
+  async function generate() {
+    setGen(true);
+    const res = await generateTaskMessage(task.id);
+    setGen(false);
+    if (!("error" in res)) { setMessage(res.message); setOpen(true); }
+  }
+  function toggleDone() {
+    start(async () => { await updateTask(task.id, companyId, { status: task.status === "feita" ? "pendente" : "feita" }); onChange(); });
+  }
+  function copy() {
+    if (message) { navigator.clipboard.writeText(message); setCopied(true); setTimeout(() => setCopied(false), 1500); }
+  }
+
+  return (
+    <div className="rounded-lg border border-border/60 p-3">
+      <div className="flex items-start gap-2">
+        <button onClick={toggleDone} aria-label="Marcar tarefa como feita" className="mt-0.5 text-text-muted hover:text-accent">
+          <Square className="h-4 w-4" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-text">{task.description}</p>
+          <p className="mt-0.5 text-[11px] text-text-muted">
+            {task.owner_name && <span><User className="mr-0.5 inline h-3 w-3 align-[-2px]" />{task.owner_name} · </span>}
+            {task.due_date ? (
+              <span className={overdue ? "text-red" : ""}>{overdue ? "venceu " : "até "}{new Date(task.due_date + "T00:00:00").toLocaleDateString("pt-BR")}</span>
+            ) : "sem prazo"}
+            {task.source === "ai" && <span className="ml-1.5 rounded bg-violet/10 px-1.5 py-0.5 text-[9px] text-violet">IA</span>}
+          </p>
+        </div>
+        <button onClick={onDelete} aria-label="Apagar tarefa" className="rounded p-1 text-text-muted hover:text-red"><Trash2 className="h-3.5 w-3.5" /></button>
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button onClick={message ? () => setOpen(!open) : generate} disabled={gen} className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] text-text hover:border-accent/40 disabled:opacity-50">
+          {gen ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />}
+          {message ? (open ? "Ocultar mensagem" : "Ver mensagem") : "Gerar mensagem"}
+        </button>
+        <a
+          href={gcalLink(`Cobrar ${task.owner_name || "cliente"}: ${task.description}`, task.remind_at || task.due_date, task.description)}
+          target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] text-text-muted hover:border-accent/40 hover:text-text"
+        >
+          <CalendarPlus className="h-3 w-3" /> Lembrete na agenda
+        </a>
+      </div>
+
+      {open && message && (
+        <div className="mt-2 rounded-lg bg-surface/60 p-2.5">
+          <p className="whitespace-pre-wrap text-xs text-text-secondary">{message}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <a href={waLink(message, ownerContact?.whatsapp)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg bg-green/10 px-2.5 py-1 text-[11px] text-green hover:bg-green/20">
+              <MessageSquare className="h-3 w-3" /> {ownerContact ? `Enviar p/ ${ownerContact.name}` : "Abrir WhatsApp"}
+            </a>
+            <button onClick={copy} className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] text-text-muted hover:text-text">
+              {copied ? <Check className="h-3 w-3 text-green" /> : <Copy className="h-3 w-3" />} Copiar
+            </button>
+            <button onClick={generate} disabled={gen} className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] text-text-muted hover:text-text disabled:opacity-50">
+              <Wand2 className="h-3 w-3" /> Regerar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DocumentsSection({
+  companyId,
+  documents,
+  onChange,
+}: {
+  companyId: string;
+  documents: CompanyDetailData["documents"];
+  onChange: () => void;
+}) {
+  const confirm = useConfirm();
+  const [uploading, setUploading] = useState(false);
+  const [, start] = useTransition();
+
+  async function upload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.set("file", file);
+    fd.set("kind", "outro");
+    await uploadDocument(companyId, fd);
+    setUploading(false);
+    e.target.value = "";
+    onChange();
+  }
+  async function openDoc(id: string) {
+    const res = await getDocumentUrl(id);
+    if (!("error" in res)) window.open(res.url, "_blank", "noopener");
+  }
+
+  return (
+    <div className={card}>
+      <SectionTitle icon={FileText} count={documents.length}>Documentos &amp; contrato</SectionTitle>
+      <div className="space-y-2">
+        {documents.map((d) => (
+          <div key={d.id} className="flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
+            <FileText className="h-4 w-4 text-text-muted" />
+            <button onClick={() => openDoc(d.id)} className="flex-1 truncate text-left text-sm text-text hover:text-accent">{d.name}</button>
+            <button onClick={() => openDoc(d.id)} aria-label="Abrir documento" className="rounded p-1 text-text-muted hover:text-accent"><ExternalLink className="h-3.5 w-3.5" /></button>
+            <button onClick={async () => { if (await confirm(`Apagar ${d.name}?`)) start(async () => { await deleteDocument(d.id, companyId); onChange(); }); }} aria-label="Apagar documento" className="rounded p-1 text-text-muted hover:text-red"><Trash2 className="h-3.5 w-3.5" /></button>
+          </div>
+        ))}
+        {documents.length === 0 && <p className="text-xs text-text-muted">Nenhum documento. Suba o contrato ou propostas aqui (privado).</p>}
+      </div>
+      <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-3 text-xs text-text-muted transition hover:border-accent/40 hover:text-text">
+        <input type="file" onChange={upload} className="hidden" disabled={uploading} aria-label="Subir documento" />
+        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        {uploading ? "Subindo..." : "Subir documento"}
+      </label>
+    </div>
+  );
+}

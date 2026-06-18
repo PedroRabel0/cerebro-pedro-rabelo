@@ -24,6 +24,7 @@ import {
   AudioLines,
   NotebookPen,
   Upload,
+  Briefcase,
 } from "lucide-react";
 import { useUserRole, type UserRole } from "@/lib/hooks/useUserRole";
 
@@ -59,6 +60,7 @@ const navSections: NavSection[] = [
   {
     title: "FERRAMENTAS",
     items: [
+      { href: "/consultoria", label: "Consultoria", Icon: Briefcase },
       { href: "/diario", label: "Diario", Icon: NotebookPen },
       { href: "/respostas", label: "Pedro Clone", Icon: MessageCircle },
       { href: "/newsletter", label: "Newsletter", Icon: Mail },
