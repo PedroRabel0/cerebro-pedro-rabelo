@@ -647,7 +647,7 @@ export async function getCalendarSuggestions(): Promise<CalendarSuggestion[]> {
   const supabase = await createClient();
 
   const [events, companiesRes, contactsRes] = await Promise.all([
-    listUpcomingEvents(user.id, 20),
+    listUpcomingEvents(user.id, 50),
     supabase.from("consulting_companies").select("id, name"),
     supabase.from("consulting_contacts").select("name, company_id"),
   ]);

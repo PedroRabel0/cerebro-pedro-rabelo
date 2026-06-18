@@ -164,7 +164,7 @@ export async function listCalendars(
 /** Proximos eventos de TODAS as agendas do usuario (inclui as compartilhadas). */
 export async function listUpcomingEvents(
   userId: string,
-  max = 20
+  max = 50
 ): Promise<{ id: string; summary: string; date: string; calendar: string }[]> {
   const token = await getValidAccessToken(userId);
   if (!token) return [];
@@ -193,7 +193,7 @@ export async function listUpcomingEvents(
   for (const cal of calendarIds.slice(0, 8)) {
     const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
       cal.id
-    )}/events?timeMin=${encodeURIComponent(timeMin)}&maxResults=10&singleEvents=true&orderBy=startTime`;
+    )}/events?timeMin=${encodeURIComponent(timeMin)}&maxResults=50&singleEvents=true&orderBy=startTime`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) continue;
     const data = (await res.json()) as {

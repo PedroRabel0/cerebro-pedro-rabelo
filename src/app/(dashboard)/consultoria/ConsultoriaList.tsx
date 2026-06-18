@@ -245,6 +245,17 @@ export default function ConsultoriaList({
   );
 }
 
+function formatEventDate(d: string): string {
+  if (!d) return "";
+  // Evento de dia inteiro: "AAAA-MM-DD" (sem hora) — parse local p/ nao trocar o dia
+  if (d.length === 10) {
+    const [y, m, day] = d.split("-").map(Number);
+    return new Date(y, m - 1, day).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) + " · dia inteiro";
+  }
+  // Evento com horario: ISO completo
+  return new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -307,7 +318,7 @@ function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-text">{s.title}</p>
                 <p className="text-[11px] text-text-muted">
-                  {new Date(s.date).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {formatEventDate(s.date)}
                   {s.calendar ? ` · ${s.calendar}` : ""}
                 </p>
               </div>
