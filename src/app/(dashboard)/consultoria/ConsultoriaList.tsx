@@ -265,6 +265,7 @@ function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   async function load() {
     setOpen(true);
@@ -299,6 +300,9 @@ function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
     );
   }
 
+  const matched = suggestions.filter((s) => s.suggestedCompanyId);
+  const visible = showAll ? suggestions : matched;
+
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -308,23 +312,32 @@ function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
         <button onClick={() => setOpen(false)} className="text-xs text-text-muted hover:text-text">Fechar</button>
       </div>
       {!loading && (
-        <p className="mb-2 text-[11px] text-text-muted">
-          {calendars.length > 0
-            ? `Lendo: ${calendars.join(", ")} · ${suggestions.length} evento(s) futuro(s) encontrado(s)`
-            : "Nenhuma agenda acessível — clique em \"Reconectar\" no topo e autorize o acesso às agendas."}
-        </p>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] text-text-muted">
+            {calendars.length > 0
+              ? `${matched.length} reunião(ões) das suas empresas · ${suggestions.length} eventos na agenda`
+              : "Nenhuma agenda acessível — clique em \"Reconectar\" no topo e autorize o acesso às agendas."}
+          </p>
+          {suggestions.length > matched.length && (
+            <button onClick={() => setShowAll((v) => !v)} className="text-[11px] text-accent hover:underline">
+              {showAll ? "Mostrar só reuniões" : "Ver todos os eventos"}
+            </button>
+          )}
+        </div>
       )}
       {loading ? (
         <div className="flex items-center gap-2 py-4 text-sm text-text-muted">
           <Loader2 className="h-4 w-4 animate-spin" /> Lendo suas agendas...
         </div>
-      ) : suggestions.length === 0 ? (
+      ) : visible.length === 0 ? (
         <p className="py-3 text-xs text-text-muted">
-          Nenhum evento futuro encontrado. O import mostra só eventos a partir de hoje — se a reunião já passou ou não está agendada na agenda, crie a reunião direto na empresa.
+          {suggestions.length === 0
+            ? "Nenhum evento futuro nas suas agendas. Cadastre a reunião direto na empresa."
+            : "Nenhuma reunião casou com suas empresas. Nomeie o evento com o nome da empresa ou do contato (ex: \"Reunião Prince\"), ou clique em \"Ver todos os eventos\" para escolher manualmente."}
         </p>
       ) : (
         <div className="space-y-2">
-          {suggestions.map((s) => (
+          {visible.map((s) => (
             <div key={s.eventId} className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-text">{s.title}</p>
