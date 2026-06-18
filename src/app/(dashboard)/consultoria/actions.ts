@@ -633,6 +633,7 @@ export interface CalendarSuggestion {
   eventId: string;
   title: string;
   date: string;
+  calendar: string;
   suggestedCompanyId: string | null;
   suggestedCompanyName: string | null;
 }
@@ -679,6 +680,7 @@ export async function getCalendarSuggestions(): Promise<CalendarSuggestion[]> {
         eventId: e.id,
         title: e.summary,
         date: e.date,
+        calendar: e.calendar,
         suggestedCompanyId: s?.id ?? null,
         suggestedCompanyName: s?.name ?? null,
       };

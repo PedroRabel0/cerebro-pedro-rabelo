@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { log } from "@/lib/logger";
 
-const SCOPE = "https://www.googleapis.com/auth/calendar.events";
+// calendar (completo): ler/escrever eventos E listar agendas (inclui as
+// compartilhadas, como a do Pedro). calendar.events sozinho nao lista agendas.
+const SCOPE = "https://www.googleapis.com/auth/calendar";
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
@@ -159,23 +161,49 @@ export async function listCalendars(
     .map((c) => ({ id: c.id, summary: (c.primary ? "Minha agenda" : c.summaryOverride || c.summary) }));
 }
 
-/** Proximos eventos da agenda principal do usuario (para importar reunioes). */
+/** Proximos eventos de TODAS as agendas do usuario (inclui as compartilhadas). */
 export async function listUpcomingEvents(
   userId: string,
   max = 20
-): Promise<{ id: string; summary: string; date: string }[]> {
+): Promise<{ id: string; summary: string; date: string; calendar: string }[]> {
   const token = await getValidAccessToken(userId);
   if (!token) return [];
+
+  // Descobre as agendas (a principal + as compartilhadas, ex: a do Pedro)
+  let calendarIds: { id: string; name: string }[] = [{ id: "primary", name: "Minha agenda" }];
+  const calRes = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (calRes.ok) {
+    const calData = (await calRes.json()) as {
+      items?: { id: string; summary: string; summaryOverride?: string; primary?: boolean }[];
+    };
+    const items = calData.items ?? [];
+    if (items.length > 0) {
+      calendarIds = items.map((c) => ({
+        id: c.id,
+        name: c.primary ? "Minha agenda" : c.summaryOverride || c.summary,
+      }));
+    }
+  }
+
   const timeMin = new Date().toISOString();
-  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&maxResults=${max}&singleEvents=true&orderBy=startTime`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) return [];
-  const data = (await res.json()) as {
-    items?: { id: string; summary?: string; start?: { dateTime?: string; date?: string } }[];
-  };
-  return (data.items ?? []).map((e) => ({
-    id: e.id,
-    summary: e.summary || "(sem titulo)",
-    date: e.start?.dateTime || e.start?.date || "",
-  }));
+  const all: { id: string; summary: string; date: string; calendar: string }[] = [];
+
+  for (const cal of calendarIds.slice(0, 8)) {
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+      cal.id
+    )}/events?timeMin=${encodeURIComponent(timeMin)}&maxResults=10&singleEvents=true&orderBy=startTime`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) continue;
+    const data = (await res.json()) as {
+      items?: { id: string; summary?: string; start?: { dateTime?: string; date?: string } }[];
+    };
+    for (const e of data.items ?? []) {
+      const date = e.start?.dateTime || e.start?.date || "";
+      if (date) all.push({ id: e.id, summary: e.summary || "(sem titulo)", date, calendar: cal.name });
+    }
+  }
+
+  return all.sort((a, b) => a.date.localeCompare(b.date)).slice(0, max);
 }

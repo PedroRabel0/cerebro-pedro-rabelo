@@ -106,14 +106,16 @@ export default function ConsultoriaList({
             </>
           )}
         </div>
-        {!googleConnected && (
-          <a
-            href="/api/google/connect"
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
-          >
-            <CalendarPlus className="h-3.5 w-3.5" /> Conectar Google Agenda
-          </a>
-        )}
+        <a
+          href="/api/google/connect"
+          className={
+            googleConnected
+              ? "flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-text-muted transition hover:text-text"
+              : "flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
+          }
+        >
+          <CalendarPlus className="h-3.5 w-3.5" /> {googleConnected ? "Reconectar" : "Conectar Google Agenda"}
+        </a>
       </div>
 
       {googleConnected && <ImportFromAgenda companies={companies} />}
@@ -304,7 +306,10 @@ function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
             <div key={s.eventId} className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-text">{s.title}</p>
-                <p className="text-[11px] text-text-muted">{new Date(s.date).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                <p className="text-[11px] text-text-muted">
+                  {new Date(s.date).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {s.calendar ? ` · ${s.calendar}` : ""}
+                </p>
               </div>
               {imported.has(s.eventId) ? (
                 <span className="flex items-center gap-1 text-xs text-green"><Check className="h-3.5 w-3.5" /> Importada</span>
