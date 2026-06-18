@@ -518,6 +518,8 @@ export interface ConsultingMeeting {
   transcript: string | null;
   summary: string | null;
   notes: string | null;
+  google_event_id: string | null;
+  google_calendar_id: string | null;
   created_at: string;
 }
 

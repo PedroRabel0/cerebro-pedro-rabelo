@@ -33,6 +33,7 @@ import {
   createMeeting,
   deleteMeeting,
   processMeeting,
+  scheduleMeeting,
   createTask,
   updateTask,
   deleteTask,
@@ -122,7 +123,7 @@ export default function CompanyDetail({
         <RoadmapSection companyId={company.id} steps={data.steps} onChange={refresh} />
       </div>
 
-      <MeetingsSection companyId={company.id} meetings={data.meetings} onChange={refresh} />
+      <MeetingsSection companyId={company.id} meetings={data.meetings} googleConnected={googleConnected} calendars={calendars} onChange={refresh} />
       <TasksSection
         companyId={company.id}
         tasks={data.tasks}
@@ -409,10 +410,14 @@ function RoadmapSection({
 function MeetingsSection({
   companyId,
   meetings,
+  googleConnected,
+  calendars,
   onChange,
 }: {
   companyId: string;
   meetings: CompanyDetailData["meetings"];
+  googleConnected: boolean;
+  calendars: { id: string; summary: string }[];
   onChange: () => void;
 }) {
   const confirm = useConfirm();
@@ -423,12 +428,34 @@ function MeetingsSection({
   const [msg, setMsg] = useState<string | null>(null);
   const [, start] = useTransition();
 
+  // Agendar reuniao (cria evento no Google + registra)
+  const [sched, setSched] = useState(false);
+  const [sTitle, setSTitle] = useState("");
+  const [sDate, setSDate] = useState("");
+  const [sTime, setSTime] = useState("09:00");
+  const [sRecur, setSRecur] = useState<"none" | "weekly" | "biweekly" | "monthly">("none");
+  const [sCal, setSCal] = useState("primary");
+  const [sBusy, setSBusy] = useState(false);
+  const [sErr, setSErr] = useState<string | null>(null);
+
   function add() {
     if (!title.trim()) return;
     start(async () => {
       await createMeeting(companyId, { title, transcript });
       setTitle(""); setTranscript(""); setAdding(false); onChange();
     });
+  }
+
+  async function doSchedule() {
+    if (!sTitle.trim() || !sDate) return;
+    setSBusy(true); setSErr(null);
+    const res = await scheduleMeeting(companyId, {
+      title: sTitle, date: sDate, time: sTime, recurrence: sRecur, calendarId: sCal,
+    });
+    setSBusy(false);
+    if ("error" in res) { setSErr(res.error); return; }
+    setSTitle(""); setSDate(""); setSTime("09:00"); setSRecur("none"); setSched(false);
+    onChange();
   }
   async function process(id: string) {
     setProcessing(id); setMsg(null);
@@ -442,12 +469,48 @@ function MeetingsSection({
     <div className={card}>
       <div className="mb-3 flex items-center justify-between">
         <SectionTitle icon={Sparkles} count={meetings.length}>Reuniões</SectionTitle>
-        {!adding && (
-          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 text-xs text-accent hover:underline">
-            <Plus className="h-3.5 w-3.5" /> Nova reunião
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {googleConnected && !sched && (
+            <button onClick={() => { setSched(true); setSCal(calendars[0]?.id || "primary"); }} className="flex items-center gap-1.5 text-xs text-accent hover:underline">
+              <CalendarPlus className="h-3.5 w-3.5" /> Agendar
+            </button>
+          )}
+          {!adding && (
+            <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text">
+              <Plus className="h-3.5 w-3.5" /> Registrar reunião
+            </button>
+          )}
+        </div>
       </div>
+
+      {sched && (
+        <div className="mb-4 space-y-2 rounded-lg border border-accent/30 bg-surface/40 p-3">
+          <p className="text-xs font-medium text-text">Agendar reunião — cria o evento na Google Agenda</p>
+          <input value={sTitle} onChange={(e) => setSTitle(e.target.value)} placeholder="Título (ex: Reunião Agência Prince)" aria-label="Título da reunião agendada" className={input} autoFocus />
+          <div className="flex flex-wrap gap-2">
+            <input type="date" value={sDate} onChange={(e) => setSDate(e.target.value)} aria-label="Data" className="rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text focus:border-accent focus:outline-none" />
+            <input type="time" value={sTime} onChange={(e) => setSTime(e.target.value)} aria-label="Horário" className="rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text focus:border-accent focus:outline-none" />
+            <select value={sRecur} onChange={(e) => setSRecur(e.target.value as typeof sRecur)} aria-label="Recorrência" className="rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text focus:border-accent focus:outline-none">
+              <option value="none">Não repete</option>
+              <option value="weekly">Toda semana</option>
+              <option value="biweekly">A cada 2 semanas</option>
+              <option value="monthly">Todo mês</option>
+            </select>
+            {calendars.length > 1 && (
+              <select value={sCal} onChange={(e) => setSCal(e.target.value)} aria-label="Agenda" className="rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text focus:border-accent focus:outline-none">
+                {calendars.map((c) => <option key={c.id} value={c.id}>{c.summary}</option>)}
+              </select>
+            )}
+          </div>
+          {sErr && <p className="text-xs text-red">{sErr}</p>}
+          <div className="flex gap-2">
+            <button onClick={doSchedule} disabled={!sTitle.trim() || !sDate || sBusy} className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50">
+              {sBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarPlus className="h-3.5 w-3.5" />} Agendar e criar na agenda
+            </button>
+            <button onClick={() => setSched(false)} className="px-2 py-1.5 text-xs text-text-muted hover:text-text">Cancelar</button>
+          </div>
+        </div>
+      )}
 
       {adding && (
         <div className="mb-4 space-y-2 rounded-lg border border-accent/30 bg-surface/40 p-3">
@@ -467,7 +530,12 @@ function MeetingsSection({
           <div key={m.id} className="rounded-lg border border-border/60 p-3">
             <div className="flex items-center gap-2">
               <span className="flex-1 text-sm font-medium text-text">{m.title}</span>
-              <span className="text-[11px] text-text-muted">{new Date(m.held_at).toLocaleDateString("pt-BR")}</span>
+              <span className="text-[11px] text-text-muted">
+                {new Date(m.held_at).toLocaleDateString("pt-BR")}
+                {m.google_event_id && (
+                  <span className="ml-1.5 inline-flex items-center gap-0.5 text-green"><CalendarCheck className="h-3 w-3" /> na agenda</span>
+                )}
+              </span>
               {m.transcript && (
                 <button
                   onClick={() => process(m.id)}

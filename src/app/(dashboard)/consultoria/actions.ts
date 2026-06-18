@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { findSimilarPlaybooks } from "@/lib/ai/embeddings";
 import { buildContentGenerationSystemPrompt } from "@/lib/ai/prompts";
-import { isGoogleConnected, createCalendarEvent, listCalendars, listUpcomingEvents } from "@/lib/google-calendar";
+import { isGoogleConnected, createCalendarEvent, createTimedCalendarEvent, listCalendars, listUpcomingEvents } from "@/lib/google-calendar";
 import { requireUser } from "@/lib/api-guards";
 import { log } from "@/lib/logger";
 import type {
@@ -711,6 +711,79 @@ export async function importMeetingFromCalendar(
   });
   if (error) return { error: error.message };
   revalidatePath(PATH);
+  revalidatePath(`${PATH}/${companyId}`);
+  return { ok: true };
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/**
+ * Agenda uma reuniao: cria o evento (com horario e recorrencia opcional) na
+ * Google Agenda escolhida E registra a reuniao na empresa, vinculada ao evento.
+ */
+export async function scheduleMeeting(
+  companyId: string,
+  input: {
+    title: string;
+    date: string; // AAAA-MM-DD
+    time: string; // HH:MM
+    durationMin?: number;
+    recurrence?: "none" | "weekly" | "biweekly" | "monthly";
+    calendarId?: string;
+  }
+): Promise<{ ok: true } | { error: string }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  if (!input.title?.trim()) return { error: "Titulo da reuniao e obrigatorio." };
+  if (!input.date) return { error: "Escolha a data." };
+
+  const time = input.time || "09:00";
+  const dur = input.durationMin || 60;
+  const startDateTime = `${input.date}T${time}:00`;
+  // calcula o fim preservando o horario de parede (trata virada de dia)
+  const startD = new Date(`${input.date}T${time}:00Z`);
+  const endD = new Date(startD.getTime() + dur * 60000);
+  const endDateTime = `${endD.getUTCFullYear()}-${pad2(endD.getUTCMonth() + 1)}-${pad2(endD.getUTCDate())}T${pad2(endD.getUTCHours())}:${pad2(endD.getUTCMinutes())}:00`;
+
+  const rrule: string[] = [];
+  if (input.recurrence === "weekly") rrule.push("RRULE:FREQ=WEEKLY");
+  else if (input.recurrence === "biweekly") rrule.push("RRULE:FREQ=WEEKLY;INTERVAL=2");
+  else if (input.recurrence === "monthly") rrule.push("RRULE:FREQ=MONTHLY");
+
+  const { data: company } = await supabase
+    .from("consulting_companies")
+    .select("name")
+    .eq("id", companyId)
+    .single();
+
+  const res = await createTimedCalendarEvent(
+    user.id,
+    {
+      summary: input.title.trim(),
+      description: `Consultoria${company?.name ? ` — ${company.name}` : ""} (Segundo Cerebro)`,
+      startDateTime,
+      endDateTime,
+      recurrence: rrule,
+    },
+    input.calendarId || "primary"
+  );
+
+  if ("error" in res) {
+    return { error: res.error === "not_connected" ? "Conecte a Google Agenda primeiro." : res.error };
+  }
+
+  const { error } = await supabase.from("consulting_meetings").insert({
+    company_id: companyId,
+    title: input.title.trim(),
+    held_at: startDateTime,
+    google_event_id: res.eventId,
+    google_calendar_id: input.calendarId || "primary",
+  });
+  if (error) return { error: error.message };
+
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }

@@ -143,6 +143,46 @@ export async function createCalendarEvent(
   return { ok: true };
 }
 
+/**
+ * Cria um evento COM HORARIO (e recorrencia opcional via RRULE) na agenda
+ * escolhida. Retorna o ID do evento criado para vincular a reuniao.
+ */
+export async function createTimedCalendarEvent(
+  userId: string,
+  ev: {
+    summary: string;
+    description?: string;
+    startDateTime: string; // "AAAA-MM-DDTHH:MM:SS" (hora local SP)
+    endDateTime: string;
+    timeZone?: string;
+    recurrence?: string[]; // ex: ["RRULE:FREQ=WEEKLY"]
+  },
+  calendarId: string = "primary"
+): Promise<{ ok: true; eventId: string } | { error: string }> {
+  const token = await getValidAccessToken(userId);
+  if (!token) return { error: "not_connected" };
+
+  const tz = ev.timeZone || "America/Sao_Paulo";
+  const body: Record<string, unknown> = {
+    summary: ev.summary,
+    description: ev.description || "",
+    start: { dateTime: ev.startDateTime, timeZone: tz },
+    end: { dateTime: ev.endDateTime, timeZone: tz },
+    reminders: { useDefault: true },
+  };
+  if (ev.recurrence && ev.recurrence.length > 0) body.recurrence = ev.recurrence;
+
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return { error: "Falha ao criar evento: " + (await res.text()).slice(0, 150) };
+  const data = (await res.json()) as { id: string };
+  return { ok: true, eventId: data.id };
+}
+
 /** Lista as agendas em que o usuario pode ESCREVER (a dele + as compartilhadas). */
 export async function listCalendars(
   userId: string
