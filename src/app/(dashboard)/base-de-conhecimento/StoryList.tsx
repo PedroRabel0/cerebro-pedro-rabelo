@@ -47,18 +47,21 @@ function StoryForm({
           required
           defaultValue={story?.title}
           placeholder="Título da história"
+          aria-label="Título da história"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <input
           name="summary"
           defaultValue={story?.summary ?? ""}
           placeholder="Resumo curto (opcional)"
+          aria-label="Resumo curto"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <div className="flex gap-3">
           <select
             name="period"
             defaultValue={story?.period ?? ""}
+            aria-label="Período da história"
             className="rounded-lg border border-border bg-card px-2 py-2 text-sm text-text focus:border-accent focus:outline-none"
           >
             {PERIODS.map((p) => (
@@ -71,6 +74,7 @@ function StoryForm({
             name="tags"
             defaultValue={story?.tags?.join(", ") ?? ""}
             placeholder="Tags (separadas por vírgula)"
+            aria-label="Tags"
             className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
         </div>
@@ -78,6 +82,7 @@ function StoryForm({
           name="body_markdown"
           defaultValue={story?.body_markdown ?? ""}
           placeholder="Conte a história em detalhes..."
+          aria-label="Corpo da história"
           rows={8}
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
@@ -85,6 +90,7 @@ function StoryForm({
           name="lesson"
           defaultValue={story?.lesson ?? ""}
           placeholder="Lição ou aprendizado (opcional)"
+          aria-label="Lição ou aprendizado"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <div className="flex gap-2">

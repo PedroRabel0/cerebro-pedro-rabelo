@@ -174,6 +174,7 @@ function TodayEditor({
             setContent(e.target.value);
             scheduleAutoSave();
           }}
+          aria-label="Entrada do dia"
           placeholder="O que aconteceu hoje? Reunioes, decisoes, aprendizados..."
           className="w-full resize-none rounded-xl border border-border bg-card p-4 pr-12 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
           rows={6}
@@ -214,6 +215,7 @@ function TodayEditor({
                   setHighlights(e.target.value);
                   scheduleAutoSave();
                 }}
+                aria-label="Destaques do dia"
                 placeholder="O que deu certo hoje?"
                 className="w-full resize-none rounded-lg border border-border bg-card p-3 pr-11 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
                 rows={2}
@@ -240,6 +242,7 @@ function TodayEditor({
                   setChallenges(e.target.value);
                   scheduleAutoSave();
                 }}
+                aria-label="Desafios enfrentados"
                 placeholder="O que foi dificil?"
                 className="w-full resize-none rounded-lg border border-border bg-card p-3 pr-11 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
                 rows={2}
@@ -266,6 +269,7 @@ function TodayEditor({
                   setDecisions(e.target.value);
                   scheduleAutoSave();
                 }}
+                aria-label="Decisoes tomadas"
                 placeholder="Que decisoes foram tomadas hoje?"
                 className="w-full resize-none rounded-lg border border-border bg-card p-3 pr-11 text-sm text-text placeholder:text-text-muted/50 focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/20"
                 rows={2}

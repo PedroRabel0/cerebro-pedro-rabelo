@@ -43,11 +43,13 @@ export default function ThemeManager({ themes }: { themes: Theme[] }) {
           <input
             name="name"
             required
+            aria-label="Nome do tema"
             placeholder="Nome do tema"
             className="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
           <input
             name="description"
+            aria-label="Descrição do tema"
             placeholder="Descrição (opcional)"
             className="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
@@ -55,6 +57,7 @@ export default function ThemeManager({ themes }: { themes: Theme[] }) {
             <input
               name="color"
               type="color"
+              aria-label="Cor do tema"
               defaultValue="#3a5a7a"
               className="h-7 w-7 cursor-pointer rounded border border-border"
             />

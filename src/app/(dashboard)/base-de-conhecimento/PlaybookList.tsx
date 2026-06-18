@@ -87,6 +87,7 @@ function GapQuestionsPanel({ playbookId, perguntas }: { playbookId: string; perg
             <div className="flex gap-2 mt-1">
               <input
                 type="text"
+                aria-label="Sua resposta"
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(q.originalIdx); }}
@@ -164,6 +165,7 @@ function PlaybookForm({
       <form onSubmit={handleSubmit} className="space-y-3">
         <input
           name="title"
+          aria-label="Título do playbook"
           required
           defaultValue={playbook?.title}
           placeholder="Título do playbook"
@@ -171,12 +173,14 @@ function PlaybookForm({
         />
         <input
           name="subtitle"
+          aria-label="Subtítulo do playbook"
           defaultValue={playbook?.subtitle ?? ""}
           placeholder="Subtítulo (opcional)"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <select
           name="theme_id"
+          aria-label="Tema do playbook"
           defaultValue={playbook?.theme_id ?? ""}
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
         >
@@ -189,6 +193,7 @@ function PlaybookForm({
         </select>
         <textarea
           name="body_markdown"
+          aria-label="Conteúdo em markdown"
           defaultValue={playbook?.body_markdown ?? ""}
           placeholder="Conteúdo em markdown..."
           rows={8}
@@ -285,6 +290,7 @@ export default function PlaybookList({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <select
+            aria-label="Filtrar por tema"
             value={filterTheme}
             onChange={(e) => setFilterTheme(e.target.value)}
             className="rounded-lg border border-border bg-card px-2 py-1 font-mono text-xs text-text-secondary focus:border-accent focus:outline-none"

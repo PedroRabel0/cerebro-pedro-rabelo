@@ -59,17 +59,20 @@ function CaptureForm({ onClose }: { onClose: () => void }) {
         <input
           name="title"
           required
+          aria-label="Título da captura"
           placeholder="Título da captura"
           className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <input
           name="context"
+          aria-label="Contexto"
           placeholder="Contexto (opcional)"
           className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <select
           name="source_type"
           required
+          aria-label="Tipo de fonte"
           defaultValue="transcript"
           className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
         >
@@ -80,11 +83,13 @@ function CaptureForm({ onClose }: { onClose: () => void }) {
         </select>
         <input
           name="source_url"
+          aria-label="URL da fonte"
           placeholder="URL da fonte (opcional)"
           className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <textarea
           name="raw_content"
+          aria-label="Conteúdo bruto"
           placeholder="Cole a transcrição ou conteúdo bruto aqui..."
           rows={10}
           className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"

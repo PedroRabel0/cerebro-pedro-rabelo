@@ -247,6 +247,7 @@ function SelectField({
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          aria-label={label}
           className="w-full appearance-none rounded-xl border border-border bg-card px-3 py-2 pr-8 text-sm text-text focus:border-accent focus:outline-none"
         >
           {placeholder && <option value="">{placeholder}</option>}
@@ -282,6 +283,7 @@ function TextField({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           rows={rows}
+          aria-label={label}
           className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none resize-none"
         />
       </div>
@@ -295,6 +297,7 @@ function TextField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        aria-label={label}
         className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
       />
     </div>
@@ -323,6 +326,7 @@ function NumberField({
         onChange={(e) => onChange(e.target.value)}
         min={min}
         max={max}
+        aria-label={label}
         className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
       />
     </div>
@@ -1145,6 +1149,7 @@ function ResultCard({
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
+                aria-label="Editar conteudo gerado"
                 className="w-full rounded-xl border border-accent/30 bg-card px-4 py-3 text-sm text-text leading-relaxed focus:border-accent focus:outline-none resize-none min-h-[120px]"
                 rows={8}
               />
@@ -1251,6 +1256,7 @@ function ResultCard({
               accept="application/pdf,image/*"
               multiple={result.contentType.includes("carousel")}
               onChange={handleImageUpload}
+              aria-label="Upload de PDF ou imagem"
               className="hidden"
               disabled={uploading}
             />
@@ -1331,6 +1337,7 @@ function ResultCard({
             }}
             placeholder="Ex: encurta, muda o tom, tira hashtags, muda o design..."
             disabled={refining}
+            aria-label="Ajustar conteudo com IA"
             className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none disabled:opacity-50"
           />
           <button
@@ -1751,6 +1758,7 @@ export default function GenerationWizard({
               onChange={(e) => updateState("topic", e.target.value)}
               placeholder="Ex: venda de empresa, TikTok Shop, como escalar e-commerce..."
               rows={2}
+              aria-label="Sobre o que quer falar"
               className="mt-3 w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none resize-none"
             />
           )}

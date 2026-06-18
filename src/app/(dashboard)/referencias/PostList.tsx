@@ -46,10 +46,11 @@ function PostForm({
         <input type="hidden" name="platform" value={profile.platform} />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <input name="url" placeholder="URL do post" className={inputCls} />
+          <input name="url" placeholder="URL do post" aria-label="URL do post" className={inputCls} />
           <input
             name="thumbnail_url"
             placeholder="URL da thumbnail"
+            aria-label="URL da thumbnail"
             className={inputCls}
           />
         </div>
@@ -57,6 +58,7 @@ function PostForm({
         <textarea
           name="caption_text"
           placeholder="Texto / legenda do post..."
+          aria-label="Texto / legenda do post"
           rows={3}
           className={inputCls}
         />
@@ -66,12 +68,14 @@ function PostForm({
             name="likes"
             type="number"
             placeholder="Likes"
+            aria-label="Likes"
             className={inputCls}
           />
           <input
             name="comments"
             type="number"
             placeholder="Comentários"
+            aria-label="Comentários"
             className={inputCls}
           />
           <input
@@ -79,6 +83,7 @@ function PostForm({
             type="number"
             step="0.01"
             placeholder="Engajamento %"
+            aria-label="Engajamento %"
             className={inputCls}
           />
         </div>
@@ -91,35 +96,41 @@ function PostForm({
             <input
               name="hook_type"
               placeholder="Tipo de hook"
+              aria-label="Tipo de hook"
               className={inputCls}
             />
             <input
               name="structure"
               placeholder="Estrutura"
+              aria-label="Estrutura"
               className={inputCls}
             />
             <input
               name="length"
               placeholder="Duração / tamanho"
+              aria-label="Duração / tamanho"
               className={inputCls}
             />
-            <input name="tone" placeholder="Tom" className={inputCls} />
+            <input name="tone" placeholder="Tom" aria-label="Tom" className={inputCls} />
             <input
               name="cta_type"
               placeholder="Tipo de CTA"
+              aria-label="Tipo de CTA"
               className={inputCls}
             />
             <input
               name="main_theme"
               placeholder="Tema principal"
+              aria-label="Tema principal"
               className={inputCls}
             />
             <input
               name="sub_theme"
               placeholder="Sub-tema"
+              aria-label="Sub-tema"
               className={inputCls}
             />
-            <input name="thesis" placeholder="Tese" className={inputCls} />
+            <input name="thesis" placeholder="Tese" aria-label="Tese" className={inputCls} />
           </div>
         </fieldset>
 

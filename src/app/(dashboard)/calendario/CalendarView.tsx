@@ -847,6 +847,7 @@ function ScheduleModal({
               <select
                 value={selectedContentId}
                 onChange={(e) => handleSelectContent(e.target.value)}
+                aria-label="Selecionar conteudo"
                 className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
               >
                 <option value="">Selecione...</option>
@@ -869,6 +870,7 @@ function ScheduleModal({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Ex: Post sobre produtividade"
+                  aria-label="Titulo"
                   className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted transition-colors focus:border-accent focus:outline-none"
                 />
               </div>
@@ -879,6 +881,7 @@ function ScheduleModal({
                 <select
                   value={contentType}
                   onChange={(e) => handleContentTypeChange(e.target.value)}
+                  aria-label="Tipo de conteudo"
                   className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
                 >
                   {Object.entries(CONTENT_TYPE_LABELS).map(([val, label]) => (
@@ -899,6 +902,7 @@ function ScheduleModal({
               type="datetime-local"
               value={scheduledFor}
               onChange={(e) => setScheduledFor(e.target.value)}
+              aria-label="Data e horario"
               className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
             />
           </div>
@@ -935,6 +939,7 @@ function ScheduleModal({
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder="Observacoes, ideias, lembretes..."
+              aria-label="Notas (opcional)"
               className="w-full resize-none rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted transition-colors focus:border-accent focus:outline-none"
             />
           </div>

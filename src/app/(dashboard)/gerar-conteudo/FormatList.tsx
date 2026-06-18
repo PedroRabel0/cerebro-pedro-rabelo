@@ -60,12 +60,14 @@ function FormatForm({ onClose }: { onClose: () => void }) {
         <input
           name="name"
           required
+          aria-label="Nome do formato"
           placeholder="Nome do formato"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <select
           name="content_type"
           required
+          aria-label="Tipo de conteúdo"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
         >
           <option value="">Tipo de conteúdo</option>
@@ -77,11 +79,13 @@ function FormatForm({ onClose }: { onClose: () => void }) {
         </select>
         <input
           name="description"
+          aria-label="Descrição do formato"
           placeholder="Descrição (opcional)"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
         />
         <textarea
           name="structure_markdown"
+          aria-label="Estrutura em markdown"
           placeholder="Estrutura em markdown (opcional)"
           rows={6}
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"

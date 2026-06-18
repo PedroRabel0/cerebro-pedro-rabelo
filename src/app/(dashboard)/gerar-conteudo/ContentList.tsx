@@ -123,6 +123,7 @@ function InlineEditor({
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={8}
+        aria-label="Editar conteudo"
         className="w-full rounded-xl border border-accent/30 bg-card px-3 py-2 text-sm text-text leading-relaxed focus:border-accent focus:outline-none resize-none"
       />
       <div className="flex gap-2">
@@ -188,6 +189,7 @@ function FeedbackForm({
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as ContentStatus)}
+              aria-label="Status do conteudo"
               className="w-full appearance-none rounded-xl border border-border bg-card px-3 py-2 pr-8 text-sm text-text focus:border-accent focus:outline-none"
             >
               <option value="draft">Rascunho</option>
@@ -228,6 +230,7 @@ function FeedbackForm({
             onChange={(e) => setText(e.target.value)}
             placeholder="Comentarios sobre o conteudo..."
             rows={3}
+            aria-label="Comentarios sobre o conteudo"
             className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
         </div>
@@ -284,6 +287,7 @@ function PublishedUrlInput({
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder="Cole a URL de publicação..."
+        aria-label="URL de publicação"
         className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:ring-1 focus:ring-accent"
       />
       <button
@@ -388,6 +392,7 @@ function ImageUploader({
           accept="application/pdf,image/*"
           multiple={isCarousel}
           onChange={handleUpload}
+          aria-label="Enviar PDF ou imagem do post"
           className="hidden"
           disabled={uploading}
         />
@@ -502,6 +507,7 @@ function RefineChat({
           }}
           placeholder="Ex: encurta, muda o tom, tira hashtags..."
           disabled={refining}
+          aria-label="Instrução para ajustar com IA"
           className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none disabled:opacity-50"
         />
         <button
@@ -614,6 +620,7 @@ export default function ContentList({
                         type="file"
                         accept="application/pdf,image/*"
                         multiple={isCarousel}
+                        aria-label="Trocar imagem do post"
                         onChange={async (e) => {
                           const files = e.target.files;
                           if (!files || files.length === 0) return;

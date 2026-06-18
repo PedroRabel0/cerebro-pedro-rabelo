@@ -172,6 +172,7 @@ export default function HooksBank({
             </label>
             <input
               type="text"
+              aria-label="Tema dos hooks"
               placeholder="Ex: decisoes, lideranca, fracasso..."
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
@@ -186,6 +187,7 @@ export default function HooksBank({
               Categoria
             </label>
             <select
+              aria-label="Filtrar por categoria"
               value={genCategory}
               onChange={(e) => setGenCategory(e.target.value)}
               className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -205,6 +207,7 @@ export default function HooksBank({
               Qtd
             </label>
             <select
+              aria-label="Quantidade de hooks"
               value={genCount}
               onChange={(e) => setGenCount(Number(e.target.value))}
               className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -268,6 +271,7 @@ export default function HooksBank({
                 </label>
                 <input
                   type="text"
+                  aria-label="Texto do hook"
                   placeholder="Digite o hook..."
                   value={manualText}
                   onChange={(e) => setManualText(e.target.value)}
@@ -280,6 +284,7 @@ export default function HooksBank({
                   Categoria
                 </label>
                 <select
+                  aria-label="Categoria do hook"
                   value={manualCategory}
                   onChange={(e) => setManualCategory(e.target.value)}
                   className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"

@@ -341,6 +341,7 @@ export default function AnalyticsDashboard({
             <select
               value={filterPlatform}
               onChange={(e) => setFilterPlatform(e.target.value)}
+              aria-label="Filtrar por plataforma"
               className="rounded-lg border border-border bg-card px-2 py-1.5 font-mono text-xs text-text-secondary focus:border-accent focus:outline-none"
             >
               <option value="">Todas ({metrics.length})</option>
@@ -621,6 +622,7 @@ function MetricForm({
             name="title"
             type="text"
             required
+            aria-label="Título do conteúdo"
             placeholder="Ex: Carousel sobre produtividade"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted transition-colors focus:border-accent focus:outline-none"
           />
@@ -634,6 +636,7 @@ function MetricForm({
           <select
             name="platform"
             required
+            aria-label="Plataforma"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           >
             <option value="instagram">Instagram</option>
@@ -651,6 +654,7 @@ function MetricForm({
           <input
             name="content_type"
             type="text"
+            aria-label="Tipo de conteúdo"
             placeholder="Ex: carousel, reel, post"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted transition-colors focus:border-accent focus:outline-none"
           />
@@ -665,6 +669,7 @@ function MetricForm({
             name="likes"
             type="number"
             min="0"
+            aria-label="Likes"
             placeholder="0"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
@@ -678,6 +683,7 @@ function MetricForm({
             name="saves"
             type="number"
             min="0"
+            aria-label="Saves"
             placeholder="0"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
@@ -691,6 +697,7 @@ function MetricForm({
             name="shares"
             type="number"
             min="0"
+            aria-label="Shares"
             placeholder="0"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
@@ -704,6 +711,7 @@ function MetricForm({
             name="comments"
             type="number"
             min="0"
+            aria-label="Comments"
             placeholder="0"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
@@ -717,6 +725,7 @@ function MetricForm({
             name="views"
             type="number"
             min="0"
+            aria-label="Views"
             placeholder="0"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
@@ -729,6 +738,7 @@ function MetricForm({
           <input
             name="posted_at"
             type="datetime-local"
+            aria-label="Data de publicação"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text transition-colors focus:border-accent focus:outline-none"
           />
         </div>

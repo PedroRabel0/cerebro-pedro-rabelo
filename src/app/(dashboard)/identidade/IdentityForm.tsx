@@ -68,6 +68,7 @@ function TagInput({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKey}
           placeholder="Digite e pressione Enter"
+          aria-label="Adicionar item"
           className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
         <button
@@ -245,6 +246,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
           onChange={(e) => handleColorsChange(e.target.value)}
           rows={6}
           placeholder='{"primary": "#c9412b", "secondary": "#3a5a7a"}'
+          aria-label="Cores da marca (JSON)"
           className={`w-full rounded-lg border bg-card px-3 py-2 font-mono text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 resize-y ${colorsError ? "border-red focus:ring-red/40" : "border-border focus:ring-accent/40"}`}
         />
         {colorsError && (
@@ -268,6 +270,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
           onChange={(e) => handleFontsChange(e.target.value)}
           rows={6}
           placeholder='{"display": "Fraunces", "body": "Inter"}'
+          aria-label="Fontes da marca (JSON)"
           className={`w-full rounded-lg border bg-card px-3 py-2 font-mono text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 resize-y ${fontsError ? "border-red focus:ring-red/40" : "border-border focus:ring-accent/40"}`}
         />
         {fontsError && (
@@ -304,6 +307,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
           onChange={(e) => setToneDescriptors(e.target.value)}
           rows={3}
           placeholder="Descreva o tom geral da comunicação..."
+          aria-label="Tom"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
@@ -318,6 +322,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
           onChange={(e) => setOpeningStyle(e.target.value)}
           rows={3}
           placeholder="Como o Pedro costuma abrir seus textos..."
+          aria-label="Estilo de abertura"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
@@ -332,6 +337,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
           onChange={(e) => setClosingStyle(e.target.value)}
           rows={3}
           placeholder="Como o Pedro costuma fechar seus textos..."
+          aria-label="Estilo de fechamento"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
@@ -346,6 +352,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
           onChange={(e) => setPositioning(e.target.value)}
           rows={3}
           placeholder="Posicionamento de marca..."
+          aria-label="Posicionamento"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
@@ -360,6 +367,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
           onChange={(e) => setReferenceCreators(e.target.value)}
           rows={3}
           placeholder="Criadores que servem como referência..."
+          aria-label="Criadores referência"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
         />
       </section>
@@ -374,6 +382,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
           value={brandbookUrl}
           onChange={(e) => setBrandbookUrl(e.target.value)}
           placeholder="https://..."
+          aria-label="Brandbook URL"
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
       </section>

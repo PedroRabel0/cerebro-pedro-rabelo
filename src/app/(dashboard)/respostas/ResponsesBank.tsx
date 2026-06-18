@@ -191,6 +191,7 @@ export default function ResponsesBank({
             </label>
             <input
               type="text"
+              aria-label="Tema da resposta"
               placeholder="Ex: precificacao, rotina, como comecar..."
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
@@ -205,6 +206,7 @@ export default function ResponsesBank({
               Qtd
             </label>
             <select
+              aria-label="Quantidade de respostas"
               value={genCount}
               onChange={(e) => setGenCount(Number(e.target.value))}
               className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -279,6 +281,7 @@ export default function ResponsesBank({
                   </label>
                   <input
                     type="text"
+                    aria-label="Pergunta"
                     placeholder="Ex: Como comecar a empreender?"
                     value={manualQuestion}
                     onChange={(e) => setManualQuestion(e.target.value)}
@@ -290,6 +293,7 @@ export default function ResponsesBank({
                     Categoria
                   </label>
                   <select
+                    aria-label="Categoria"
                     value={manualCategory}
                     onChange={(e) => setManualCategory(e.target.value)}
                     className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -307,6 +311,7 @@ export default function ResponsesBank({
                   Resposta
                 </label>
                 <textarea
+                  aria-label="Resposta"
                   placeholder="A resposta na voz do Pedro..."
                   value={manualAnswer}
                   onChange={(e) => setManualAnswer(e.target.value)}

@@ -278,6 +278,7 @@ export default function DecisionRules({ initialRules }: Props) {
                 value={ruleText}
                 onChange={(e) => setRuleText(e.target.value)}
                 rows={3}
+                aria-label="Regra"
                 placeholder="Ex: Quando o tema e lideranca, sempre abrir com historia pessoal"
                 className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
               />
@@ -290,6 +291,7 @@ export default function DecisionRules({ initialRules }: Props) {
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as RuleCategory)}
+                  aria-label="Categoria"
                   className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent/40"
                 >
                   {RULE_CATEGORIES.map((c) => (
@@ -307,6 +309,7 @@ export default function DecisionRules({ initialRules }: Props) {
                   type="text"
                   value={context}
                   onChange={(e) => setContext(e.target.value)}
+                  aria-label="Contexto (porque)"
                   placeholder="Ex: Porque storytelling conecta mais que teoria"
                   className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
                 />
@@ -343,6 +346,7 @@ export default function DecisionRules({ initialRules }: Props) {
             value={aiText}
             onChange={(e) => setAiText(e.target.value)}
             rows={6}
+            aria-label="Texto para extrair regras"
             placeholder="Cole aqui a transcricao, notas ou texto para extrair regras..."
             className="mb-3 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
           />
@@ -487,6 +491,7 @@ export default function DecisionRules({ initialRules }: Props) {
                             value={editRuleText}
                             onChange={(e) => setEditRuleText(e.target.value)}
                             rows={2}
+                            aria-label="Editar regra"
                             className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent/40 resize-y"
                           />
                           <div className="flex gap-3">
@@ -497,6 +502,7 @@ export default function DecisionRules({ initialRules }: Props) {
                                   e.target.value as RuleCategory
                                 )
                               }
+                              aria-label="Categoria"
                               className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent/40"
                             >
                               {RULE_CATEGORIES.map((c) => (
@@ -509,6 +515,7 @@ export default function DecisionRules({ initialRules }: Props) {
                               type="text"
                               value={editContext}
                               onChange={(e) => setEditContext(e.target.value)}
+                              aria-label="Contexto (porque)"
                               placeholder="Contexto (porque)"
                               className="flex-1 rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40"
                             />

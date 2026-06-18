@@ -154,6 +154,7 @@ export default function ProfileManager({
           <select
             name="platform"
             required
+            aria-label="Plataforma"
             className="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-text focus:border-blue focus:outline-none"
           >
             <option value="">Plataforma...</option>
@@ -167,12 +168,14 @@ export default function ProfileManager({
             name="handle"
             required
             placeholder="@handle"
+            aria-label="Handle do perfil"
             className="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-text placeholder:text-text-muted focus:border-blue focus:outline-none"
           />
           <input
             name="display_name"
             required
             placeholder="Nome de exibição"
+            aria-label="Nome de exibição"
             className="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-text placeholder:text-text-muted focus:border-blue focus:outline-none"
           />
           <div className="flex items-center gap-2">

@@ -29,16 +29,19 @@ function KnowledgeForm({ onClose }: { onClose: () => void }) {
           name="title"
           required
           placeholder="Título"
+          aria-label="Título"
           className={inputCls}
         />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <input
             name="author"
             placeholder="Autor"
+            aria-label="Autor"
             className={inputCls}
           />
           <select
             name="source_type"
+            aria-label="Tipo de fonte"
             className={inputCls}
           >
             <option value="">Tipo de fonte...</option>
@@ -54,11 +57,13 @@ function KnowledgeForm({ onClose }: { onClose: () => void }) {
         <input
           name="source_url"
           placeholder="URL da fonte (opcional)"
+          aria-label="URL da fonte"
           className={inputCls}
         />
         <input
           name="tags"
           placeholder="Tags (separadas por vírgula)"
+          aria-label="Tags"
           className={inputCls}
         />
         <div>
@@ -68,6 +73,7 @@ function KnowledgeForm({ onClose }: { onClose: () => void }) {
           <select
             name="citation_allowed"
             defaultValue="attributed"
+            aria-label="Citação"
             className={inputCls}
           >
             <option value="yes">Sim</option>

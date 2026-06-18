@@ -251,6 +251,7 @@ export default function BookQuestionsPanel({
                   onChange={(e) =>
                     setAnswers((prev) => ({ ...prev, [i]: e.target.value }))
                   }
+                  aria-label="Sua resposta"
                   placeholder="Sua resposta aqui... ou clique no microfone"
                   rows={3}
                   className="w-full rounded-lg border border-border bg-surface px-3 py-2 pr-11 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"

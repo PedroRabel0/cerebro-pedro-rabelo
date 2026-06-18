@@ -670,6 +670,7 @@ function ProfilesTab({
                 <select
                   value={platform}
                   onChange={(e) => setPlatform(e.target.value)}
+                  aria-label="Plataforma"
                   className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
                 >
                   {PLATFORMS.map((p) => (
@@ -686,6 +687,7 @@ function ProfilesTab({
                   value={handle}
                   onChange={(e) => setHandle(e.target.value)}
                   placeholder="@alexhormozi"
+                  aria-label="Handle do perfil"
                   className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
                 />
               </div>
@@ -696,6 +698,7 @@ function ProfilesTab({
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Alex Hormozi"
+                  aria-label="Nome do perfil"
                   className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
                 />
               </div>
@@ -900,6 +903,7 @@ function ManualTab({
             placeholder='Titulo da tendencia (ex: "Quiet quitting voltou a viralizar")'
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            aria-label="Titulo da tendencia"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
           <input
@@ -907,6 +911,7 @@ function ManualTab({
             placeholder="URL (opcional)"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
+            aria-label="URL da tendencia"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
           <input
@@ -914,6 +919,7 @@ function ManualTab({
             placeholder="Descricao (opcional)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            aria-label="Descricao da tendencia"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
           <textarea
@@ -921,6 +927,7 @@ function ManualTab({
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}
             rows={3}
+            aria-label="Texto original ou post viral"
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none resize-none"
           />
           <button

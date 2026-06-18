@@ -446,6 +446,7 @@ export default function UniversalInput() {
           accept=".txt,.md,.csv,.json,.pdf,.doc,.docx"
           onChange={handleFileSelect}
           className="hidden"
+          aria-label="Enviar arquivo"
         />
 
         {/* File selected banner */}
@@ -477,6 +478,7 @@ export default function UniversalInput() {
           onChange={(e) => { if (!selectedFile) setInput(e.target.value); }}
           onKeyDown={handleKeyDown}
           disabled={state === "processing" || !!selectedFile}
+          aria-label="Campo de entrada universal"
           placeholder={selectedFile ? "Arquivo selecionado — clique Processar" : "Cole aqui qualquer coisa — link do YouTube, post do Instagram, URL de artigo, texto, transcrição, ideia..."}
           rows={selectedFile ? 2 : 4}
           className={`w-full resize-none border border-border bg-card px-5 py-4 pr-36 text-sm text-text placeholder:text-text-muted focus:border-accent/50 focus:outline-none disabled:opacity-50 ${

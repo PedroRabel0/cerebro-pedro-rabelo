@@ -108,12 +108,14 @@ export default function NewsletterPanel({
             value={theme}
             onChange={(e) => setTheme(e.target.value)}
             required
+            aria-label="Tema da newsletter"
             placeholder="Tema da newsletter (ex: lideranca esta semana)"
             className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
           <input
             value={weekLabel}
             onChange={(e) => setWeekLabel(e.target.value)}
+            aria-label="Label da semana"
             placeholder="Label da semana (opcional, ex: Semana 1 - Junho 2026)"
             className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
@@ -233,6 +235,7 @@ export default function NewsletterPanel({
                               value={editBody}
                               onChange={(e) => setEditBody(e.target.value)}
                               rows={20}
+                              aria-label="Corpo da newsletter"
                               className="w-full rounded-xl border border-border bg-card px-3 py-2 font-mono text-xs text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
                             />
                             <div className="flex gap-2">
