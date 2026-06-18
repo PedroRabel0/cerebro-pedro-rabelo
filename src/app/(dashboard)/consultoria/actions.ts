@@ -642,12 +642,16 @@ export interface CalendarSuggestion {
  * Le os proximos eventos da agenda e sugere a empresa de cada um, casando o
  * titulo do evento com o nome da empresa ou dos contatos cadastrados.
  */
-export async function getCalendarSuggestions(): Promise<CalendarSuggestion[]> {
+export async function getCalendarSuggestions(): Promise<{
+  suggestions: CalendarSuggestion[];
+  calendars: string[];
+}> {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const [events, companiesRes, contactsRes] = await Promise.all([
+  const [events, cals, companiesRes, contactsRes] = await Promise.all([
     listUpcomingEvents(user.id, 50),
+    listCalendars(user.id),
     supabase.from("consulting_companies").select("id, name"),
     supabase.from("consulting_contacts").select("name, company_id"),
   ]);
@@ -657,9 +661,12 @@ export async function getCalendarSuggestions(): Promise<CalendarSuggestion[]> {
 
   function suggest(title: string): { id: string; name: string } | null {
     const t = title.toLowerCase();
-    // 1) nome de contato cadastrado no titulo
+    // 1) nome completo OU primeiro nome de contato no titulo (ex: "Tiago")
     for (const c of contacts) {
-      if (c.name && c.name.length > 2 && t.includes(c.name.toLowerCase())) {
+      if (!c.name) continue;
+      const full = c.name.toLowerCase();
+      const first = full.split(/\s+/)[0];
+      if ((full.length > 2 && t.includes(full)) || (first.length > 3 && t.includes(first))) {
         const co = companies.find((x) => x.id === c.company_id);
         if (co) return co;
       }
@@ -672,7 +679,7 @@ export async function getCalendarSuggestions(): Promise<CalendarSuggestion[]> {
     return null;
   }
 
-  return events
+  const suggestions = events
     .filter((e) => e.date)
     .map((e) => {
       const s = suggest(e.summary);
@@ -685,6 +692,8 @@ export async function getCalendarSuggestions(): Promise<CalendarSuggestion[]> {
         suggestedCompanyName: s?.name ?? null,
       };
     });
+
+  return { suggestions, calendars: cals.map((c) => c.summary) };
 }
 
 /** Cria uma reuniao na empresa a partir de um evento da agenda. */

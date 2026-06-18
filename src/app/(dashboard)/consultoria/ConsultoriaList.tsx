@@ -261,6 +261,7 @@ function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<CalendarSuggestion[]>([]);
+  const [calendars, setCalendars] = useState<string[]>([]);
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
@@ -269,8 +270,9 @@ function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
     setOpen(true);
     setLoading(true);
     const data = await getCalendarSuggestions();
-    setSuggestions(data);
-    setChoice(Object.fromEntries(data.map((s) => [s.eventId, s.suggestedCompanyId || ""])));
+    setSuggestions(data.suggestions);
+    setCalendars(data.calendars);
+    setChoice(Object.fromEntries(data.suggestions.map((s) => [s.eventId, s.suggestedCompanyId || ""])));
     setLoading(false);
   }
 
@@ -305,12 +307,21 @@ function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
         </span>
         <button onClick={() => setOpen(false)} className="text-xs text-text-muted hover:text-text">Fechar</button>
       </div>
+      {!loading && (
+        <p className="mb-2 text-[11px] text-text-muted">
+          {calendars.length > 0
+            ? `Lendo: ${calendars.join(", ")} · ${suggestions.length} evento(s) futuro(s) encontrado(s)`
+            : "Nenhuma agenda acessível — clique em \"Reconectar\" no topo e autorize o acesso às agendas."}
+        </p>
+      )}
       {loading ? (
         <div className="flex items-center gap-2 py-4 text-sm text-text-muted">
-          <Loader2 className="h-4 w-4 animate-spin" /> Lendo sua agenda...
+          <Loader2 className="h-4 w-4 animate-spin" /> Lendo suas agendas...
         </div>
       ) : suggestions.length === 0 ? (
-        <p className="py-3 text-xs text-text-muted">Nenhum evento próximo na sua agenda.</p>
+        <p className="py-3 text-xs text-text-muted">
+          Nenhum evento futuro encontrado. O import mostra só eventos a partir de hoje — se a reunião já passou ou não está agendada na agenda, crie a reunião direto na empresa.
+        </p>
       ) : (
         <div className="space-y-2">
           {suggestions.map((s) => (
