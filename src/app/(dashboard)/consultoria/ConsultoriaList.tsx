@@ -12,6 +12,8 @@ import {
   CheckSquare,
   FileSignature,
   Wallet,
+  CalendarCheck,
+  CalendarPlus,
 } from "lucide-react";
 import { createCompany, type CompanyWithCounts, type ConsultoriaOverview } from "./actions";
 
@@ -44,9 +46,13 @@ const PAYMENT_LABEL: Record<string, string> = {
 export default function ConsultoriaList({
   companies,
   overview,
+  googleConnected,
+  googleFlash,
 }: {
   companies: CompanyWithCounts[];
   overview: ConsultoriaOverview;
+  googleConnected: boolean;
+  googleFlash?: string;
 }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
@@ -75,6 +81,43 @@ export default function ConsultoriaList({
 
   return (
     <div className="space-y-6">
+      {/* Google Calendar connection */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <div className="flex items-center gap-2 text-sm">
+          {googleConnected ? (
+            <>
+              <CalendarCheck className="h-4 w-4 text-green" />
+              <span className="text-text">Google Agenda conectada</span>
+              <span className="text-xs text-text-muted">— lembretes entram direto na sua agenda</span>
+            </>
+          ) : (
+            <>
+              <CalendarPlus className="h-4 w-4 text-text-muted" />
+              <span className="text-text-secondary">Conecte sua Google Agenda para lembretes automáticos</span>
+            </>
+          )}
+        </div>
+        {!googleConnected && (
+          <a
+            href="/api/google/connect"
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
+          >
+            <CalendarPlus className="h-3.5 w-3.5" /> Conectar Google Agenda
+          </a>
+        )}
+      </div>
+
+      {googleFlash === "connected" && (
+        <div className="rounded-lg border border-green/20 bg-green/5 px-4 py-2 text-sm text-green">
+          Google Agenda conectada com sucesso.
+        </div>
+      )}
+      {googleFlash === "error" && (
+        <div className="rounded-lg border border-red/20 bg-red/5 px-4 py-2 text-sm text-red">
+          Não foi possível conectar a Google Agenda. Tente novamente.
+        </div>
+      )}
+
       {/* Overview strip */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl bg-surface px-4 py-3">

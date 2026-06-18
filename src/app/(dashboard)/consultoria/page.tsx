@@ -2,15 +2,23 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 import { Briefcase } from "lucide-react";
-import { getConsultoriaData } from "./actions";
+import { getConsultoriaData, getGoogleStatus } from "./actions";
 import ConsultoriaList from "./ConsultoriaList";
 
-export default async function ConsultoriaPage() {
-  const { companies, overview } = await getConsultoriaData();
+export default async function ConsultoriaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ google?: string }>;
+}) {
+  const [{ companies, overview }, googleStatus, sp] = await Promise.all([
+    getConsultoriaData(),
+    getGoogleStatus(),
+    searchParams,
+  ]);
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 to-violet/20">
             <Briefcase className="h-5 w-5 text-accent" />
@@ -26,7 +34,12 @@ export default async function ConsultoriaPage() {
         </div>
       </div>
 
-      <ConsultoriaList companies={companies} overview={overview} />
+      <ConsultoriaList
+        companies={companies}
+        overview={overview}
+        googleConnected={googleStatus.connected}
+        googleFlash={sp.google}
+      />
     </div>
   );
 }

@@ -21,6 +21,8 @@ import {
   CheckSquare,
   Square,
   Sparkles,
+  Send,
+  CalendarCheck,
 } from "lucide-react";
 import { useConfirm } from "@/components/ConfirmProvider";
 import type { CompanyDetail as CompanyDetailData } from "../actions";
@@ -41,6 +43,8 @@ import {
   createStep,
   toggleStep,
   deleteStep,
+  addTaskReminderToCalendar,
+  askConsultoria,
 } from "../actions";
 import type { ConsultingContact, ConsultingTask } from "@/lib/supabase/types";
 
@@ -77,7 +81,13 @@ function SectionTitle({ icon: Icon, children, count }: { icon: typeof User; chil
   );
 }
 
-export default function CompanyDetail({ data }: { data: CompanyDetailData }) {
+export default function CompanyDetail({
+  data,
+  googleConnected,
+}: {
+  data: CompanyDetailData;
+  googleConnected: boolean;
+}) {
   const { company } = data;
   const router = useRouter();
   const refresh = () => router.refresh();
@@ -97,8 +107,56 @@ export default function CompanyDetail({ data }: { data: CompanyDetailData }) {
       </div>
 
       <MeetingsSection companyId={company.id} meetings={data.meetings} onChange={refresh} />
-      <TasksSection companyId={company.id} tasks={data.tasks} contacts={data.contacts} onChange={refresh} />
+      <TasksSection companyId={company.id} tasks={data.tasks} contacts={data.contacts} googleConnected={googleConnected} onChange={refresh} />
+      <AskBrainSection companyId={company.id} />
       <DocumentsSection companyId={company.id} documents={data.documents} onChange={refresh} />
+    </div>
+  );
+}
+
+function AskBrainSection({ companyId }: { companyId: string }) {
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function ask() {
+    if (!question.trim()) return;
+    setLoading(true);
+    setAnswer(null);
+    const res = await askConsultoria(companyId, question);
+    setLoading(false);
+    setAnswer("error" in res ? res.error : res.answer);
+  }
+
+  return (
+    <div className="rounded-xl border border-violet/20 bg-violet/5 p-4">
+      <SectionTitle icon={Sparkles}>Perguntar ao Cérebro</SectionTitle>
+      <p className="mb-3 -mt-1 text-xs text-text-muted">
+        Embasado nos playbooks do Pedro + o contexto desta empresa
+      </p>
+      <div className="flex gap-2">
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && ask()}
+          placeholder="Ex: que estratégia de recompra faz sentido pra essa empresa?"
+          aria-label="Pergunta ao Cérebro"
+          className={input}
+        />
+        <button
+          onClick={ask}
+          disabled={loading || !question.trim()}
+          aria-label="Perguntar"
+          className="flex items-center gap-1.5 rounded-lg bg-violet px-3 text-white transition hover:brightness-110 disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </button>
+      </div>
+      {answer && (
+        <div className="mt-3 whitespace-pre-wrap rounded-lg bg-card px-4 py-3 text-sm text-text-secondary">
+          {answer}
+        </div>
+      )}
     </div>
   );
 }
@@ -413,11 +471,13 @@ function TasksSection({
   companyId,
   tasks,
   contacts,
+  googleConnected,
   onChange,
 }: {
   companyId: string;
   tasks: ConsultingTask[];
   contacts: ConsultingContact[];
+  googleConnected: boolean;
   onChange: () => void;
 }) {
   const confirm = useConfirm();
@@ -440,7 +500,7 @@ function TasksSection({
 
       <div className="space-y-2">
         {pending.map((t) => (
-          <TaskRow key={t.id} task={t} companyId={companyId} contacts={contacts} onChange={onChange} onDelete={async () => { if (await confirm("Apagar esta tarefa?")) start(async () => { await deleteTask(t.id, companyId); onChange(); }); }} />
+          <TaskRow key={t.id} task={t} companyId={companyId} contacts={contacts} googleConnected={googleConnected} onChange={onChange} onDelete={async () => { if (await confirm("Apagar esta tarefa?")) start(async () => { await deleteTask(t.id, companyId); onChange(); }); }} />
         ))}
         {pending.length === 0 && <p className="text-xs text-text-muted">Nenhuma tarefa pendente.</p>}
       </div>
@@ -475,12 +535,14 @@ function TaskRow({
   task,
   companyId,
   contacts,
+  googleConnected,
   onChange,
   onDelete,
 }: {
   task: ConsultingTask;
   companyId: string;
   contacts: ConsultingContact[];
+  googleConnected: boolean;
   onChange: () => void;
   onDelete: () => void;
 }) {
@@ -488,7 +550,15 @@ function TaskRow({
   const [gen, setGen] = useState(false);
   const [message, setMessage] = useState<string | null>(task.message_draft);
   const [copied, setCopied] = useState(false);
+  const [reminder, setReminder] = useState<{ state: "idle" | "loading" | "done" | "error"; msg?: string }>({ state: "idle" });
   const [, start] = useTransition();
+
+  async function addReminder() {
+    setReminder({ state: "loading" });
+    const res = await addTaskReminderToCalendar(task.id);
+    if ("error" in res) setReminder({ state: "error", msg: res.error });
+    else setReminder({ state: "done" });
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const overdue = task.due_date && task.due_date < today;
@@ -531,14 +601,32 @@ function TaskRow({
           {gen ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />}
           {message ? (open ? "Ocultar mensagem" : "Ver mensagem") : "Gerar mensagem"}
         </button>
-        <a
-          href={gcalLink(`Cobrar ${task.owner_name || "cliente"}: ${task.description}`, task.remind_at || task.due_date, task.description)}
-          target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] text-text-muted hover:border-accent/40 hover:text-text"
-        >
-          <CalendarPlus className="h-3 w-3" /> Lembrete na agenda
-        </a>
+        {googleConnected ? (
+          <button
+            onClick={addReminder}
+            disabled={reminder.state === "loading" || reminder.state === "done"}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] text-text-muted hover:border-accent/40 hover:text-text disabled:opacity-70"
+          >
+            {reminder.state === "loading" ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : reminder.state === "done" ? (
+              <CalendarCheck className="h-3 w-3 text-green" />
+            ) : (
+              <CalendarPlus className="h-3 w-3" />
+            )}
+            {reminder.state === "done" ? "Na agenda" : "Lembrete na agenda"}
+          </button>
+        ) : (
+          <a
+            href={gcalLink(`Cobrar ${task.owner_name || "cliente"}: ${task.description}`, task.remind_at || task.due_date, task.description)}
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] text-text-muted hover:border-accent/40 hover:text-text"
+          >
+            <CalendarPlus className="h-3 w-3" /> Lembrete na agenda
+          </a>
+        )}
       </div>
+      {reminder.state === "error" && <p className="mt-1 text-[11px] text-red">{reminder.msg}</p>}
 
       {open && message && (
         <div className="mt-2 rounded-lg bg-surface/60 p-2.5">

@@ -3,6 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
+import { findSimilarPlaybooks } from "@/lib/ai/embeddings";
+import { buildContentGenerationSystemPrompt } from "@/lib/ai/prompts";
+import { isGoogleConnected, createCalendarEvent } from "@/lib/google-calendar";
 import { requireUser } from "@/lib/api-guards";
 import { log } from "@/lib/logger";
 import type {
@@ -538,4 +541,110 @@ export async function deleteStep(id: string, companyId: string): Promise<{ ok: t
   if (error) return { error: error.message };
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
+}
+
+// ============================================================
+// Fase 3 — Google Calendar (lembretes reais) + Q&A do Cerebro
+// ============================================================
+
+export async function getGoogleStatus(): Promise<{ connected: boolean }> {
+  const user = await requireUser();
+  return { connected: await isGoogleConnected(user.id) };
+}
+
+/**
+ * Cria um lembrete REAL na Google Agenda do operador para cobrar a tarefa.
+ * Requer Google conectado (senao retorna not_connected pra UI cair no link).
+ */
+export async function addTaskReminderToCalendar(
+  taskId: string
+): Promise<{ ok: true } | { error: string }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: task } = await supabase.from("consulting_tasks").select("*").eq("id", taskId).single();
+  if (!task) return { error: "Tarefa nao encontrada." };
+
+  const date = task.remind_at || task.due_date;
+  if (!date) return { error: "Defina um prazo na tarefa primeiro." };
+
+  const res = await createCalendarEvent(user.id, {
+    summary: `Cobrar ${task.owner_name || "cliente"}: ${task.description}`,
+    description: "Lembrete da consultoria (Segundo Cerebro)",
+    date,
+  });
+  return res;
+}
+
+/**
+ * Pergunta ao Cerebro com o contexto da empresa: playbooks do Pedro (busca
+ * semantica) + objetivo da empresa + resumos das reunioes.
+ */
+export async function askConsultoria(
+  companyId: string,
+  question: string
+): Promise<{ answer: string } | { error: string }> {
+  await requireUser();
+  if (!question.trim()) return { error: "Faca uma pergunta." };
+  const supabase = await createClient();
+
+  const [{ data: company }, { data: meetings }, { data: identity }] = await Promise.all([
+    supabase.from("consulting_companies").select("name, sector, goal").eq("id", companyId).single(),
+    supabase.from("consulting_meetings").select("title, summary").eq("company_id", companyId).order("held_at", { ascending: false }).limit(5),
+    supabase.from("identity").select("*").limit(1).single(),
+  ]);
+
+  let playbookContext = "";
+  try {
+    const similar = await findSimilarPlaybooks(question, 0.3, 5);
+    if (similar.length > 0) {
+      const { data: pbs } = await supabase
+        .from("playbooks")
+        .select("title, body_markdown")
+        .in("id", similar.map((s) => s.id));
+      playbookContext = (pbs ?? [])
+        .map((p) => `### ${p.title}\n${(p.body_markdown || "").slice(0, 1200)}`)
+        .join("\n\n");
+    }
+  } catch (err) {
+    log.error("[Consultoria] askConsultoria embeddings: " + String(err));
+  }
+
+  const meetingCtx = (meetings ?? [])
+    .filter((m) => m.summary)
+    .map((m) => `- ${m.title}: ${m.summary}`)
+    .join("\n");
+
+  const systemPrompt = identity
+    ? buildContentGenerationSystemPrompt(identity)
+    : "REGRA: responda em PT-BR. Voce e o consultor Pedro Rabelo.";
+
+  const userPrompt = `Pergunta sobre a consultoria da empresa "${company?.name || "(cliente)"}"${company?.goal ? ` (objetivo: ${company.goal})` : ""}.
+
+## Conhecimento do Pedro (playbooks relevantes):
+${playbookContext || "(nenhum playbook diretamente relacionado encontrado)"}
+
+## Contexto da empresa (resumos de reunioes):
+${meetingCtx || "(sem reunioes resumidas ainda)"}
+
+## Pergunta:
+${question}
+
+Responda de forma pratica e direta, no tom do Pedro, usando o conhecimento acima como base. Se faltar embasamento, diga objetivamente o que precisaria saber. Sempre em PT-BR.`;
+
+  try {
+    const client = getClient();
+    const r = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1500,
+      system: [{ type: "text" as const, text: systemPrompt, cache_control: { type: "ephemeral" as const } }],
+      messages: [{ role: "user", content: userPrompt }],
+    });
+    logCost("claude-sonnet-4-6", r.usage.input_tokens, r.usage.output_tokens);
+    const answer = (r.content[0].type === "text" ? r.content[0].text : "").trim();
+    return { answer };
+  } catch (err) {
+    const m = err instanceof Error ? err.message : "Erro desconhecido";
+    return { error: `Falha ao consultar o Cerebro: ${m}` };
+  }
 }
