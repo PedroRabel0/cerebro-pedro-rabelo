@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { log } from "@/lib/logger";
+import { requireAdmin } from "@/lib/api-guards";
 import { revalidatePath } from "next/cache";
 
 export interface DecisionRule {
@@ -41,6 +42,7 @@ export async function createRule(
   category: string,
   context?: string
 ): Promise<DecisionRule> {
+  await requireAdmin();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("decision_rules")
@@ -62,6 +64,7 @@ export async function updateRule(
   category: string,
   context?: string
 ): Promise<DecisionRule> {
+  await requireAdmin();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("decision_rules")
@@ -80,6 +83,7 @@ export async function updateRule(
 }
 
 export async function deleteRule(id: string): Promise<void> {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase
     .from("decision_rules")
@@ -98,6 +102,7 @@ interface SuggestedRule {
 export async function generateRulesFromContent(
   contentText: string
 ): Promise<SuggestedRule[]> {
+  await requireAdmin();
   try {
     const supabase = await createClient();
 

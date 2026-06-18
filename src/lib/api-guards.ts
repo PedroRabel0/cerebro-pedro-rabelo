@@ -38,6 +38,29 @@ export async function getSessionUser() {
 }
 
 /**
+ * Exige um usuario autenticado (sessao Supabase valida). Use no inicio de
+ * server actions sensiveis para ter autorizacao server-side de verdade — em vez
+ * de depender SO do middleware (ponto unico de falha). Lanca se nao houver sessao.
+ */
+export async function requireUser() {
+  const user = await getSessionUser();
+  if (!user) throw new Error("Nao autenticado.");
+  return user;
+}
+
+/**
+ * Exige que o usuario seja o admin (Pedro). Fecha a escalada de privilegio em
+ * que o operador Henrique poderia chamar acoes Pedro-only diretamente (hoje so
+ * bloqueado na UI/middleware). Lanca se nao for admin.
+ */
+export async function requireAdmin() {
+  const user = await requireUser();
+  const role = user.user_metadata?.role as string | undefined;
+  if (role !== "pedro") throw new Error("Acao restrita ao administrador.");
+  return user;
+}
+
+/**
  * Rate limiter leve em memoria (por instancia quente). NAO e robusto entre
  * instancias serverless — e um quebra-molas para uma app de poucos usuarios.
  * Para limite forte/distribuido, migrar para @upstash/ratelimit + KV (Fase 2).

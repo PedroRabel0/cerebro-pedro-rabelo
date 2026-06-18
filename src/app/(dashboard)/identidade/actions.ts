@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/api-guards";
 import { revalidatePath } from "next/cache";
 
 export interface Identity {
@@ -30,6 +31,7 @@ export async function getIdentity(): Promise<Identity | null> {
 }
 
 export async function upsertIdentity(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const colorsRaw = formData.get("colors") as string;
@@ -116,6 +118,7 @@ const PEDRO_BRAND_DEFAULTS = {
 } as const;
 
 export async function autoFillIdentity(): Promise<Identity> {
+  await requireAdmin();
   const existing = await getIdentity();
 
   const isEmpty =
@@ -150,6 +153,7 @@ export async function autoFillIdentity(): Promise<Identity> {
 }
 
 export async function resetToPedroDefaults(): Promise<void> {
+  await requireAdmin();
   const supabase = await createClient();
   const payload = {
     ...PEDRO_BRAND_DEFAULTS,

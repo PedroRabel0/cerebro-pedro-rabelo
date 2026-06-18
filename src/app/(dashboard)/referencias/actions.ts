@@ -2,6 +2,7 @@
 
 
 import { log } from '@/lib/logger';
+import { requireAdmin } from "@/lib/api-guards";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";
@@ -263,6 +264,7 @@ export async function getProfiles() {
 }
 
 export async function createProfile(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const platform = formData.get("platform") as string;
   const handle = (formData.get("handle") as string).replace(/^@/, "");
@@ -291,6 +293,7 @@ export async function createProfile(formData: FormData) {
 }
 
 export async function rescrapeProfile(profileId: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data: profile, error } = await supabase
     .from("reference_profiles")
@@ -321,6 +324,7 @@ export async function rescrapeProfile(profileId: string) {
 export async function scrapeProfileNow(
   profileId: string,
 ): Promise<{ posts_found: number; posts_new: number } | { error: string }> {
+  await requireAdmin();
   try {
     const supabase = await createClient();
 
@@ -516,6 +520,7 @@ async function analyzeDNAInBackground(
 }
 
 export async function deleteProfile(id: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase
     .from("reference_profiles")
@@ -539,6 +544,7 @@ export async function getPostsByProfile(profileId: string) {
 }
 
 export async function createPost(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase.from("reference_posts").insert({
     profile_id: formData.get("profile_id") as string,
@@ -563,6 +569,7 @@ export async function createPost(formData: FormData) {
 }
 
 export async function deletePost(id: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase
     .from("reference_posts")
@@ -583,6 +590,7 @@ export interface WeeklyPattern {
 }
 
 export async function detectWeeklyPatterns(): Promise<WeeklyPattern[]> {
+  await requireAdmin();
   const supabase = await createClient();
 
   // Fetch posts from last 7 days
@@ -705,6 +713,7 @@ export async function createFormatFromPattern(
   description: string,
   suggestion: string,
 ) {
+  await requireAdmin();
   const supabase = await createClient();
 
   const name = `Formato: ${patternType} — ${description.slice(0, 50)}`;
@@ -727,6 +736,7 @@ export async function createFormatFromPattern(
 export async function analyzeProfileForPedro(
   profileId: string,
 ): Promise<{ analysis: string } | { error: string }> {
+  await requireAdmin();
   try {
     const supabase = await createClient();
 
@@ -862,6 +872,7 @@ export async function getKnowledge() {
 }
 
 export async function createKnowledge(formData: FormData) {
+  await requireAdmin();
   const supabase = await createClient();
   const tagsRaw = formData.get("tags") as string;
   const tags = tagsRaw
@@ -884,6 +895,7 @@ export async function createKnowledge(formData: FormData) {
 }
 
 export async function deleteKnowledge(id: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase
     .from("reference_knowledge")
