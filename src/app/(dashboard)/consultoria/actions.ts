@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { findSimilarPlaybooks } from "@/lib/ai/embeddings";
 import { buildContentGenerationSystemPrompt } from "@/lib/ai/prompts";
-import { isGoogleConnected, createCalendarEvent } from "@/lib/google-calendar";
+import { isGoogleConnected, createCalendarEvent, listCalendars, listUpcomingEvents } from "@/lib/google-calendar";
 import { requireUser } from "@/lib/api-guards";
 import { log } from "@/lib/logger";
 import type {
@@ -599,7 +599,8 @@ export async function getGoogleStatus(): Promise<{ connected: boolean }> {
  * Requer Google conectado (senao retorna not_connected pra UI cair no link).
  */
 export async function addTaskReminderToCalendar(
-  taskId: string
+  taskId: string,
+  calendarId: string = "primary"
 ): Promise<{ ok: true } | { error: string }> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -610,12 +611,97 @@ export async function addTaskReminderToCalendar(
   const date = task.remind_at || task.due_date;
   if (!date) return { error: "Defina um prazo na tarefa primeiro." };
 
-  const res = await createCalendarEvent(user.id, {
-    summary: `Cobrar ${task.owner_name || "cliente"}: ${task.description}`,
-    description: "Lembrete da consultoria (Segundo Cerebro)",
-    date,
-  });
+  const res = await createCalendarEvent(
+    user.id,
+    {
+      summary: `Cobrar ${task.owner_name || "cliente"}: ${task.description}`,
+      description: "Lembrete da consultoria (Segundo Cerebro)",
+      date,
+    },
+    calendarId
+  );
   return res;
+}
+
+/** Lista as agendas em que da pra escrever (sua + as do Pedro compartilhadas). */
+export async function getCalendarList(): Promise<{ id: string; summary: string }[]> {
+  const user = await requireUser();
+  return listCalendars(user.id);
+}
+
+export interface CalendarSuggestion {
+  eventId: string;
+  title: string;
+  date: string;
+  suggestedCompanyId: string | null;
+  suggestedCompanyName: string | null;
+}
+
+/**
+ * Le os proximos eventos da agenda e sugere a empresa de cada um, casando o
+ * titulo do evento com o nome da empresa ou dos contatos cadastrados.
+ */
+export async function getCalendarSuggestions(): Promise<CalendarSuggestion[]> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const [events, companiesRes, contactsRes] = await Promise.all([
+    listUpcomingEvents(user.id, 20),
+    supabase.from("consulting_companies").select("id, name"),
+    supabase.from("consulting_contacts").select("name, company_id"),
+  ]);
+
+  const companies = (companiesRes.data ?? []) as { id: string; name: string }[];
+  const contacts = (contactsRes.data ?? []) as { name: string; company_id: string }[];
+
+  function suggest(title: string): { id: string; name: string } | null {
+    const t = title.toLowerCase();
+    // 1) nome de contato cadastrado no titulo
+    for (const c of contacts) {
+      if (c.name && c.name.length > 2 && t.includes(c.name.toLowerCase())) {
+        const co = companies.find((x) => x.id === c.company_id);
+        if (co) return co;
+      }
+    }
+    // 2) palavra significativa do nome da empresa no titulo (ex: "Prince")
+    for (const co of companies) {
+      const words = co.name.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+      if (words.some((w) => t.includes(w))) return co;
+    }
+    return null;
+  }
+
+  return events
+    .filter((e) => e.date)
+    .map((e) => {
+      const s = suggest(e.summary);
+      return {
+        eventId: e.id,
+        title: e.summary,
+        date: e.date,
+        suggestedCompanyId: s?.id ?? null,
+        suggestedCompanyName: s?.name ?? null,
+      };
+    });
+}
+
+/** Cria uma reuniao na empresa a partir de um evento da agenda. */
+export async function importMeetingFromCalendar(
+  companyId: string,
+  title: string,
+  heldAt: string
+): Promise<{ ok: true } | { error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.from("consulting_meetings").insert({
+    company_id: companyId,
+    title: title || "Reuniao da agenda",
+    held_at: heldAt || new Date().toISOString(),
+  });
+  if (error) return { error: error.message };
+  revalidatePath(PATH);
+  revalidatePath(`${PATH}/${companyId}`);
+  return { ok: true };
 }
 
 /**

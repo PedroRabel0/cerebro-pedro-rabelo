@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -45,6 +45,7 @@ import {
   deleteStep,
   addTaskReminderToCalendar,
   askConsultoria,
+  getCalendarList,
 } from "../actions";
 import type { ConsultingContact, ConsultingTask } from "@/lib/supabase/types";
 
@@ -92,6 +93,21 @@ export default function CompanyDetail({
   const router = useRouter();
   const refresh = () => router.refresh();
 
+  const [calendars, setCalendars] = useState<{ id: string; summary: string }[]>([]);
+  const [calendarId, setCalendarIdState] = useState("primary");
+
+  useEffect(() => {
+    if (!googleConnected) return;
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem("consultoria_cal") : null;
+    if (saved) setCalendarIdState(saved);
+    getCalendarList().then((cals) => setCalendars(cals));
+  }, [googleConnected]);
+
+  function setCalendarId(id: string) {
+    setCalendarIdState(id);
+    if (typeof window !== "undefined") window.localStorage.setItem("consultoria_cal", id);
+  }
+
   return (
     <div className="space-y-5">
       <Link href="/consultoria" className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text">
@@ -107,7 +123,16 @@ export default function CompanyDetail({
       </div>
 
       <MeetingsSection companyId={company.id} meetings={data.meetings} onChange={refresh} />
-      <TasksSection companyId={company.id} tasks={data.tasks} contacts={data.contacts} googleConnected={googleConnected} onChange={refresh} />
+      <TasksSection
+        companyId={company.id}
+        tasks={data.tasks}
+        contacts={data.contacts}
+        googleConnected={googleConnected}
+        calendars={calendars}
+        calendarId={calendarId}
+        onCalendarChange={setCalendarId}
+        onChange={refresh}
+      />
       <AskBrainSection companyId={company.id} />
       <DocumentsSection companyId={company.id} documents={data.documents} onChange={refresh} />
     </div>
@@ -472,12 +497,18 @@ function TasksSection({
   tasks,
   contacts,
   googleConnected,
+  calendars,
+  calendarId,
+  onCalendarChange,
   onChange,
 }: {
   companyId: string;
   tasks: ConsultingTask[];
   contacts: ConsultingContact[];
   googleConnected: boolean;
+  calendars: { id: string; summary: string }[];
+  calendarId: string;
+  onCalendarChange: (id: string) => void;
   onChange: () => void;
 }) {
   const confirm = useConfirm();
@@ -496,11 +527,28 @@ function TasksSection({
 
   return (
     <div className={card}>
-      <SectionTitle icon={CheckSquare} count={pending.length}>Tarefas</SectionTitle>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <SectionTitle icon={CheckSquare} count={pending.length}>Tarefas</SectionTitle>
+        {googleConnected && calendars.length > 1 && (
+          <label className="flex items-center gap-1.5 text-[11px] text-text-muted">
+            <CalendarCheck className="h-3.5 w-3.5" /> Lembretes em:
+            <select
+              value={calendarId}
+              onChange={(e) => onCalendarChange(e.target.value)}
+              aria-label="Agenda para os lembretes"
+              className="rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-text focus:border-accent focus:outline-none"
+            >
+              {calendars.map((c) => (
+                <option key={c.id} value={c.id}>{c.summary}</option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
 
       <div className="space-y-2">
         {pending.map((t) => (
-          <TaskRow key={t.id} task={t} companyId={companyId} contacts={contacts} googleConnected={googleConnected} onChange={onChange} onDelete={async () => { if (await confirm("Apagar esta tarefa?")) start(async () => { await deleteTask(t.id, companyId); onChange(); }); }} />
+          <TaskRow key={t.id} task={t} companyId={companyId} contacts={contacts} googleConnected={googleConnected} calendarId={calendarId} onChange={onChange} onDelete={async () => { if (await confirm("Apagar esta tarefa?")) start(async () => { await deleteTask(t.id, companyId); onChange(); }); }} />
         ))}
         {pending.length === 0 && <p className="text-xs text-text-muted">Nenhuma tarefa pendente.</p>}
       </div>
@@ -536,6 +584,7 @@ function TaskRow({
   companyId,
   contacts,
   googleConnected,
+  calendarId,
   onChange,
   onDelete,
 }: {
@@ -543,6 +592,7 @@ function TaskRow({
   companyId: string;
   contacts: ConsultingContact[];
   googleConnected: boolean;
+  calendarId: string;
   onChange: () => void;
   onDelete: () => void;
 }) {
@@ -555,7 +605,7 @@ function TaskRow({
 
   async function addReminder() {
     setReminder({ state: "loading" });
-    const res = await addTaskReminderToCalendar(task.id);
+    const res = await addTaskReminderToCalendar(task.id, calendarId);
     if ("error" in res) setReminder({ state: "error", msg: res.error });
     else setReminder({ state: "done" });
   }

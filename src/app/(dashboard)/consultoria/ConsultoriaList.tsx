@@ -14,8 +14,17 @@ import {
   Wallet,
   CalendarCheck,
   CalendarPlus,
+  Check,
 } from "lucide-react";
-import { createCompany, type CompanyWithCounts, type ConsultoriaOverview } from "./actions";
+import {
+  createCompany,
+  getCalendarSuggestions,
+  importMeetingFromCalendar,
+  type CompanyWithCounts,
+  type ConsultoriaOverview,
+  type CalendarSuggestion,
+} from "./actions";
+import { CalendarSearch, Download } from "lucide-react";
 
 const STATUS_STYLE: Record<string, string> = {
   ativa: "bg-green/10 text-green",
@@ -106,6 +115,8 @@ export default function ConsultoriaList({
           </a>
         )}
       </div>
+
+      {googleConnected && <ImportFromAgenda companies={companies} />}
 
       {googleFlash === "connected" && (
         <div className="rounded-lg border border-green/20 bg-green/5 px-4 py-2 text-sm text-green">
@@ -225,6 +236,102 @@ export default function ConsultoriaList({
                 </span>
               </div>
             </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<CalendarSuggestion[]>([]);
+  const [choice, setChoice] = useState<Record<string, string>>({});
+  const [imported, setImported] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function load() {
+    setOpen(true);
+    setLoading(true);
+    const data = await getCalendarSuggestions();
+    setSuggestions(data);
+    setChoice(Object.fromEntries(data.map((s) => [s.eventId, s.suggestedCompanyId || ""])));
+    setLoading(false);
+  }
+
+  async function importEvent(s: CalendarSuggestion) {
+    const companyId = choice[s.eventId];
+    if (!companyId) return;
+    setBusy(s.eventId);
+    const res = await importMeetingFromCalendar(companyId, s.title, s.date);
+    setBusy(null);
+    if (!("error" in res)) {
+      setImported((prev) => new Set(prev).add(s.eventId));
+      router.refresh();
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={load}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-2.5 text-sm text-text-secondary transition hover:border-accent/40 hover:text-text"
+      >
+        <CalendarSearch className="h-4 w-4 text-accent" /> Importar reuniões da agenda
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="flex items-center gap-2 text-sm font-semibold text-text">
+          <CalendarSearch className="h-4 w-4 text-accent" /> Reuniões da sua agenda
+        </span>
+        <button onClick={() => setOpen(false)} className="text-xs text-text-muted hover:text-text">Fechar</button>
+      </div>
+      {loading ? (
+        <div className="flex items-center gap-2 py-4 text-sm text-text-muted">
+          <Loader2 className="h-4 w-4 animate-spin" /> Lendo sua agenda...
+        </div>
+      ) : suggestions.length === 0 ? (
+        <p className="py-3 text-xs text-text-muted">Nenhum evento próximo na sua agenda.</p>
+      ) : (
+        <div className="space-y-2">
+          {suggestions.map((s) => (
+            <div key={s.eventId} className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-text">{s.title}</p>
+                <p className="text-[11px] text-text-muted">{new Date(s.date).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+              </div>
+              {imported.has(s.eventId) ? (
+                <span className="flex items-center gap-1 text-xs text-green"><Check className="h-3.5 w-3.5" /> Importada</span>
+              ) : (
+                <>
+                  <select
+                    value={choice[s.eventId] || ""}
+                    onChange={(e) => setChoice((prev) => ({ ...prev, [s.eventId]: e.target.value }))}
+                    aria-label="Empresa da reunião"
+                    className="rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-text focus:border-accent focus:outline-none"
+                  >
+                    <option value="">Escolher empresa...</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => importEvent(s)}
+                    disabled={!choice[s.eventId] || busy === s.eventId}
+                    className="flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50"
+                  >
+                    {busy === s.eventId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                    Importar
+                  </button>
+                </>
+              )}
+            </div>
           ))}
         </div>
       )}

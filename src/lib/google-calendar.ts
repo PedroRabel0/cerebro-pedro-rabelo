@@ -115,7 +115,8 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
  */
 export async function createCalendarEvent(
   userId: string,
-  ev: { summary: string; description?: string; date: string }
+  ev: { summary: string; description?: string; date: string },
+  calendarId: string = "primary"
 ): Promise<{ ok: true } | { error: string }> {
   const token = await getValidAccessToken(userId);
   if (!token) return { error: "not_connected" };
@@ -124,7 +125,8 @@ export async function createCalendarEvent(
   end.setDate(end.getDate() + 1);
   const endStr = end.toISOString().slice(0, 10);
 
-  const res = await fetch(EVENTS_URL, {
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+  const res = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -137,4 +139,43 @@ export async function createCalendarEvent(
   });
   if (!res.ok) return { error: "Falha ao criar evento: " + (await res.text()).slice(0, 150) };
   return { ok: true };
+}
+
+/** Lista as agendas em que o usuario pode ESCREVER (a dele + as compartilhadas). */
+export async function listCalendars(
+  userId: string
+): Promise<{ id: string; summary: string }[]> {
+  const token = await getValidAccessToken(userId);
+  if (!token) return [];
+  const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    items?: { id: string; summary: string; summaryOverride?: string; accessRole: string; primary?: boolean }[];
+  };
+  return (data.items ?? [])
+    .filter((c) => c.accessRole === "owner" || c.accessRole === "writer")
+    .map((c) => ({ id: c.id, summary: (c.primary ? "Minha agenda" : c.summaryOverride || c.summary) }));
+}
+
+/** Proximos eventos da agenda principal do usuario (para importar reunioes). */
+export async function listUpcomingEvents(
+  userId: string,
+  max = 20
+): Promise<{ id: string; summary: string; date: string }[]> {
+  const token = await getValidAccessToken(userId);
+  if (!token) return [];
+  const timeMin = new Date().toISOString();
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&maxResults=${max}&singleEvents=true&orderBy=startTime`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    items?: { id: string; summary?: string; start?: { dateTime?: string; date?: string } }[];
+  };
+  return (data.items ?? []).map((e) => ({
+    id: e.id,
+    summary: e.summary || "(sem titulo)",
+    date: e.start?.dateTime || e.start?.date || "",
+  }));
 }
