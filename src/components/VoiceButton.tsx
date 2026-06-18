@@ -128,6 +128,13 @@ export default function VoiceButton({
       type="button"
       onClick={handleClick}
       disabled={disabled || isProcessing}
+      aria-label={
+        isProcessing
+          ? "Transcrevendo audio"
+          : isRecording
+          ? "Parar gravacao de voz"
+          : "Gravar por voz"
+      }
       title={
         isProcessing
           ? "Transcrevendo..."

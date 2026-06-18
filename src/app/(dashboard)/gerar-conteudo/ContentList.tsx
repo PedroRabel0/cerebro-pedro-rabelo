@@ -14,6 +14,7 @@ import {
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
+import { useConfirm } from "@/components/ConfirmProvider";
 import {
   MessageSquare,
   ThumbsUp,
@@ -526,6 +527,7 @@ export default function ContentList({
 }: {
   contents: GeneratedContent[];
 }) {
+  const confirm = useConfirm();
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [publishUrlId, setPublishUrlId] = useState<string | null>(null);
@@ -542,7 +544,7 @@ export default function ContentList({
   const [freshImages, setFreshImages] = useState<Record<string, string>>({});
 
   async function handleDelete(id: string) {
-    if (!confirm("Apagar este conteudo?")) return;
+    if (!(await confirm("Apagar este conteudo?"))) return;
     await deleteContent(id);
   }
 
@@ -637,7 +639,7 @@ export default function ContentList({
                     </label>
                     <button
                       onClick={async () => {
-                        if (!confirm("Remover esta imagem?")) return;
+                        if (!(await confirm("Remover esta imagem?"))) return;
                         await removeContentImage(c.id);
                         setFreshImages((prev) => {
                           const next = { ...prev };

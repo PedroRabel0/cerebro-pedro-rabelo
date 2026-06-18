@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { ReferenceProfile } from "@/lib/supabase/types";
 import { createProfile, deleteProfile, rescrapeProfile, scrapeProfileNow } from "./actions";
 import { Download, Loader2 } from "lucide-react";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 const PLATFORMS = ["instagram", "youtube", "linkedin", "x", "other"] as const;
 
@@ -45,6 +46,7 @@ export default function ProfileManager({
   const [pullingId, setPullingId] = useState<string | null>(null);
   const [pullResult, setPullResult] = useState<Record<string, { message: string; isError: boolean }>>({});
   const [isPending, startTransition] = useTransition();
+  const confirm = useConfirm();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -68,14 +70,14 @@ export default function ProfileManager({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Apagar este perfil e todos os posts associados?")) return;
+    if (!(await confirm("Apagar este perfil e todos os posts associados?"))) return;
     if (selectedId === id) onSelect(null);
     await deleteProfile(id);
   }
 
   async function handleRescrape(e: React.MouseEvent, profileId: string) {
     e.stopPropagation();
-    if (!confirm("Isso vai re-scraper todos os posts deste perfil. Continuar?")) return;
+    if (!(await confirm("Isso vai re-scraper todos os posts deste perfil. Continuar?"))) return;
     setRescrapingId(profileId);
     startTransition(async () => {
       try {

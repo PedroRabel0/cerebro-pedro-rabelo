@@ -3,10 +3,12 @@
 import { useState } from "react";
 import type { Theme } from "@/lib/supabase/types";
 import { createTheme, deleteTheme } from "./actions";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 export default function ThemeManager({ themes }: { themes: Theme[] }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -17,7 +19,7 @@ export default function ThemeManager({ themes }: { themes: Theme[] }) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Apagar este tema? Playbooks associados ficarão sem tema."))
+    if (!(await confirm("Apagar este tema? Playbooks associados ficarão sem tema.")))
       return;
     await deleteTheme(id);
   }

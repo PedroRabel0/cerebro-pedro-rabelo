@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useConfirm } from "@/components/ConfirmProvider";
 import type { Newsletter, NewsletterStatus } from "@/lib/supabase/types";
 import {
   generateNewsletter,
@@ -38,6 +39,7 @@ export default function NewsletterPanel({
 }: {
   newsletters: Newsletter[];
 }) {
+  const confirm = useConfirm();
   const [isPending, startTransition] = useTransition();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -62,8 +64,8 @@ export default function NewsletterPanel({
     });
   }
 
-  function handleDelete(id: string) {
-    if (!confirm("Apagar esta newsletter?")) return;
+  async function handleDelete(id: string) {
+    if (!(await confirm("Apagar esta newsletter?"))) return;
     startTransition(async () => {
       await deleteNewsletter(id);
       if (expandedId === id) setExpandedId(null);

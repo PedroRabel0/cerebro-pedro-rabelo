@@ -10,6 +10,7 @@ import {
   Loader2,
 } from "lucide-react";
 import VoiceButton from "@/components/VoiceButton";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { saveEntry, deleteEntry, generateDaySummary } from "./actions";
 
 interface JournalEntry {
@@ -369,6 +370,7 @@ function EntryCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const confirm = useConfirm();
 
   const preview =
     entry.content.length > 200
@@ -376,7 +378,7 @@ function EntryCard({
       : entry.content;
 
   async function handleDelete() {
-    if (!confirm("Apagar esta entrada?")) return;
+    if (!(await confirm("Apagar esta entrada?"))) return;
     setDeleting(true);
     try {
       await deleteEntry(entry.id);

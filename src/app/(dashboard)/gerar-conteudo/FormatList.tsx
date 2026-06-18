@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ContentFormat, ContentType } from "@/lib/supabase/types";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { createFormat, deleteFormat } from "./actions";
 
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
@@ -112,9 +113,10 @@ export default function FormatList({
   formats: ContentFormat[];
 }) {
   const [showForm, setShowForm] = useState(false);
+  const confirm = useConfirm();
 
   async function handleDelete(id: string) {
-    if (!confirm("Apagar este formato?")) return;
+    if (!(await confirm("Apagar este formato?"))) return;
     await deleteFormat(id);
   }
 

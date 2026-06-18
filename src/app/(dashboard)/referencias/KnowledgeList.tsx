@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/ConfirmProvider";
 import type { ReferenceKnowledge } from "@/lib/supabase/types";
 import { createKnowledge, deleteKnowledge } from "./actions";
 
@@ -101,9 +102,10 @@ export default function KnowledgeList({
   knowledge: ReferenceKnowledge[];
 }) {
   const [showForm, setShowForm] = useState(false);
+  const confirm = useConfirm();
 
   async function handleDelete(id: string) {
-    if (!confirm("Apagar este item de conhecimento?")) return;
+    if (!(await confirm("Apagar este item de conhecimento?"))) return;
     await deleteKnowledge(id);
   }
 

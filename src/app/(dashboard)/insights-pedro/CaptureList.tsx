@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/ConfirmProvider";
 import type { Capture, CaptureStatus } from "@/lib/supabase/types";
 import { createCapture, deleteCapture } from "./actions";
 import CaptureDetail from "./CaptureDetail";
@@ -114,9 +115,10 @@ function CaptureForm({ onClose }: { onClose: () => void }) {
 export default function CaptureList({ captures }: { captures: Capture[] }) {
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   async function handleDelete(id: string) {
-    if (!confirm("Apagar esta captura?")) return;
+    if (!(await confirm("Apagar esta captura?"))) return;
     await deleteCapture(id);
   }
 

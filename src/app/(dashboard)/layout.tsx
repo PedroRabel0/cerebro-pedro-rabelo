@@ -1,4 +1,5 @@
 import Sidebar from "@/components/Sidebar";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
 
 export default function DashboardLayout({
   children,
@@ -6,6 +7,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
+    <ConfirmProvider>
     <div className="flex min-h-screen">
       {/* Skip to content — accessibility */}
       <a
@@ -21,5 +23,6 @@ export default function DashboardLayout({
         </div>
       </main>
     </div>
+    </ConfirmProvider>
   );
 }

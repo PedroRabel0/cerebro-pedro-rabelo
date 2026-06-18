@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition } from "react";
 import type { ReferencePost, ReferenceProfile } from "@/lib/supabase/types";
 import { getPostsByProfile, createPost, deletePost } from "./actions";
 import ProfileInsights from "./ProfileInsights";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 function DnaTag({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
@@ -151,6 +152,7 @@ export default function PostList({
   const [posts, setPosts] = useState<ReferencePost[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const confirm = useConfirm();
 
   useEffect(() => {
     if (!profile) {
@@ -187,7 +189,7 @@ export default function PostList({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Apagar este post de referência?")) return;
+    if (!(await confirm("Apagar este post de referência?"))) return;
     await deletePost(id);
     if (profile) {
       startTransition(async () => {
