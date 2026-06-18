@@ -285,6 +285,7 @@ export type ContentType =
   | "instagram_reel"
   | "instagram_carousel"
   | "instagram_carousel_educativo"
+  | "instagram_frase"
   | "instagram_static"
   | "youtube_long"
   | "youtube_short"

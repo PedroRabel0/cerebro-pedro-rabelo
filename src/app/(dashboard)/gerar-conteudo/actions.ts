@@ -942,6 +942,25 @@ ${details.texto_post ? `   Tema/base: "${details.texto_post}"` : ""}
 
 Tom: conversa direta, como se falasse 1:1 com alguém. Sem enrolação.`;
           break;
+        case "instagram_frase":
+          typeInstructions = `FORMATO: Instagram Frase (card de citacao — estilo @alfredosoares)
+TOM: ${details.tom || "provocativo"}
+
+Gere um post no formato CITACAO/FRASE de impacto, baseado no tema e na base de conhecimento do Pedro:
+
+**FRASE** (a estrela do post — o que vai no card):
+- Curta e forte, no maximo 2-3 linhas.
+- Estrutura: comece com uma verdade/observacao e termine com o "soco" (a parte mais impactante).
+- Marque a parte de MAIOR IMPACTO entre **asteriscos duplos** (essa parte vira VERMELHA no design).
+${details.gancho ? `- Use como base: "${details.gancho}"` : "- Crie do zero a partir do tema."}
+- Exemplos do estilo: "Tem gente que te admira, mas nunca vai te elogiar por **medo de te ver crescer ainda mais.**" / "Se ainda nao der pra ser exemplo pelo resultado, **que tu seja pelo esforco.**"
+
+**LEGENDA** (texto abaixo do post):
+- 3-4 paragrafos curtos expandindo a ideia da frase, com tom de quem JA viveu (nao teoria).
+- Termine com um CTA (salvar, enviar pra alguem que precisa, ou link na bio).
+
+FORMATO DE RESPOSTA: primeiro a linha "FRASE:" (com a parte de impacto entre **), depois "LEGENDA:" com o texto.`;
+          break;
         case "instagram_carousel_educativo":
           typeInstructions = `FORMATO: Carrossel Educativo para Instagram (${details.num_slides || "6"} slides de conteudo)
 TOM: ${details.tom || "provocativo"}
@@ -1096,6 +1115,29 @@ INSTRUCOES FINAIS:
 
       if ("error" in result) {
         return { error: result.error };
+      }
+
+      // For instagram_frase, append a clean quote-card design prompt
+      if (contentType === "instagram_frase") {
+        const fraseOnly = result.content_text
+          .split(/LEGENDA/i)[0]
+          .replace(/^\s*FRASE:?\s*/i, "")
+          .trim();
+        result.content_text += `\n\n---PROMPT DE DESIGN---\nCrie um post de Instagram quadrado 1080x1080px — card de citacao minimalista (estilo @alfredosoares).
+
+ESTILO VISUAL:
+- Fundo preto solido (#0A0A0A)
+- Tipografia sans-serif BOLD pesada, alinhada a esquerda, com muito respiro
+- A FRASE em branco (#FFFFFF); a parte marcada entre ** vai em VERMELHO (#E31B23)
+- Abaixo da frase, em cinza claro (#888888), o handle "@pedrorabelo"
+- SEM icones, SEM formas, SEM elementos graficos, SEM imagem de fundo — so a frase grande e limpa
+
+FRASE (use exatamente esta, com a parte entre ** em vermelho):
+${fraseOnly}
+
+REGRAS:
+- A frase ocupa o terco superior/central, grande e 100% legivel no celular
+- Mantenha muito espaco em branco (respiro), nada de poluicao visual`;
       }
 
       // For carousel_educativo, append the design prompt template server-side

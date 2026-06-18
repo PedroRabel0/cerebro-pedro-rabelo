@@ -288,6 +288,8 @@ CRITICAL RULES:
 - Each element in the diagram must have specific Portuguese text inside it
 - Make the visual structure feel like it has DEPTH — use perspective, shading, layering
 - The design should tell a story even without reading the text — the visual structure itself communicates the concept
+- TEXT MUST FIT INSIDE ITS SHAPE (critical): keep every label SHORT — ideally 1-4 words. Every piece of text must sit COMPLETELY inside its shape/box/segment with comfortable padding on all sides — NEVER let text overflow, touch the edges, get cut off, wrap awkwardly, or spill outside the shape or the canvas. Size each shape generously to contain its text; if a label would be long, shorten it so it fits.
+- Leave a clear safety margin around the whole composition so no element is cropped at the canvas edges. Prefer fewer, larger, well-spaced elements over many cramped ones.
 
 Reply with ONLY the prompt. No preamble, no markdown, no explanations.`;
 }

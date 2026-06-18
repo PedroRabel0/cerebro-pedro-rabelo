@@ -43,16 +43,48 @@ const SOURCE_OPTIONS = [
 ] as const;
 
 
+// Labels completos (usados nos resultados / lookup por valor)
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: "instagram_reel", label: "Instagram Reels" },
-  { value: "instagram_carousel", label: "Instagram Carousel" },
-  { value: "instagram_carousel_educativo", label: "Carrossel Educativo" },
+  { value: "instagram_frase", label: "Instagram Frase" },
+  { value: "instagram_carousel_educativo", label: "Instagram Educativo" },
   { value: "instagram_static", label: "Instagram Estatico" },
   { value: "youtube_long", label: "YouTube Longo" },
   { value: "youtube_short", label: "YouTube Short" },
   { value: "linkedin_post", label: "LinkedIn Post" },
   { value: "x_thread", label: "X Thread" },
   { value: "x_tweet", label: "X Tweet" },
+];
+
+// Agrupado por plataforma (usado no seletor de tipos)
+const CONTENT_GROUPS: { platform: string; types: { value: ContentType; label: string }[] }[] = [
+  {
+    platform: "Instagram",
+    types: [
+      { value: "instagram_reel", label: "Reels" },
+      { value: "instagram_frase", label: "Frase" },
+      { value: "instagram_carousel_educativo", label: "Educativo" },
+      { value: "instagram_static", label: "Estático" },
+    ],
+  },
+  {
+    platform: "YouTube",
+    types: [
+      { value: "youtube_long", label: "Longo" },
+      { value: "youtube_short", label: "Short" },
+    ],
+  },
+  {
+    platform: "LinkedIn",
+    types: [{ value: "linkedin_post", label: "Post" }],
+  },
+  {
+    platform: "X / Twitter",
+    types: [
+      { value: "x_thread", label: "Thread" },
+      { value: "x_tweet", label: "Tweet" },
+    ],
+  },
 ];
 
 const OBJETIVO_OPTIONS = [
@@ -422,6 +454,39 @@ function CarrosselEducativoFields({
         value={details.cta || ""}
         onChange={(v) => update("cta", v)}
         placeholder="Chamada para acao do ultimo slide"
+      />
+    </div>
+  );
+}
+
+const TOM_FRASE_OPTIONS = [
+  { value: "provocativo", label: "Provocativo" },
+  { value: "inspirador", label: "Inspirador" },
+  { value: "direto", label: "Direto" },
+];
+
+function InstagramFraseFields({
+  details,
+  update,
+}: {
+  details: Record<string, string>;
+  update: (k: string, v: string) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <FieldLabel>Tom</FieldLabel>
+        <PillSelect
+          options={TOM_FRASE_OPTIONS}
+          value={(details.tom as string) || "provocativo"}
+          onChange={(v) => update("tom", v)}
+        />
+      </div>
+      <TextField
+        label="Frase base (opcional)"
+        value={details.gancho || ""}
+        onChange={(v) => update("gancho", v)}
+        placeholder="Se quiser partir de uma frase sua — se vazio, a IA cria"
       />
     </div>
   );
@@ -815,6 +880,8 @@ function TypeDetailFields({
       return <InstagramCarouselFields details={details} update={update} />;
     case "instagram_carousel_educativo":
       return <CarrosselEducativoFields details={details} update={update} />;
+    case "instagram_frase":
+      return <InstagramFraseFields details={details} update={update} />;
     case "linkedin_post":
       return <LinkedinPostFields details={details} update={update} />;
     case "x_thread":
@@ -1139,7 +1206,7 @@ function ResultCard({
       </div>
 
       {(() => {
-        const hasDesignPrompt = result.contentType === "instagram_carousel_educativo" && text.includes("---PROMPT DE DESIGN---");
+        const hasDesignPrompt = (result.contentType === "instagram_carousel_educativo" || result.contentType === "instagram_frase") && text.includes("---PROMPT DE DESIGN---");
         const contentText = hasDesignPrompt ? text.split("---PROMPT DE DESIGN---")[0].trim() : text;
         const designPrompt = hasDesignPrompt ? text.split("---PROMPT DE DESIGN---")[1].trim() : null;
 
@@ -1799,33 +1866,40 @@ export default function GenerationWizard({
         <p className="text-sm text-text-muted">
           Selecione um ou mais tipos de conteudo para gerar.
         </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {CONTENT_TYPES.map((t) => {
-            const active = state.selectedTypes.includes(t.value);
-            return (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => selectTypeAndAdvance(t.value)}
-                className={`rounded-2xl border px-4 py-3 text-left font-mono text-xs transition-all ${
-                  active
-                    ? "border-accent bg-accent/10 text-accent font-bold"
-                    : "border-border bg-card text-text-muted hover:border-border-light hover:text-text"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`h-3 w-3 rounded-md border-2 transition-all ${
-                      active
-                        ? "border-accent bg-accent"
-                        : "border-text-muted"
-                    }`}
-                  />
-                  {t.label}
-                </div>
-              </button>
-            );
-          })}
+        <div className="space-y-4">
+          {CONTENT_GROUPS.map((group) => (
+            <div key={group.platform}>
+              <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                {group.platform}
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {group.types.map((t) => {
+                  const active = state.selectedTypes.includes(t.value);
+                  return (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => selectTypeAndAdvance(t.value)}
+                      className={`rounded-2xl border px-4 py-3 text-left font-mono text-xs transition-all ${
+                        active
+                          ? "border-accent bg-accent/10 text-accent font-bold"
+                          : "border-border bg-card text-text-muted hover:border-border-light hover:text-text"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`h-3 w-3 rounded-md border-2 transition-all ${
+                            active ? "border-accent bg-accent" : "border-text-muted"
+                          }`}
+                        />
+                        {t.label}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
         <p className="text-[10px] text-text-muted">
           Clique para selecionar e avancar. Clique novamente para desmarcar.
