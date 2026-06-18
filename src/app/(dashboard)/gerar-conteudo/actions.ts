@@ -1688,7 +1688,7 @@ export async function generateImageForContent(
 
     const imageResult = await generateImage(imagePrompt, {
       size: sizeMap[contentType] || '1024x1024',
-      quality: 'medium',
+      quality: 'high',
       format: 'webp',
     });
 

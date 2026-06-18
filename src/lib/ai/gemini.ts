@@ -308,6 +308,95 @@ Type-size hierarchy descends MONOTONICALLY across four tiers: TITLE (top, the si
 - FINAL CHECK before output: (a) is the structure centered on x=540? (b) is every label connected by a line? (c) are labels in balanced mirrored pairs at matching heights? (d) is nothing tiny or orphaned? (e) does the center of mass sit on the axis? If any answer is no, fix it before finalizing.`;
 }
 
+function getSignatureStyle(accent: string): string {
+  return `## SIGNATURE STYLE — #BORAVENDER / @alfredosoares (STUDY & REPLICATE)
+
+This section encodes the shared brand DNA observed across the reference posts. Replicate this premium Brazilian agency-grade language precisely for EVERY Pedro Rabelo (@pedrorabelo) infographic. This is editorial, art-directed work: perfect alignment, generous whitespace, a single confident dominant structure, magazine-grade finish. The single non-negotiable: ${accent} is a pure, fully-saturated traffic-signal red (#E31B23). NEVER drift toward orange, brick, vermillion, coral, salmon, scarlet, or maroon — if a swatch reads even slightly warm or brown, it is wrong. The red is loud and pure.
+
+### 1. The red — ${accent} is the entire brand
+- ${accent} is the ONLY chromatic accent in the whole piece. Use it for: the title keyword phrase, all pills/badges, all "VS" squares, numbered chips, key curves/shapes, satellite ring outlines, Venn fills, dashed leader lines + nodes, the central VS spine, phase washes, and bold-red keywords.
+- Reds appear in exactly three weights: (1) FULL solid ${accent} for pills, badges, boxes, numbered chips, and the keyword box; (2) semi-transparent ${accent} at 35-55% opacity for overlapping Venn circles and phase area-fills (overlaps deepen naturally into richer red); (3) thin ${accent} strokes (1-1.5px) for dashed leaders, satellite outlines, and the VS spine. Vary opacity, never the hue — no gradient ever passes through orange. The only allowed red gradient is white->${accent} (light-left to saturated-right) for horizontal phase bands.
+- Everything else is strictly monochrome: pure black, near-blacks (#0A0A0A, #141414), white, grays. The ONLY non-red color permitted is a single deep navy (#1A2A4A) reserved exclusively for a secondary data curve when two curves must be distinguished. Nothing else gets color.
+
+### 2. Two background modes (pick ONE per post, commit fully — never mix)
+- BLACK MODE (Pedro's default — use unless the content is a data chart or a photorealistic metaphor): true near-black field (#000000 to #0A0A0A), optionally with a whisper-quiet texture — faint concentric rings OR a barely-visible dot grid at ~4% white. Text white; cards #141414 with a hairline 1px #222-#2A2A2A border, ~14-16px corner radius, generous internal padding. Used for high-drama structures: VS comparisons, Venn diagrams, radial cycles, pyramids, funnels.
+- LIGHT EDITORIAL MODE (only for data charts and photorealistic-metaphor posts): off-white field (#F5F5F5 to #FAFAFA) carrying a subtle dot-grid texture (evenly spaced faint ~1px gray dots, low opacity, like engineering paper). Text near-black (#0A0A0A-#111); cards pure white with a hairline 1px #E5E5E5 border, ~12px radius, a whisper-soft drop shadow. Photorealistic-metaphor posts ALWAYS use this mode.
+- The background is flat and uniform edge to edge; the texture is whisper-quiet, never busy.
+
+### 3. Massive black-weight title (always uppercase)
+- Giant headline, condensed-to-normal heavy sans-serif (Helvetica/Inter/Archivo Black feel), 900 weight, tight leading, UPPERCASE, top-left or top-centered, occupying real estate with confidence.
+- The KEY PHRASE is emphasized in ONE of two treatments only (choose one per post): (a) the entire key line set in ${accent} (rest of title stays white in black mode / near-black in light mode), OR (b) the key phrase wrapped inside a SOLID ${accent} rounded-rectangle box with white bold text inside.
+- Small square ${accent} "VS" badges may sit inline inside a title as connector tokens between compared terms (e.g. "SEO [vs] AEO [vs] GEO") — each a tiny solid red rounded square with white bold "vs".
+- Optional one-line gray subtitle below, with its two or three most important words in bold.
+
+### 4. Pills, badges, and numbers (red, solid, uppercase)
+- Section pills: solid ${accent} rounded pills, white UPPERCASE bold text, used as card headers / phase labels (e.g. "INTRODUCAO").
+- VS badge: solid ${accent} square (slightly rounded), white bold "VS", centered in the gap between two compared cards — a recurring signature token.
+- Numbered badges: small solid ${accent} circles or rounded squares with white bold numerals (1-5), pinned to the edge of the element they number (satellite top edges, step cards, pyramid tiers).
+- All text inside pills/badges is uppercase and bold.
+
+### 5. Dashed leader system + nodes — the core finishing DNA
+- EVERY annotation, chip, label, or callout connects to its anchor via a THIN dashed guide line (1px, short even dashes; ${accent} red or neutral gray on light mode, light-gray/white-30% on dark mode), terminating in a SMALL filled circular NODE (~4-6px dot) sitting exactly on the anchor point — the curve, the diagram edge, the metaphor detail. The node visually "pins" the line to the data; place a node at the label end too.
+- Leaders are short, clean, and purposeful — they never cross, never tangle. Annotation text sits neatly aligned at the far end. This dashed-line-plus-node pinning is the single most identifiable signature of the look: nothing ever floats unconnected. Use it liberally and precisely.
+
+### 6. Body copy with bold keywords
+- Body is clean sans-serif, regular weight, comfortable size, high contrast, short — one phrase or one to two lines per card, never long paragraphs, generous line spacing. The load-bearing keyword(s) per line are bold; the single most important term may be bold + ${accent}. This selective bolding creates the scannable, confident editorial rhythm.
+- Lead with bold mini-heading patterns where useful ("Objetivo da fase" / "Gatilho de passagem"): bold mini-heading + one short line beneath.
+
+### 7. Cards
+- BLACK MODE: #141414 fill, ~14-16px radius, hairline #222-#2A2A2A border, generous padding; circular satellites get a soft top-left inner highlight for a glossy 3D bevel.
+- LIGHT MODE: white fill, ~12px radius, hairline #E5E5E5 border, whisper-soft shadow, generous padding.
+- Card internal pattern: a solid ${accent} UPPERCASE pill at top (when labeling a phase/step), then a bold label line, then 1-2 short body lines with bold keywords. Uniform vertical rhythm; identical card heights across a row; perfect baseline alignment.
+
+### 8. One dominant central structure
+- Each post is built around a SINGLE sophisticated central visual (line/area chart, 2-col VS, 3-circle Venn, radial cycle, funnel, 3D pyramid, or a central photorealistic metaphor image) that fills the width with confidence — never timid, never floating in empty space, but breathing with generous, even margins. Strict grid; never crowd; never randomly center-justify body text.
+
+### 9. Optional photorealistic hero (for metaphor posts)
+- When the concept benefits from a metaphor, replace the diagram with ONE central photorealistic hero object that embodies it (e.g. a tree with vivid red foliage above ground and a mirrored red root system below the soil line — visible result above, invisible work below; or an iceberg with red underwater mass). Keep ${accent} red as the only saturated color in the photo. The object is sharp, well-lit, unmistakably the metaphor, never decorative clutter. Anchor 4-6 rounded label chips around it (each with a tiny red line icon), each tethered to a precise point by a thin dashed leader + node, with the central/most-important chip in bold. The photorealistic object is the ONLY rendered element; all chips, lines, nodes, and footer stay flat vector.
+
+### 10. Footer (always)
+- Bottom-left: the campaign hashtag in small gray. Bottom-right: the handle, ALWAYS "@pedrorabelo" — never "@alfredosoares". Both sit low-contrast on the same baseline, quietly framing the piece.
+
+### Hard rules checklist
+- Red is ${accent} (#E31B23) only — never orange/brick/coral.
+- Title uppercase, black-weight 900; key phrase entirely red OR in a solid red box.
+- Pills/badges solid red, uppercase, white text.
+- Every annotation tied to its anchor by a dashed line + node; nothing floats.
+- Bold keywords (sometimes bold-red) in short body copy.
+- ONE background mode per post (black default; light only for charts/metaphors), committed fully.
+- ONE dominant central structure, generous even margins, agency-grade alignment.
+- Footer: hashtag bottom-left, handle bottom-right, both small gray; handle ALWAYS @pedrorabelo.`;
+}
+
+function getStructureExecutions(accent: string): string {
+  return `## REFERENCE STRUCTURE EXECUTIONS
+
+Concrete, upgraded build recipes for the recurring central structures, executed at the reference standard. Each fills the canvas width as the single dominant element and follows the brand DNA: pure ${accent} (#E31B23) red, dashed-leader-plus-node annotations (every annotation tethered to its anchor by a thin dashed line ending in a small filled circular node, never floating), solid red uppercase pills/badges, bold (sometimes bold-red) keywords, ONE committed background mode, generous even margins. Footer always hashtag bottom-left / "@pedrorabelo" bottom-right in small gray. Pick the one structure that fits the concept.
+
+### FUNNEL (conversion / filtering / stage narrowing)
+Light Mode (off-white + dot grid). A clean vertical stack of 4-5 trapezoid bands narrowing top->bottom, perfectly centered, equal band heights, crisp edges. Bands deepen toward ${accent} (top lightest ~40% or white with hairline border, bottom band solid saturated ${accent} with white bold text). Each band carries a small numbered solid ${accent} pill on its left lip and a white bold stage label centered inside; a thin dashed ${accent} leader runs to the right margin ending in a node, where a short white card states the stage metric + a bold keyword. Add bold percentage/count figures at each step's right edge. Generous vertical gaps so the taper reads cleanly.
+
+### 3D PYRAMID (hierarchy / maturity levels)
+Black Mode (pure black). A clean isometric pyramid sliced into 3-5 horizontal tiers, base widest, drawn with subtle isometric depth — #141414 faces with thin ${accent} edge highlights catching a single soft top-light for a consistent bevel. Tiers shade from dark/neutral toward saturated ${accent} (apex-to-base or inverted for emphasis); apex may be crowned in solid ${accent}. Each tier carries a white bold UPPERCASE label centered on its front face and a small solid ${accent} numbered badge pinned to its left edge. Thin dashed ${accent} leaders fan out to the margin, each ending in a node + a #141414 callout card with a bold keyword annotation.
+
+### 2-COLUMN VS COMPARISON
+Black Mode. Header: two wide rounded #141414 cards side by side (e.g. "Branding" | "Marketing"), large white bold titles, with a single SQUARE solid ${accent} "VS" badge (white bold "VS") centered in the gap between them. Below: 5-6 paired rows; each row is two #141414 rounded cards (left vs right) separated by a thin VERTICAL ${accent} DASHED SPINE running down the exact center, punctuated by small red nodes where each row meets the spine. Each card holds one short line with its key term in bold (e.g. "Deve ser a base"). Identical uniform row height and gutter; perfect mirror baseline alignment across the continuous, perfectly centered spine.
+
+### 3-CIRCLE VENN
+Black Mode (optional subtle concentric-ring texture). Three large overlapping circles filled with semi-transparent ${accent} at 35-50% opacity (overlaps blend into richer red), arranged two-up (upper-left, upper-right) / one-down centered, symmetric geometry. Each circle: white bold UPPERCASE label + 3 short bullets (small ${accent} arrow markers, keyword in bold). The triple-center intersection is labeled in white bold; each pairwise overlap carries a small white line-icon. External dark callout boxes with dashed borders sit outside the circles, each tethered inward by a thin dashed ${accent} leader ending in a node. Title may carry inline square ${accent} "vs" badge tokens between the three names.
+
+### RADIAL NUMBERED CYCLE
+Black Mode. A large central dark circle (white bold UPPERCASE core concept, optional solid ${accent} box around the key phrase) ringed by 5-6 satellite circles at perfectly even angular spacing, equal size. Each satellite: #141414 fill, thin ${accent} ring outline, a soft top-left inner highlight for a glossy 3D bevel, a white UPPERCASE label inside, and a solid ${accent} numbered badge (1-N) seated on its top edge. Connect the satellites in a loop with curved ${accent} DASHED arrows showing a consistent clockwise cycle direction, each arrow ending in a small red node. Optional dashed leaders from each satellite out to a short anchored note. Clean radial symmetry throughout.
+
+### LINE / AREA CHART WITH PHASE BANDS
+Light Mode (off-white + dot grid). Framed plot: X-axis labeled (e.g. "Tempo"), Y-axis labeled (e.g. "Vendas & Lucro"), faint gridlines. Split the plot into 4-5 vertical PHASE BANDS left->right, each a soft horizontal wash gradient from near-white (left) to saturated ${accent} (right), each labeled at the top with a solid ${accent} pill (e.g. Desenvolvimento / Introducao / Crescimento / Maturidade / Declinio). Overlay two smooth curves: one deep navy (#1A2A4A) for the primary series and one ${accent} for the secondary; each curve carries a small text label + a SHORT dashed arrow ending in a node pointing exactly at the curve. Below the chart, a row of 4 uniform-width white cards (hairline border, ~12px corners), each topped by a solid ${accent} UPPERCASE pill (phase name), then a bold mini-heading + 1-2 lines, then a second bold mini-heading + 1-2 lines.
+
+### CENTRAL PHOTOREALISTIC METAPHOR IMAGE WITH ANCHORED CHIPS
+Light Mode (off-white + dot grid). Title above with the key phrase in ${accent} or in a solid ${accent} box. One sharp, well-lit photorealistic central object embodying the metaphor (e.g. a tree with vivid ${accent}-red foliage as the visible result and a mirrored ${accent}-tinted ROOT SYSTEM below the soil line as the invisible work; or an iceberg with red underwater mass), red as the only saturated color in the photo. Anchor 4-6 rounded label chips around it (light on light), each with a tiny ${accent} line-icon, each tethered to a precise point on the image by a thin dashed ${accent} leader ending in a small filled node at both ends; place a central bold chip for the core idea, with supporting chips evenly distributed. The photoreal image is the only rendered element; all chips, leaders, nodes, and footer stay flat vector. Leaders never cross; composition balanced left-to-right.
+
+For every structure: ONE committed background mode; red is ${accent} (#E31B23) only, never orange; footer hashtag bottom-left, "@pedrorabelo" bottom-right in small gray.`;
+}
+
 function buildMasterPrompt(contentText: string, contentType: string, brand: BrandConfig): string {
   const styles = getContentTypeStyles(brand);
   const styleGuide = styles[contentType] || styles.instagram_carousel;
@@ -329,7 +418,11 @@ Every design MUST have the main keyword in the title displayed inside a solid re
 Examples: "ANATOMIA DO [VALOR DE MARCA]", "O FUNIL [AMPULHETA]", "3 FRAMEWORKS DE [STORYTELLING]", "AS CAMADAS DO [CONTEÚDO]"
 The text OUTSIDE the box is white. The text INSIDE the red box is also white but the red box creates contrast.
 
+${getSignatureStyle(brand.colors.accent)}
+
 ${VISUAL_STRUCTURES}
+
+${getStructureExecutions(brand.colors.accent)}
 
 ## FORMAT SPECS:
 ${styleGuide}
@@ -337,7 +430,7 @@ ${styleGuide}
 ${getCompositionDiscipline(brand.colors.accent)}
 
 ## COLOR PALETTE:
-- Background: solid black ${brand.colors.bg} — ALWAYS flat, never gradients on the background itself
+- Background: flat and uniform — default BLACK MODE (solid near-black ${brand.colors.bg}); use LIGHT EDITORIAL MODE (off-white + faint dot grid) only for data charts and photorealistic-metaphor posts, per SIGNATURE STYLE. Never gradients on the background itself.
 - Primary accent: red ${brand.colors.accent} — highlight boxes, shape fills, icons, headers
 - Dark red shades: #8B0000, #CC1111 — for depth/shadows on 3D shapes (pyramids, funnels, cones)
 - Bright red: #FF3333 — for highlights on 3D shapes (light-facing surfaces)
