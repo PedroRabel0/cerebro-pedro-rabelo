@@ -84,7 +84,7 @@ export async function upsertIdentity(formData: FormData) {
 
 const PEDRO_BRAND_DEFAULTS = {
   id: 1,
-  colors: { primary: "#000000", accent: "#c9412b" },
+  colors: { primary: "#0A0A0A", accent: "#E31B23" },
   fonts: { display: "Fraunces", body: "Inter", mono: "JetBrains Mono" },
   voice_uses: [
     "Frameworks práticos",

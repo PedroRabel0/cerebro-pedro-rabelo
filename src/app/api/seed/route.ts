@@ -53,7 +53,7 @@ export async function GET(request: Request) {
     const { error: identityError } = await supabase.from("identity").upsert(
       {
         id: 1,
-        colors: { primary: "#000000", accent: "#c9412b" },
+        colors: { primary: "#0A0A0A", accent: "#E31B23" },
         fonts: { display: "Fraunces", body: "Inter", mono: "JetBrains Mono" },
         voice_uses: [
           "Frameworks praticos",

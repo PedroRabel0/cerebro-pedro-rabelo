@@ -57,7 +57,7 @@ const PROVIDERS: Record<string, ProviderInfo> = {
   },
   apify: {
     label: "Apify",
-    color: "#c9412b",
+    color: "#E31B23",
     icon: Radio,
     description: "Scraping Instagram (perfis e posts)",
     models: ["Instagram Profile Scraper"],

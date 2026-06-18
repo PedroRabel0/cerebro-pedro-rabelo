@@ -292,7 +292,7 @@ function CoverSlide({ slide }: { slide: SlideData }) {
           left: 0,
           right: 0,
           height: 6,
-          background: "linear-gradient(90deg, #c9412b, #e05040, #c9412b)",
+          background: "linear-gradient(90deg, #E31B23, #FF3333, #E31B23)",
         }}
       />
 
@@ -315,7 +315,7 @@ function CoverSlide({ slide }: { slide: SlideData }) {
       {slide.subtitle && (
         <p
           style={{
-            color: "#c9412b",
+            color: "#E31B23",
             fontSize: 28,
             fontWeight: 600,
             marginTop: 40,
@@ -342,7 +342,7 @@ function CoverSlide({ slide }: { slide: SlideData }) {
             width: 8,
             height: 8,
             borderRadius: "50%",
-            background: "#c9412b",
+            background: "#E31B23",
           }}
         />
         <span
@@ -387,7 +387,7 @@ function ContentSlide({ slide }: { slide: SlideData }) {
       >
         <span
           style={{
-            color: "#c9412b",
+            color: "#E31B23",
             fontSize: 72,
             fontWeight: 900,
             lineHeight: 1,
@@ -400,7 +400,7 @@ function ContentSlide({ slide }: { slide: SlideData }) {
           style={{
             flex: 1,
             height: 2,
-            background: "linear-gradient(90deg, #c9412b, transparent)",
+            background: "linear-gradient(90deg, #E31B23, transparent)",
           }}
         />
       </div>
@@ -479,7 +479,7 @@ function CTASlide({ slide }: { slide: SlideData }) {
           width: 400,
           height: 400,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(201,65,43,0.15) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(227,27,35,0.15) 0%, transparent 70%)",
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
@@ -513,7 +513,7 @@ function CTASlide({ slide }: { slide: SlideData }) {
       >
         <div
           style={{
-            background: "#c9412b",
+            background: "#E31B23",
             color: "#fff",
             padding: "16px 40px",
             borderRadius: 12,
@@ -527,12 +527,12 @@ function CTASlide({ slide }: { slide: SlideData }) {
         <div
           style={{
             background: "transparent",
-            color: "#c9412b",
+            color: "#E31B23",
             padding: "16px 40px",
             borderRadius: 12,
             fontSize: 24,
             fontWeight: 700,
-            border: "2px solid #c9412b",
+            border: "2px solid #E31B23",
             letterSpacing: "0.02em",
           }}
         >
@@ -555,7 +555,7 @@ function CTASlide({ slide }: { slide: SlideData }) {
             width: 8,
             height: 8,
             borderRadius: "50%",
-            background: "#c9412b",
+            background: "#E31B23",
           }}
         />
         <span
@@ -578,7 +578,7 @@ function CTASlide({ slide }: { slide: SlideData }) {
           left: 0,
           right: 0,
           height: 6,
-          background: "linear-gradient(90deg, #c9412b, #e05040, #c9412b)",
+          background: "linear-gradient(90deg, #E31B23, #FF3333, #E31B23)",
         }}
       />
     </div>

@@ -134,7 +134,7 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
   function handleColorsChange(value: string) {
     setColors(value);
     if (value.trim() && !validateJson(value, "cores")) {
-      setColorsError("JSON inválido. Exemplo: {\"primary\": \"#c9412b\"}");
+      setColorsError("JSON inválido. Exemplo: {\"primary\": \"#E31B23\"}");
     } else {
       setColorsError(null);
     }
@@ -239,13 +239,13 @@ export default function IdentityForm({ initial, wasAutoFilled }: Props) {
           Cores
         </h2>
         <p className="text-[10px] text-text-muted mb-3">
-          JSON com as cores da marca. Ex: {"{\"primary\": \"#c9412b\", \"secondary\": \"#3a5a7a\"}"}
+          JSON com as cores da marca. Ex: {"{\"primary\": \"#0A0A0A\", \"accent\": \"#E31B23\"}"}
         </p>
         <textarea
           value={colors}
           onChange={(e) => handleColorsChange(e.target.value)}
           rows={6}
-          placeholder='{"primary": "#c9412b", "secondary": "#3a5a7a"}'
+          placeholder='{"primary": "#0A0A0A", "accent": "#E31B23"}'
           aria-label="Cores da marca (JSON)"
           className={`w-full rounded-lg border bg-card px-3 py-2 font-mono text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 resize-y ${colorsError ? "border-red focus:ring-red/40" : "border-border focus:ring-accent/40"}`}
         />

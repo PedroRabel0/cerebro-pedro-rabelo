@@ -138,7 +138,7 @@ STRUCTURES CATALOG (pick ONE):
 `;
 
 function getContentTypeStyles(brand: BrandConfig): Record<string, string> {
-  const { bg, accent } = brand.colors;
+  const { bg, accent, text } = brand.colors;
   return {
     instagram_carousel: `
     Instagram carousel COVER SLIDE — the first slide that stops the scroll.
@@ -219,7 +219,93 @@ function getContentTypeStyles(brand: BrandConfig): Record<string, string> {
     - Maximum impact, minimum elements
     - Footer: "@pedrorabelo" in gray (#666666)
     - Background: Solid black (${bg})`,
+
+    instagram_static: `SINGLE-IMAGE STATIC INFOGRAPHIC (instagram_static) — dedicated style. This is ONE self-contained, fully-composed square infographic at exactly 1080x1080px that must deliver the entire idea on its own. It is NOT a carousel slide or cover: do not use carousel pacing, "swipe" cues, page numbers, slide indicators, or continuation arrows. One frame, one strong idea.
+
+    BACKGROUND: Solid pure black ${bg}, full bleed, flat — never gradients or textures on the background.
+
+    This is a premium @alfredosoares / @gabrielbechi infographic: one dominant centered diagram, strong hierarchy, every label anchored. The whole composition is centered on the vertical axis (x=540) inside a uniform 80px safe-area margin on all four sides — nothing touches or is cropped by the edges.
+
+    LAYOUT ZONES (stacked on the central axis, top to bottom):
+
+    1. TITLE ZONE (top band, ~220px tall):
+       - A short, punchy MASSIVE headline in extra-bold/black-weight geometric sans-serif (Montserrat Black feel), white ${text}, centered, maximum two lines.
+       - The single most important KEYWORD MUST sit inside a RED HIGHLIGHT BOX: a solid ${accent} rounded rectangle, 16px corner radius, white bold text inside, generous ~24px internal padding. This is THE signature brand element #1 — always present and the strongest focal accent in the title. Non-negotiable.
+       - Optional one-line subtitle below in #AAAAAA explaining the concept — short and centered.
+
+    2. CENTRAL VISUAL ZONE (middle band, ~620px tall — the dominant hero):
+       - ONE structure chosen from the catalog to fit the content (funnel, 3D pyramid in perspective, radial wheel, comparison table, circular diagram with satellites, diamond, flowchart, Venn, 2x2 matrix, numbered icon list, etc.), centered on x=540 and vertically centered in this band. It must fill the band confidently and be unmistakably the largest, highest-contrast element — never floating small in the middle.
+       - For symmetric structures, mirror-balance them across the central axis so left and right weights are equal.
+       - Fill shapes with brand red ${accent} as the primary color; build 3D depth ONLY within the sanctioned red ramp — #8B0000 (dark/shadow side) to ${accent} (mid-tone) to #FF3333 (light side), single light source from top-left. White icons centered inside solid ${accent} circles of one consistent size. Use #1A1A1A / #111111 for secondary cards/shapes and #333333 for thin borders.
+       - Every layer/segment carries SHORT Portuguese text (1-4 words) that sits completely inside the shape with padding — never overflowing or cropped.
+
+    3. DETAIL / ANNOTATION ZONE (integrated into the central band, subordinate to the diagram — never a separate floating strip):
+       - Side labels, questions, or callouts MUST follow the COMPOSITION & LAYOUT DISCIPLINE: balanced mirrored pairs at matched left/right heights, each ANCHORED to the exact layer/segment it describes by a thin 1-2px guide line in #333333 (or ${accent} at low emphasis), ending in a small filled dot or tick at the shape. NO floating, unanchored text — ever. Labels snap to the vertical center of the layer they point to so leader lines stay short, parallel, and balanced.
+       - Any concluding/result element (check circle, outcome badge, total) is sized proportionally to the diagram (min 96px) and connected to it on the central axis by an arrow or short stem — never a tiny detached dot.
+       - Optional supporting cards: #1A1A1A (or #111111) fill, 1px #333333 border, 16px radius, white ${text} titles and #AAAAAA description text, aligned to the grid in a single balanced row with at least 48px clearance from the central visual.
+
+    4. FOOTER ZONE (bottom band, ~70px, the quietest tier):
+       - A thin #333333 divider line above it. Descriptive hashtag flush LEFT and "@pedrorabelo" flush RIGHT, both small and baseline-aligned in #666666, sitting at least 60px above the bottom edge. Always present, never competing with the content.
+
+    COLOR RULES (strict): background ${bg}; the ONLY red is brand red ${accent} — with #8B0000 (shadow) and #FF3333 (highlight) as tonal variants of that same red for 3D depth, NOT new hues. Absolutely no orange or brick tone such as #c9412b. White ${text} for primary text and icons; #AAAAAA for captions/descriptions; #666666 for footer; #1A1A1A / #111111 for cards and panels; #333333 for thin borders and connector lines. These three reds are the entire warm palette — nothing else.
+
+    TYPOGRAPHY: heavy black-weight geometric sans-serif throughout. Strong monotonic size descent: title dramatically oversized > structure/layer labels and key numbers (medium-bold white) > anchored annotations (#AAAAAA) > footer (#666666). Tight, confident letter-spacing. All text sharp and anti-aliased.
+
+    OVERALL FEEL: premium, centered, balanced, high-contrast black-and-red — the polished agency look of @alfredosoares / @gabrielbechi. One centered hero diagram with symmetric, line-anchored labels and a quiet footer. Every element intentional, anchored, and finished — no floating labels, no orphaned tiny shapes, no lopsided weight.`,
   };
+}
+
+function getCompositionDiscipline(accent: string): string {
+  return `## COMPOSITION & LAYOUT DISCIPLINE
+
+This is a NON-NEGOTIABLE section. Treat the 1080x1080px canvas as a strict editorial grid — every element is placed by rule, never floated freely. The finished piece must read as agency-grade work in the @alfredosoares / @gabrielbechi tradition: centered, balanced, with one dominant diagram, strong hierarchy, and zero floating debris. Apply ALL rules below; they override any tendency toward loose, scattered, or lopsided placement.
+
+### 1. CENTRAL AXIS & SYMMETRY (anchor everything)
+- Establish ONE vertical center axis at x=540px (the exact horizontal middle). The PRIMARY visual structure (funnel, pyramid, radial wheel, diamond, circular-satellite diagram, Venn, 2x2 matrix, flowchart) MUST be centered on it — its geometric center of mass sits on x=540, never drifting left or right.
+- The structure is also vertically centered within the content band (between the title zone and the footer), filling it confidently — never drifting up or down, never floating small in the middle.
+- The title's red keyword box, the diagram, and the footer stack as a single centered column sharing the same horizontal center.
+- For axially symmetric structures (funnel, pyramid, diamond, radial wheel, concentric circles, Venn), build them perfectly mirror-balanced about x=540 — left and right halves are mirror images in silhouette and carry equal visual weight.
+
+### 2. SAFE-AREA & MARGINS (nothing touches the edges)
+- Enforce a uniform safe-area margin of at least 80px on all four sides. NO shape, text, icon, guide line, or label may enter this margin or be cropped by the canvas edge — only the full-bleed black background extends to the edges.
+- All live content sits inside a 920x920px inner frame, partitioned into three stacked bands: a TITLE ZONE (top ~220px tall) for the headline and its red keyword box; a DIAGRAM ZONE (center, ~620px tall) for the hero structure and all its anchored labels; and a FOOTER ZONE (bottom ~70px tall, baseline at least 60px above the bottom edge).
+- Keep at least 48px of breathing space between any two distinct blocks. Prefer fewer, larger, well-spaced elements over many cramped ones; generous negative space is a feature, but it must be symmetric (equal gutters left and right of the diagram).
+
+### 3. BALANCED VISUAL WEIGHT (the anti-defect rule: left = right)
+- Visual weight on the left of the central axis must EQUAL the weight on the right. If you place a label, callout, question, or stat on one side, place a counterpart of comparable weight on the opposite side at the SAME vertical height (mirrored across x=540), with matching baselines. Labels come in mirrored PAIRS, never as lone floaters.
+- NEVER leave one side heavy and the other empty (the failure mode: one label mid-left, another lower-right, with dead space between).
+- If there is only ONE annotation, do not push it to a side — center it directly below the structure as a full-width caption block, or split its content into a balanced pair across both sides.
+- For an odd number of labels, alternate left/right down the axis in evenly spaced rows, OR stack all labels in one centered column below the diagram — never scatter them at random heights.
+- Before finalizing, mentally compute the center of mass of all non-background elements; it must land on x=540 (+/- 20px). If not, rebalance.
+
+### 4. ANCHORED LABELS — NOTHING FLOATS (core fix)
+- EVERY annotation, side question, callout, or stat label MUST be physically CONNECTED to the exact shape, layer, or segment it describes by a thin 1-2px leader line in #333333 (or ${accent} at low emphasis for the active layer), terminating in a small filled dot or tick at the anchor point on the structure side. A label without a connector line touching its target is FORBIDDEN — no exceptions.
+- The guide line runs from the EDGE of the labeled element horizontally (or gently angled) to the label, staying short and parallel to its neighbors.
+- Align each label's vertical center EXACTLY to the vertical center of the layer / tier / spoke it annotates — labels snap to layer baselines, never to arbitrary heights. One label per layer.
+- Mirrored pairs sit at matching y-coordinates and matching horizontal distance from the axis, so the two connector lines are the same length.
+- Text reads inward toward the hero: left-side labels are right-aligned toward their line, right-side labels are left-aligned toward their line.
+- For radial / circular-satellite diagrams: connectors are straight spokes from the central hub to each satellite; satellites are evenly distributed around the full 360 degrees at equal radius.
+
+### 5. NO TINY, NO ORPHAN ELEMENTS (proportional terminals)
+- No element may be visually minuscule or disconnected. Any concluding/result marker (a "check" circle, outcome badge, final node, total figure) MUST be sized proportionally to the structure — minimum 96px diameter, large enough to read as the payoff — and MUST be visually attached: either it is the natural bottom vertex of the funnel/pyramid (touching the last layer) or it connects on the central axis by a short centered 1px #333333 stem or arrow. Never render it as a tiny detached dot dangling in empty space.
+- Icon circles are a single consistent size class throughout one image (e.g. all 64px). Never mix wildly different icon-circle sizes.
+
+### 6. Z-ORDER & HIERARCHY (back to front, largest to smallest)
+Stacking order: (1) black background #0A0A0A full bleed; (2) main structure shapes (red-toned fills); (3) thin guide/connector lines #333333; (4) anchored labels, icon circles, stat numbers; (5) title + red keyword box, always on top within the title zone; (6) footer text.
+Type-size hierarchy descends MONOTONICALLY across four tiers: TITLE (top, the single most dominant element, second-loudest only to nothing) > structure layer labels / key numbers > anchored annotations (#AAAAAA descriptive lines) > FOOTER (#666666, the quietest). No annotation may be larger than the diagram's own stage labels, and nothing may rival the title. No subordinate element (label, icon, card, end-node) may rival the main diagram in size or contrast.
+
+### 7. ALIGNMENT, BASELINES & GEOMETRY CONSISTENCY
+- Align text baselines across paired labels and across rows of cards; labels in the same row share one baseline.
+- Align all left-side labels to a common left text edge and all right-side labels to a common right text edge. Icon circles repeating down a list are left-aligned on a single vertical guide (same x for every circle center). Numbered list items share consistent left indentation.
+- Use ONE corner-radius scale per image: 16px for the red keyword box and cards (#1A1A1A / #111111), with optional 8px only for small chips/badges — do not mix radii arbitrarily.
+- Stroke widths are consistent: all thin guide/connector and divider lines exactly 1-2px in #333333; card borders 1px #333333; structure outlines (if any) 2px. Leader lines all share one weight.
+- Even spacing: equal vertical gaps between funnel layers / pyramid tiers / list items / cards; equal angular spacing between radial satellites. Consistent rhythm, no uneven gaps.
+
+### 8. PREMIUM VECTOR FINISH
+- Crisp vector edges, perfect geometric precision, anti-aliased — zero hand-drawn or sketchy feel. No blur except intentional soft drop shadows beneath 3D forms (dark red #8B0000, offset down-right ~8px, low opacity).
+- 3D forms use a single consistent light source from the top-left: lit faces lean toward #FF3333, shadowed faces toward #8B0000, mid-tone faces use ${accent}. Keep all gradients strictly within these three reds — never orange or brick.
+- Generous, consistent internal padding (min 24px) inside cards and the keyword box. Kern the massive title tight but never touching.
+- FINAL CHECK before output: (a) is the structure centered on x=540? (b) is every label connected by a line? (c) are labels in balanced mirrored pairs at matching heights? (d) is nothing tiny or orphaned? (e) does the center of mass sit on the axis? If any answer is no, fix it before finalizing.`;
 }
 
 function buildMasterPrompt(contentText: string, contentType: string, brand: BrandConfig): string {
@@ -247,6 +333,8 @@ ${VISUAL_STRUCTURES}
 
 ## FORMAT SPECS:
 ${styleGuide}
+
+${getCompositionDiscipline(brand.colors.accent)}
 
 ## COLOR PALETTE:
 - Background: solid black ${brand.colors.bg} — ALWAYS flat, never gradients on the background itself
