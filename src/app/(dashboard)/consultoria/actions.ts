@@ -263,23 +263,46 @@ export async function processMeeting(
     .eq("id", meeting.company_id)
     .single();
 
+  // Contexto do Cerebro (playbooks do Pedro) para embasar pontos-chave e duvidas
+  let playbookContext = "";
+  try {
+    const similar = await findSimilarPlaybooks(
+      `${company?.goal || ""} ${meeting.transcript.slice(0, 1500)}`,
+      0.3,
+      5
+    );
+    if (similar.length > 0) {
+      const { data: pbs } = await supabase
+        .from("playbooks")
+        .select("title, body_markdown")
+        .in("id", similar.map((s) => s.id));
+      playbookContext = (pbs ?? [])
+        .map((p) => `### ${p.title}\n${(p.body_markdown || "").slice(0, 900)}`)
+        .join("\n\n");
+    }
+  } catch {
+    // segue sem playbooks
+  }
+
   const today = new Date().toISOString().slice(0, 10);
   const prompt = `REGRA ABSOLUTA: responda SEMPRE em portugues brasileiro (PT-BR).
 
 Voce e o assistente de consultoria do Pedro Rabelo. Analise a TRANSCRICAO de uma reuniao de consultoria e extraia:
 1. Um RESUMO objetivo (3-5 linhas) com os pontos principais e decisoes.
-2. As TAREFAS/ACOES que ficaram definidas (o que precisa ser feito, por quem, ate quando).
+2. PONTOS-CHAVE: as coisas mais importantes que foram ditas (insights, numeros, decisoes).
+3. DUVIDAS EM ABERTO: perguntas/duvidas que ficaram da reuniao. Para CADA duvida, responda usando o CONHECIMENTO DO PEDRO abaixo (playbooks) quando aplicavel; se nao houver base, diga objetivamente o que precisaria saber.
+4. TAREFAS/ACOES definidas (o que precisa ser feito, por quem, ate quando).
 
 EMPRESA: ${company?.name || "(cliente)"}${company?.goal ? ` — objetivo: ${company.goal}` : ""}
 DATA DE HOJE: ${today}
 
-Para cada tarefa identifique:
-- "description": o que precisa ser feito (claro e acionavel)
-- "owner_name": quem ficou responsavel (nome citado na reuniao; se nao houver, use "")
-- "due_date": prazo no formato AAAA-MM-DD se a reuniao mencionar um (ex: "ate sexta", "em 3 dias" -> calcule a partir de hoje); se nao houver, use null
+## CONHECIMENTO DO PEDRO (playbooks relevantes — use para responder as duvidas):
+${playbookContext || "(nenhum playbook diretamente relacionado)"}
+
+Para cada tarefa: "description" (acionavel), "owner_name" (quem ficou responsavel; "" se nao houver), "due_date" (AAAA-MM-DD se mencionado, calculando a partir de hoje; senao null).
 
 Responda APENAS com um JSON neste formato:
-{"summary": "...", "tasks": [{"description": "...", "owner_name": "...", "due_date": "AAAA-MM-DD ou null"}]}
+{"summary": "...", "key_points": ["...", "..."], "open_questions": [{"question": "...", "answer": "..."}], "tasks": [{"description": "...", "owner_name": "...", "due_date": "AAAA-MM-DD ou null"}]}
 
 TRANSCRICAO:
 ${meeting.transcript.slice(0, 14000)}`;
@@ -294,14 +317,33 @@ ${meeting.transcript.slice(0, 14000)}`;
     logCost("claude-sonnet-4-6", response.usage.input_tokens, response.usage.output_tokens);
 
     const text = response.content[0].type === "text" ? response.content[0].text : "";
-    const parsed = parseJSON<{ summary: string; tasks: { description: string; owner_name?: string; due_date?: string | null }[] }>(text);
+    const parsed = parseJSON<{
+      summary: string;
+      key_points?: string[];
+      open_questions?: { question: string; answer: string }[];
+      tasks: { description: string; owner_name?: string; due_date?: string | null }[];
+    }>(text);
 
     if (!parsed || !Array.isArray(parsed.tasks)) {
       return { error: "Nao consegui extrair as tarefas. Tente reprocessar." };
     }
 
-    if (parsed.summary) {
-      await supabase.from("consulting_meetings").update({ summary: parsed.summary }).eq("id", meetingId);
+    // Resumo rico (markdown) com resumo + pontos-chave + duvidas respondidas
+    const parts: string[] = [];
+    if (parsed.summary) parts.push(`## Resumo\n${parsed.summary}`);
+    if (parsed.key_points?.length) {
+      parts.push(`## Pontos-chave\n${parsed.key_points.map((k) => `- ${k}`).join("\n")}`);
+    }
+    if (parsed.open_questions?.length) {
+      parts.push(
+        `## Duvidas em aberto (respondidas com o Cerebro)\n${parsed.open_questions
+          .map((q) => `**${q.question}**\n${q.answer}`)
+          .join("\n\n")}`
+      );
+    }
+    const composed = parts.join("\n\n");
+    if (composed) {
+      await supabase.from("consulting_meetings").update({ summary: composed }).eq("id", meetingId);
     }
 
     const rows = parsed.tasks
