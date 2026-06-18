@@ -1089,21 +1089,12 @@ const DESIGN_SEPARATOR = "---PROMPT DE DESIGN---";
 // When refining a carousel_educativo, the refine/addStory actions return only the
 // adjusted slide text (no design prompt). Re-attach the design block and keep the
 // embedded slide copy in sync with the new text so it isn't silently destroyed.
-function mergeCarouselDesignPrompt(oldFullText: string, newSlideText: string): string {
-  if (!oldFullText.includes(DESIGN_SEPARATOR)) return newSlideText;
+// Ao refinar, o topo (legenda/frase) muda; o bloco de design (slides/card) e
+// preservado intacto — nao reescrevemos o conteudo dos slides com a legenda.
+function mergeCarouselDesignPrompt(oldFullText: string, newTopText: string): string {
+  if (!oldFullText.includes(DESIGN_SEPARATOR)) return newTopText;
   const designBlock = oldFullText.split(DESIGN_SEPARATOR)[1] || "";
-  const SLIDES_MARKER = "CONTEUDO DE CADA SLIDE:";
-  if (designBlock.includes(SLIDES_MARKER)) {
-    const head = designBlock.split(SLIDES_MARKER)[0];
-    const afterSlides = designBlock.split(SLIDES_MARKER)[1] || "";
-    const tail = afterSlides.includes("REGRAS:")
-      ? "\n\nREGRAS:" + afterSlides.split("REGRAS:")[1]
-      : "";
-    const rebuilt = `${head}${SLIDES_MARKER}\n${newSlideText.trim()}${tail}`;
-    return `${newSlideText.trim()}\n\n${DESIGN_SEPARATOR}${rebuilt}`;
-  }
-  // Fallback: preserve the original design block unchanged rather than lose it.
-  return `${newSlideText.trim()}\n\n${DESIGN_SEPARATOR}${designBlock}`;
+  return `${newTopText.trim()}\n\n${DESIGN_SEPARATOR}${designBlock}`;
 }
 
 function ResultCard({

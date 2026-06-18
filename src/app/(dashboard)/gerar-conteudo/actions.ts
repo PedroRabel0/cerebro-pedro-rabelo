@@ -1005,7 +1005,10 @@ INSTRUCOES DO FORMATO:
 3. Opinioes fortes > conselhos genericos
 4. NUNCA repita o mesmo conteudo em slides diferentes
 5. Formate com marcadores claros: [SLIDE 1 - CAPA], [SLIDE 2 - INTRO], [SLIDE 3], etc.
-6. NAO inclua prompt de design ou instrucoes visuais — gere APENAS o conteudo dos slides`;
+6. NAO inclua prompt de design ou instrucoes visuais.
+
+Depois de TODOS os slides, escreva uma linha exatamente assim: ---LEGENDA---
+E entao a LEGENDA do post de Instagram: 3-4 paragrafos curtos que COMPLEMENTAM o carrossel (NAO repita o conteudo dos slides; contextualize, provoque ou conte um bastidor pessoal) e termine com um CTA. Essa legenda e o texto que vai na descricao do post.`;
           break;
       }
 
@@ -1119,31 +1122,43 @@ INSTRUCOES FINAIS:
 
       // For instagram_frase, append a clean quote-card design prompt
       if (contentType === "instagram_frase") {
-        const fraseOnly = result.content_text
+        const raw = result.content_text
           .split(/LEGENDA/i)[0]
           .replace(/^\s*FRASE:?\s*/i, "")
           .trim();
+        const redParts = [...raw.matchAll(/\*\*(.+?)\*\*/g)].map((m) => m[1].trim());
+        const fraseLimpa = raw.replace(/\*\*/g, "").trim();
+        const redInstruction =
+          redParts.length > 0
+            ? `Esta parte da frase DEVE ficar em VERMELHO (#E31B23): "${redParts.join(" / ")}". Todo o RESTO da frase fica em BRANCO (#FFFFFF).`
+            : `A ultima clausula (a parte de maior impacto) deve ficar em VERMELHO (#E31B23); o resto em BRANCO (#FFFFFF).`;
         result.content_text += `\n\n---PROMPT DE DESIGN---\nCrie um post de Instagram quadrado 1080x1080px — card de citacao minimalista (estilo @alfredosoares).
 
-ESTILO VISUAL:
-- Fundo preto solido (#0A0A0A)
-- Tipografia sans-serif BOLD pesada, alinhada a esquerda, com muito respiro
-- A FRASE em branco (#FFFFFF); a parte marcada entre ** vai em VERMELHO (#E31B23)
-- Abaixo da frase, em cinza claro (#888888), o handle "@pedrorabelo"
-- SEM icones, SEM formas, SEM elementos graficos, SEM imagem de fundo — so a frase grande e limpa
+ATENCAO: o post e COLORIDO, NAO e preto e branco. Fundo PRETO, texto BRANCO, e uma parte em VERMELHO. O vermelho e OBRIGATORIO.
 
-FRASE (use exatamente esta, com a parte entre ** em vermelho):
-${fraseOnly}
+ESTILO VISUAL:
+- Fundo PRETO solido (#0A0A0A)
+- Tipografia sans-serif BOLD pesada, alinhada a esquerda, muito respiro
+- ${redInstruction}
+- Abaixo da frase, em cinza claro (#888888), o handle "@pedrorabelo"
+- SEM icones, SEM formas, SEM imagem de fundo — so a frase grande e limpa
+
+FRASE COMPLETA (renderize exatamente este texto):
+"${fraseLimpa}"
 
 REGRAS:
 - A frase ocupa o terco superior/central, grande e 100% legivel no celular
-- Mantenha muito espaco em branco (respiro), nada de poluicao visual`;
+- NAO entregue em preto e branco — a parte indicada PRECISA estar em vermelho #E31B23
+- Muito espaco em branco (respiro), nada de poluicao visual`;
       }
 
-      // For carousel_educativo, append the design prompt template server-side
+      // For carousel_educativo: separa SLIDES (vao pro design) da LEGENDA (vai no topo)
       if (contentType === "instagram_carousel_educativo") {
         const totalSlides = (parseInt(details.num_slides) || 6) + 3;
-        result.content_text += `\n\n---PROMPT DE DESIGN---\nCrie um carrossel de Instagram com ${totalSlides} slides no formato 1080x1350px.
+        const parts = result.content_text.split(/---\s*LEGENDA\s*---/i);
+        const slides = parts[0].trim();
+        const legenda = (parts[1] || "").trim();
+        const designBlock = `Crie um carrossel de Instagram com ${totalSlides} slides no formato 1080x1350px.
 
 ESTILO VISUAL (paleta VERMELHO + PRETO):
 - Fundo preto (#0A0A0A) como base de todos os slides
@@ -1166,7 +1181,7 @@ IMAGENS DE CONTEUDO (importante):
 - A capa pode ter uma imagem de fundo forte com overlay escuro para o titulo se destacar
 
 CONTEUDO DE CADA SLIDE:
-${result.content_text.split("---PROMPT DE DESIGN---")[0].trim()}
+${slides}
 
 REGRAS:
 - Mantenha consistencia visual entre TODOS os slides (preto + vermelho)
@@ -1175,6 +1190,7 @@ REGRAS:
 - Blocos de explicacao em box cinza escuro (#1A1A1A)
 - Use a foto real do Pedro no header de todos os slides
 - Cada slide deve ser legivel sem zoom no celular`;
+        result.content_text = `${legenda || "(legenda nao gerada — clique em Regerar)"}\n\n---PROMPT DE DESIGN---\n${designBlock}`;
       }
 
       // Save to DB
