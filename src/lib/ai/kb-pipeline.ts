@@ -777,6 +777,19 @@ export async function runFullPipeline(
           };
         }
 
+        // SANITIZA o alvo: COMPLEMENTA/DUPLICATA referenciam um playbook existente.
+        // Se a IA devolveu um id que NÃO é um vizinho real, o INSERT da proposta
+        // quebra na FK (playbook_alvo_id) e a BATCH INTEIRA some — por isso vídeos/
+        // docs com base cheia ficavam com "0 propostas". Alvo inválido → vira NOVO.
+        if (
+          reconciliation.playbook_alvo &&
+          !vizinhos.some((v) => v.id === reconciliation.playbook_alvo)
+        ) {
+          log.error(`[KB Pipeline] playbook_alvo inválido "${reconciliation.playbook_alvo}" em "${candidato.titulo}" → NOVO`);
+          reconciliation.playbook_alvo = null;
+          reconciliation.decisao = 'NOVO';
+        }
+
         log.info(
           `[KB Pipeline] "${candidato.titulo}" → ${reconciliation.decisao}` +
           ` | tema: ${reconciliation.tema_sugerido}`,

@@ -555,7 +555,18 @@ export async function submitUniversalInput(
     const allRows = [...proposalRows, ...historiaRows];
     const totalProposals = allRows.length;
 
-    // Salva tudo em paralelo
+    // Insere as propostas PRIMEIRO e CHECA o erro. Se falhar (ex: FK/constraint),
+    // NÃO marca a captura como processada — assim não vira o estado enganoso
+    // "processado com 0 propostas". O erro real do banco fica logado.
+    if (totalProposals > 0) {
+      const { error: propErr } = await supabase.from("proposals").insert(allRows);
+      if (propErr) {
+        log.error("[Universal] Falha ao salvar propostas: " + propErr.message + " | details: " + (propErr.details || ""));
+        revalidatePath("/");
+        return { captureId: capture.id, status: "saved_without_ai" as const, instagramData };
+      }
+    }
+
     await Promise.all([
       supabase.from("captures").update({
         title: pipelineResult.title,
@@ -563,9 +574,6 @@ export async function submitUniversalInput(
         status: "processed",
         speaker_verified: pipelineResult.speaker_verified,
       }).eq("id", capture.id),
-      totalProposals > 0
-        ? supabase.from("proposals").insert(allRows)
-        : Promise.resolve(),
       supabase.from("activity_log").insert({
         actor: "ia",
         action: `Pipeline KB v2: ${totalProposals} proposta(s) ` +
