@@ -193,8 +193,10 @@ export async function extractFromInput(
     const client = getClient();
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 8192,
+      // Haiku (~100 tok/s) em vez de Sonnet (~49 tok/s): com 8192 tokens o Sonnet
+      // levava ~168s e estourava o limite de 60s da Vercel. Haiku + 4096 cabe (~40s).
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
       system: [
         {
           type: 'text' as const,
@@ -664,7 +666,7 @@ export async function runFullPipeline(
   // Antes era um loop SEQUENCIAL (N playbooks = N chamadas de IA em série), o que
   // estourava o limite de 60s da Vercel em transcricoes grandes. Agora roda em
   // paralelo e limita a quantidade.
-  const MAX_PLAYBOOKS = 8;
+  const MAX_PLAYBOOKS = 6;
   const candidatos = extraction.playbooks.slice(0, MAX_PLAYBOOKS);
   if (extraction.playbooks.length > MAX_PLAYBOOKS) {
     log.info(`[KB Pipeline] Limitando a ${MAX_PLAYBOOKS} de ${extraction.playbooks.length} playbooks extraidos`);
@@ -688,11 +690,26 @@ export async function runFullPipeline(
         }
 
         // 3c. Reconciliação + Classificação + Linkagem (Haiku)
-        const reconciliation = await reconcileAndLink({
-          candidato,
-          conhecimento_existente: vizinhos,
-          temas_existentes: temas,
-        });
+        // Sem vizinhos similares (ex: base recém-resetada) já é NOVO — não gasta
+        // uma chamada de IA pra concluir o óbvio. Economiza muito tempo na Vercel.
+        const reconciliation = vizinhos.length === 0
+          ? {
+              decisao: 'NOVO' as const,
+              playbook_alvo: null,
+              tema_sugerido: temas[0]?.name || 'Geral',
+              subtema_sugerido: '',
+              diff: [],
+              itens_afetados: [],
+              resumo_para_pedro: `Novo playbook: "${candidato.titulo}".`,
+              faz_parte_de: [],
+              relacionado_a: [],
+              merge_sugerido: [],
+            }
+          : await reconcileAndLink({
+              candidato,
+              conhecimento_existente: vizinhos,
+              temas_existentes: temas,
+            });
 
         if ('error' in reconciliation) {
           log.error(`[KB Pipeline] Reconciliação falhou para "${candidato.titulo}": ${reconciliation.error}`);

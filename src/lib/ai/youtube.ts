@@ -188,7 +188,9 @@ async function fetchTranscript(videoId: string): Promise<string | null> {
  */
 async function fetchTranscriptSupadata(videoId: string): Promise<string | null> {
   try {
-    const apiKey = process.env.SUPADATA_API_KEY;
+    // Remove BOM (﻿ / 65279) e quebras — a chave estava com um char invisivel
+    // que quebrava o header HTTP ("Cannot convert argument to a ByteString").
+    const apiKey = process.env.SUPADATA_API_KEY?.replace(/[﻿\r\n]/g, '').trim();
     if (!apiKey) {
       log.info('[YouTube/Supadata] No API key configured');
       return null;
