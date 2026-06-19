@@ -83,7 +83,7 @@ export async function analyzeTrend(
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 2048,
       messages: [
         {
@@ -111,7 +111,7 @@ JSON:
     const textBlock = response.content.find((b) => b.type === "text");
     if (!textBlock || textBlock.type !== "text") return { error: "Resposta vazia da IA." };
 
-    logCost("claude-sonnet-4-6", response.usage.input_tokens, response.usage.output_tokens);
+    logCost("claude-haiku-4-5-20251001", response.usage.input_tokens, response.usage.output_tokens);
 
     const parsed = parseJSON<{
       analysis: string;
@@ -531,12 +531,12 @@ Gere de 5 a 8 recomendacoes de conteudo. Todas em pt-br. Foque em insights PRATI
   if (posts.length > 0) {
     try {
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 4096,
         messages: [{ role: "user", content: aiPrompt }],
       });
 
-      logCost("claude-sonnet-4-6", response.usage.input_tokens, response.usage.output_tokens);
+      logCost("claude-haiku-4-5-20251001", response.usage.input_tokens, response.usage.output_tokens);
 
       const textBlock = response.content.find((b) => b.type === "text");
       if (textBlock && textBlock.type === "text") {

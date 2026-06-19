@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Radar faz scraping + IA — precisa de mais que os ~10s padrão
 
 import {
   getTrends,

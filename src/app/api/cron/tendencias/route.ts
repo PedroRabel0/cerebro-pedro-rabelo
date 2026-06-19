@@ -182,7 +182,7 @@ export async function GET(request: Request) {
         : "Criador de conteudo sobre marketing e empreendedorismo.";
 
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 3000,
         messages: [{
           role: "user",
@@ -206,7 +206,7 @@ Gere JSON:
         }],
       });
 
-      logCost("claude-sonnet-4-6", response.usage.input_tokens, response.usage.output_tokens);
+      logCost("claude-haiku-4-5-20251001", response.usage.input_tokens, response.usage.output_tokens);
 
       const textBlock = response.content.find((b) => b.type === "text");
       if (textBlock && textBlock.type === "text") {
