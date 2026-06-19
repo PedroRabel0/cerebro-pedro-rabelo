@@ -51,7 +51,7 @@ import {
   askConsultoria,
   getCalendarList,
 } from "../actions";
-import type { ConsultingContact, ConsultingTask } from "@/lib/supabase/types";
+import type { ConsultingContact, ConsultingTask, ConsultingMeeting } from "@/lib/supabase/types";
 
 const input =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none";
@@ -130,6 +130,7 @@ export default function CompanyDetail({
       <TasksSection
         companyId={company.id}
         tasks={data.tasks}
+        meetings={data.meetings}
         contacts={data.contacts}
         googleConnected={googleConnected}
         calendars={calendars}
@@ -670,6 +671,7 @@ function MeetingsSection({
 function TasksSection({
   companyId,
   tasks,
+  meetings,
   contacts,
   googleConnected,
   calendars,
@@ -679,6 +681,7 @@ function TasksSection({
 }: {
   companyId: string;
   tasks: ConsultingTask[];
+  meetings: ConsultingMeeting[];
   contacts: ConsultingContact[];
   googleConnected: boolean;
   calendars: { id: string; summary: string }[];
@@ -690,7 +693,17 @@ function TasksSection({
   const [desc, setDesc] = useState("");
   const [owner, setOwner] = useState("");
   const [due, setDue] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [, start] = useTransition();
+
+  function toggleGroup(key: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   function add() {
     if (!desc.trim()) return;
@@ -699,6 +712,32 @@ function TasksSection({
 
   const pending = tasks.filter((t) => t.status !== "feita");
   const done = tasks.filter((t) => t.status === "feita");
+
+  const renderTask = (t: ConsultingTask) => (
+    <TaskRow
+      key={t.id}
+      task={t}
+      companyId={companyId}
+      contacts={contacts}
+      googleConnected={googleConnected}
+      calendarId={calendarId}
+      onChange={onChange}
+      onDelete={async () => {
+        if (await confirm("Apagar esta tarefa?")) start(async () => { await deleteTask(t.id, companyId); onChange(); });
+      }}
+    />
+  );
+
+  // Agrupa as tarefas pendentes pela reuniao de origem (as manuais ficam em "avulsas")
+  const meetingById = new Map(meetings.map((m) => [m.id, m]));
+  const groups: { key: string; label: string; date: string | null; tasks: ConsultingTask[] }[] = [];
+  for (const m of meetings) {
+    const ts = pending.filter((t) => t.meeting_id === m.id);
+    if (ts.length) groups.push({ key: m.id, label: m.title, date: m.held_at, tasks: ts });
+  }
+  const avulsas = pending.filter((t) => !t.meeting_id || !meetingById.has(t.meeting_id));
+  if (avulsas.length) groups.push({ key: "__avulsas__", label: "Tarefas avulsas", date: null, tasks: avulsas });
+  const hasMeetingGroups = groups.some((g) => g.key !== "__avulsas__");
 
   return (
     <div className={card}>
@@ -721,12 +760,34 @@ function TasksSection({
         )}
       </div>
 
-      <div className="space-y-2">
-        {pending.map((t) => (
-          <TaskRow key={t.id} task={t} companyId={companyId} contacts={contacts} googleConnected={googleConnected} calendarId={calendarId} onChange={onChange} onDelete={async () => { if (await confirm("Apagar esta tarefa?")) start(async () => { await deleteTask(t.id, companyId); onChange(); }); }} />
-        ))}
-        {pending.length === 0 && <p className="text-xs text-text-muted">Nenhuma tarefa pendente.</p>}
-      </div>
+      {pending.length === 0 ? (
+        <p className="text-xs text-text-muted">Nenhuma tarefa pendente.</p>
+      ) : hasMeetingGroups ? (
+        <div className="space-y-3">
+          {groups.map((g) => (
+            <div key={g.key}>
+              <button
+                onClick={() => toggleGroup(g.key)}
+                aria-expanded={!collapsedGroups.has(g.key)}
+                className="flex w-full items-center gap-1.5 text-[11px] font-medium text-text-muted transition hover:text-text"
+              >
+                {collapsedGroups.has(g.key) ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {g.key !== "__avulsas__" && <Sparkles className="h-3 w-3 text-accent" />}
+                <span className="text-text">{g.label}</span>
+                {g.date && <span>· {new Date(g.date).toLocaleDateString("pt-BR")}</span>}
+                <span>· {g.tasks.length}</span>
+              </button>
+              {!collapsedGroups.has(g.key) && (
+                <div className="mt-2 space-y-2 border-l border-border/40 pl-3">
+                  {g.tasks.map(renderTask)}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">{pending.map(renderTask)}</div>
+      )}
 
       <div className="mt-3 space-y-2 rounded-lg border border-border/60 p-3">
         <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Nova tarefa" aria-label="Descrição da tarefa" className={input} />
