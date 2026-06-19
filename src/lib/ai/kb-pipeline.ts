@@ -207,7 +207,7 @@ export async function extractFromInput(
       messages: [
         {
           role: 'user',
-          content: `INPUT (tipo: ${sourceType}):\n\n${rawContent.slice(0, 30000)}\n\n---\nIMPORTANTE (orçamento de tempo/tokens): extraia NO MÁXIMO 4 playbooks — os 4 mais importantes — de forma CONCISA (passos curtos, 1 exemplo por playbook). A resposta JSON PRECISA terminar completa e fechada; é melhor menos playbooks do que um JSON cortado.`,
+          content: `INPUT (tipo: ${sourceType}):\n\n${rawContent.slice(0, 30000)}\n\n---\nORÇAMENTO DE TOKENS (CRÍTICO): sua resposta JSON DEVE terminar completa e fechada. Para caber:\n- NO MÁXIMO 3 playbooks essenciais.\n- Cada playbook CONCISO: principio em 1 frase, 2-3 passos curtos (como_executar com 1-2 itens), 1 exemplo curto, NO MÁXIMO 1 trecho_fonte.\n- historias_pessoais: NO MÁXIMO 1, com corpo_longo de NO MÁXIMO 4 frases (ou [] se não houver história pessoal do Pedro).\nPriorize COMPLETAR o JSON acima de detalhar.`,
         },
       ],
     });
