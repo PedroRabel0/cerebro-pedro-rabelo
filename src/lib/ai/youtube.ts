@@ -337,10 +337,16 @@ export async function extractYouTubeContent(
 
     log.info(`[YouTube] Video ID: ${videoId}`);
 
-    // Fetch metadata and transcript in parallel
+    // Fetch metadata and transcript in parallel.
+    // A transcricao tem orcamento de tempo: se a lib estiver bloqueada ou a
+    // analise de video (Gemini) demorar, seguimos so com o titulo — assim a
+    // funcao nunca estoura o limite de 60s da Vercel.
     const [metadata, transcript] = await Promise.all([
       fetchMetadata(videoId),
-      fetchTranscript(videoId),
+      Promise.race<string | null>([
+        fetchTranscript(videoId),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000)),
+      ]),
     ]);
 
     log.info(`[YouTube] Title: ${metadata.title}`);

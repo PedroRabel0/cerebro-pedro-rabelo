@@ -5,6 +5,7 @@ import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { processUniversalInput } from "@/lib/ai/universal";
+import { extractYouTubeContent } from "@/lib/ai/youtube";
 import { runFullPipeline, calculateCompletude } from "@/lib/ai/kb-pipeline";
 import type { PipelineResult, EnrichedProposal } from "@/lib/ai/kb-pipeline";
 import { scrapeInstagramPost } from "@/lib/ai/apify";
@@ -351,6 +352,23 @@ export async function submitUniversalInput(
       }
     } catch (err) {
       log.error("[Instagram] Scrape error:" + " " + String(err));
+    }
+  }
+
+  // 3.5. YouTube: extrai titulo (+ transcricao se vier rapido) ANTES do pipeline,
+  // pra ele receber conteudo real em vez de uma URL crua. extractYouTubeContent
+  // ja tem orcamento de tempo interno (12s na transcricao), entao nao trava.
+  if (sourceType === "youtube") {
+    try {
+      const yt = await extractYouTubeContent(input.trim());
+      if (yt && !("error" in yt)) {
+        aiInput = yt.transcript
+          ? `Video do YouTube:\nTitulo: ${yt.title}\nCanal: ${yt.author}\n\nTranscricao:\n${yt.transcript}`
+          : `Video do YouTube (sem transcricao disponivel):\nTitulo: ${yt.title}\nCanal: ${yt.author}\nURL: ${input.trim()}\n\nGere propostas de conhecimento com base no titulo e tema provavel do video.`;
+        log.info(`[Universal] YouTube enriquecido: "${yt.title}" — transcript ${yt.transcript?.length ?? 0} chars`);
+      }
+    } catch (err) {
+      log.error("[YouTube] enrich error:" + " " + String(err));
     }
   }
 
