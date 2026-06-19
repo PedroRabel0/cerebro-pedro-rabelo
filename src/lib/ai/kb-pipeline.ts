@@ -660,89 +660,93 @@ export async function runFullPipeline(
     parent_id: t.parent_id || null,
   }));
 
-  // ---- PASSO 3: Para cada playbook → embedding + reconciliação ----
-  const enrichedProposals: EnrichedProposal[] = [];
+  // ---- PASSO 3: Para cada playbook → embedding + reconciliação (em PARALELO) ----
+  // Antes era um loop SEQUENCIAL (N playbooks = N chamadas de IA em série), o que
+  // estourava o limite de 60s da Vercel em transcricoes grandes. Agora roda em
+  // paralelo e limita a quantidade.
+  const MAX_PLAYBOOKS = 8;
+  const candidatos = extraction.playbooks.slice(0, MAX_PLAYBOOKS);
+  if (extraction.playbooks.length > MAX_PLAYBOOKS) {
+    log.info(`[KB Pipeline] Limitando a ${MAX_PLAYBOOKS} de ${extraction.playbooks.length} playbooks extraidos`);
+  }
 
-  for (const candidato of extraction.playbooks) {
-    try {
-      // 3a. Gera embedding do candidato
-      const queryText = `${candidato.titulo} ${candidato.estrutura.principio || ''}`;
-      let embedding: number[] | undefined;
-      let vizinhos: Awaited<ReturnType<typeof findSimilarPlaybooks>> = [];
-
+  const enrichedProposals: EnrichedProposal[] = await Promise.all(
+    candidatos.map(async (candidato): Promise<EnrichedProposal> => {
       try {
-        embedding = await generateEmbedding(queryText);
-        // 3b. Busca vizinhos similares (top 8, threshold 0.5)
-        vizinhos = await findSimilarPlaybooks(queryText, 0.5, 8);
-        log.info(`[KB Pipeline] "${candidato.titulo}" → ${vizinhos.length} vizinhos similares`);
-      } catch (embErr) {
-        log.error(`[KB Pipeline] Embedding falhou para "${candidato.titulo}": ${embErr}`);
-        // Continua sem embedding — reconciliação funcionará sem vizinhos
-      }
+        // 3a. Gera embedding do candidato
+        const queryText = `${candidato.titulo} ${candidato.estrutura.principio || ''}`;
+        let embedding: number[] | undefined;
+        let vizinhos: Awaited<ReturnType<typeof findSimilarPlaybooks>> = [];
 
-      // 3c. Reconciliação + Classificação + Linkagem (Haiku)
-      const reconciliation = await reconcileAndLink({
-        candidato,
-        conhecimento_existente: vizinhos,
-        temas_existentes: temas,
-      });
+        try {
+          embedding = await generateEmbedding(queryText);
+          // 3b. Busca vizinhos similares (top 8, threshold 0.5)
+          vizinhos = await findSimilarPlaybooks(queryText, 0.5, 8);
+        } catch (embErr) {
+          log.error(`[KB Pipeline] Embedding falhou para "${candidato.titulo}": ${embErr}`);
+          // Continua sem embedding — reconciliação funcionará sem vizinhos
+        }
 
-      if ('error' in reconciliation) {
-        log.error(`[KB Pipeline] Reconciliação falhou para "${candidato.titulo}": ${reconciliation.error}`);
-        // Cria proposta como NOVO sem reconciliação
-        enrichedProposals.push({
+        // 3c. Reconciliação + Classificação + Linkagem (Haiku)
+        const reconciliation = await reconcileAndLink({
+          candidato,
+          conhecimento_existente: vizinhos,
+          temas_existentes: temas,
+        });
+
+        if ('error' in reconciliation) {
+          log.error(`[KB Pipeline] Reconciliação falhou para "${candidato.titulo}": ${reconciliation.error}`);
+          return {
+            candidato,
+            reconciliation: {
+              decisao: 'NOVO',
+              playbook_alvo: null,
+              tema_sugerido: temas[0]?.name || 'Geral',
+              subtema_sugerido: '',
+              diff: [],
+              itens_afetados: [],
+              resumo_para_pedro: `Novo playbook: "${candidato.titulo}" (reconciliação falhou).`,
+              faz_parte_de: [],
+              relacionado_a: [],
+              merge_sugerido: [],
+            },
+            completude: calculateCompletude(candidato.estrutura),
+            embedding,
+          };
+        }
+
+        log.info(
+          `[KB Pipeline] "${candidato.titulo}" → ${reconciliation.decisao}` +
+          ` | tema: ${reconciliation.tema_sugerido}`,
+        );
+        return {
+          candidato,
+          reconciliation,
+          completude: calculateCompletude(candidato.estrutura),
+          embedding,
+        };
+      } catch (err) {
+        log.error(`[KB Pipeline] Erro processando "${candidato.titulo}": ${err}`);
+        // Não falha tudo por um playbook
+        return {
           candidato,
           reconciliation: {
             decisao: 'NOVO',
             playbook_alvo: null,
-            tema_sugerido: temas[0]?.name || 'Geral',
+            tema_sugerido: 'Geral',
             subtema_sugerido: '',
             diff: [],
             itens_afetados: [],
-            resumo_para_pedro: `Novo playbook: "${candidato.titulo}" (reconciliação falhou).`,
+            resumo_para_pedro: `Novo playbook: "${candidato.titulo}" (erro no pipeline).`,
             faz_parte_de: [],
             relacionado_a: [],
             merge_sugerido: [],
           },
           completude: calculateCompletude(candidato.estrutura),
-          embedding,
-        });
-        continue;
+        };
       }
-
-      enrichedProposals.push({
-        candidato,
-        reconciliation,
-        completude: calculateCompletude(candidato.estrutura),
-        embedding,
-      });
-
-      log.info(
-        `[KB Pipeline] "${candidato.titulo}" → ${reconciliation.decisao}` +
-        ` | tema: ${reconciliation.tema_sugerido}` +
-        ` | completude: ${calculateCompletude(candidato.estrutura)}%`,
-      );
-    } catch (err) {
-      log.error(`[KB Pipeline] Erro processando "${candidato.titulo}": ${err}`);
-      // Não falha tudo por um playbook — continua com os outros
-      enrichedProposals.push({
-        candidato,
-        reconciliation: {
-          decisao: 'NOVO',
-          playbook_alvo: null,
-          tema_sugerido: 'Geral',
-          subtema_sugerido: '',
-          diff: [],
-          itens_afetados: [],
-          resumo_para_pedro: `Novo playbook: "${candidato.titulo}" (erro no pipeline).`,
-          faz_parte_de: [],
-          relacionado_a: [],
-          merge_sugerido: [],
-        },
-        completude: calculateCompletude(candidato.estrutura),
-      });
-    }
-  }
+    })
+  );
 
   log.info(
     `[KB Pipeline] Completo: ${enrichedProposals.length} propostas enriquecidas ` +

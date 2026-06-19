@@ -345,7 +345,7 @@ export async function extractYouTubeContent(
       fetchMetadata(videoId),
       Promise.race<string | null>([
         fetchTranscript(videoId),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000)),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 18000)),
       ]),
     ]);
 

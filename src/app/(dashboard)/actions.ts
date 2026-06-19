@@ -362,10 +362,13 @@ export async function submitUniversalInput(
     try {
       const yt = await extractYouTubeContent(input.trim());
       if (yt && !("error" in yt)) {
-        aiInput = yt.transcript
-          ? `Video do YouTube:\nTitulo: ${yt.title}\nCanal: ${yt.author}\n\nTranscricao:\n${yt.transcript}`
+        // Trunca a transcricao: transcricoes longas (20k+ chars) fazem o pipeline
+        // extrair playbooks demais e estourar o limite de 60s da Vercel.
+        const transcript = yt.transcript ? yt.transcript.slice(0, 12000) : null;
+        aiInput = transcript
+          ? `Video do YouTube:\nTitulo: ${yt.title}\nCanal: ${yt.author}\n\nTranscricao:\n${transcript}`
           : `Video do YouTube (sem transcricao disponivel):\nTitulo: ${yt.title}\nCanal: ${yt.author}\nURL: ${input.trim()}\n\nGere propostas de conhecimento com base no titulo e tema provavel do video.`;
-        log.info(`[Universal] YouTube enriquecido: "${yt.title}" — transcript ${yt.transcript?.length ?? 0} chars`);
+        log.info(`[Universal] YouTube enriquecido: "${yt.title}" — transcript ${transcript?.length ?? 0} chars (de ${yt.transcript?.length ?? 0})`);
       }
     } catch (err) {
       log.error("[YouTube] enrich error:" + " " + String(err));
