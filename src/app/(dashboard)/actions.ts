@@ -428,6 +428,14 @@ export async function submitUniversalInput(
 
     if ("error" in pipelineResult) {
       log.error("[Universal] KB Pipeline failed:" + " " + String(pipelineResult.error));
+      // Se a falha foi timeout/parse (extracao ja foi lenta), NAO roda o legado —
+      // seria outra chamada de IA de ~40s e garantiria o timeout de 60s da Vercel.
+      const errStr = String(pipelineResult.error).toLowerCase();
+      if (errStr.includes("timed out") || errStr.includes("timeout") || errStr.includes("parsear")) {
+        log.info("[Universal] Falha lenta — pulando legado pra nao estourar 60s");
+        revalidatePath("/");
+        return { captureId: capture.id, status: "saved_without_ai" as const, instagramData };
+      }
       // Fallback: tenta pipeline legado
       log.info("[Universal] Tentando pipeline legado como fallback...");
       const legacyResult = await processUniversalInput(aiInput);

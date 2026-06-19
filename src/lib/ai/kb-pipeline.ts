@@ -207,13 +207,13 @@ export async function extractFromInput(
       messages: [
         {
           role: 'user',
-          content: `INPUT (tipo: ${sourceType}):\n\n${rawContent.slice(0, 30000)}`,
+          content: `INPUT (tipo: ${sourceType}):\n\n${rawContent.slice(0, 30000)}\n\n---\nIMPORTANTE (orçamento de tempo/tokens): extraia NO MÁXIMO 4 playbooks — os 4 mais importantes — de forma CONCISA (passos curtos, 1 exemplo por playbook). A resposta JSON PRECISA terminar completa e fechada; é melhor menos playbooks do que um JSON cortado.`,
         },
       ],
     });
 
     logCost(
-      'claude-sonnet-4-6',
+      'claude-haiku-4-5-20251001',
       response.usage.input_tokens,
       response.usage.output_tokens,
     );
