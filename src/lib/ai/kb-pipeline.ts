@@ -627,13 +627,22 @@ export async function runFullPipeline(
   // Uma chamada de extração só aguenta ~6000 chars sem estourar o teto de tokens.
   // Para entradas longas (docs, transcrições grandes), dividimos em até 2 pedaços
   // de 6000 chars e extraímos em PARALELO — recupera a riqueza sem passar dos 60s.
+  // Espalha os pedaços pelo documento INTEIRO (início / meio / fim) em vez de só
+  // o começo — assim pegamos "as partes mais interessantes" de todo o conteúdo.
+  // Até 3 pedaços de 6000 chars, extraídos em PARALELO (cabe nos 60s).
   const CHUNK_SIZE = 6000;
-  const MAX_CHUNKS = 2;
-  const chunks: string[] = [];
-  for (let i = 0; i < rawContent.length && chunks.length < MAX_CHUNKS; i += CHUNK_SIZE) {
-    chunks.push(rawContent.slice(i, i + CHUNK_SIZE));
+  const MAX_CHUNKS = 3;
+  const totalChunks = Math.max(1, Math.ceil(rawContent.length / CHUNK_SIZE));
+  const positions: number[] = [];
+  if (totalChunks <= MAX_CHUNKS) {
+    for (let i = 0; i < totalChunks; i++) positions.push(i);
+  } else {
+    for (let k = 0; k < MAX_CHUNKS; k++) {
+      positions.push(Math.round((k * (totalChunks - 1)) / (MAX_CHUNKS - 1)));
+    }
   }
-  log.info(`[KB Pipeline] Iniciando extração (${rawContent.length} chars → ${chunks.length} pedaço(s), tipo: ${sourceType})`);
+  const chunks = positions.map((p) => rawContent.slice(p * CHUNK_SIZE, p * CHUNK_SIZE + CHUNK_SIZE));
+  log.info(`[KB Pipeline] Extração: ${rawContent.length} chars → ${chunks.length} de ${totalChunks} pedaços (posições ${positions.join(',')}), tipo: ${sourceType}`);
 
   const parts = await Promise.all(chunks.map((c) => extractFromInput(c, sourceType)));
   const oks = parts.filter((p): p is ExtractionResult => !('error' in p));
@@ -641,9 +650,24 @@ export async function runFullPipeline(
     return ('error' in parts[0] ? parts[0] : { error: 'Falha na extração' });
   }
 
-  // Combina os pedaços (limita o total pra não sobrecarregar o PASSO 3)
+  // Intercala os playbooks dos pedaços (round-robin) pra ter variedade do doc
+  // inteiro, não só do primeiro pedaço. Limita a 8 pra não sobrecarregar o PASSO 3.
+  const lists = oks.map((e) => e.playbooks);
+  const mergedPlaybooks: ExtractionResult['playbooks'] = [];
+  for (let i = 0; mergedPlaybooks.length < 8; i++) {
+    let addedAny = false;
+    for (const list of lists) {
+      if (list[i]) {
+        mergedPlaybooks.push(list[i]);
+        addedAny = true;
+        if (mergedPlaybooks.length >= 8) break;
+      }
+    }
+    if (!addedAny) break;
+  }
+
   const extraction: ExtractionResult = {
-    playbooks: oks.flatMap((e) => e.playbooks).slice(0, 8),
+    playbooks: mergedPlaybooks,
     historias_pessoais: oks.flatMap((e) => e.historias_pessoais).slice(0, 3),
     detected_type: oks[0].detected_type,
     title: oks[0].title,

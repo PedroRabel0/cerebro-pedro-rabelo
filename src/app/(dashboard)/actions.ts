@@ -362,9 +362,9 @@ export async function submitUniversalInput(
     try {
       const yt = await extractYouTubeContent(input.trim());
       if (yt && !("error" in yt)) {
-        // Trunca a transcricao: transcricoes longas (20k+ chars) fazem o pipeline
-        // extrair playbooks demais e estourar o limite de 60s da Vercel.
-        const transcript = yt.transcript ? yt.transcript.slice(0, 6000) : null;
+        // Manda a transcricao quase inteira (cap de seguranca em 100k); o pipeline
+        // espalha pedacos pelo video todo e pega "as partes mais interessantes".
+        const transcript = yt.transcript ? yt.transcript.slice(0, 100000) : null;
         aiInput = transcript
           ? `Video do YouTube:\nTitulo: ${yt.title}\nCanal: ${yt.author}\n\nTranscricao:\n${transcript}`
           : `Video do YouTube (sem transcricao disponivel):\nTitulo: ${yt.title}\nCanal: ${yt.author}\nURL: ${input.trim()}\n\nGere propostas de conhecimento com base no titulo e tema provavel do video.`;
