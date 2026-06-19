@@ -23,6 +23,8 @@ import {
   Sparkles,
   Send,
   CalendarCheck,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { useConfirm } from "@/components/ConfirmProvider";
 import type { CompanyDetail as CompanyDetailData } from "../actions";
@@ -429,7 +431,17 @@ function MeetingsSection({
   const [transcript, setTranscript] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [, start] = useTransition();
+
+  function toggleCollapsed(id: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // Agendar reuniao (cria evento no Google + registra)
   const [sched, setSched] = useState(false);
@@ -603,7 +615,21 @@ function MeetingsSection({
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
-            {m.summary && <p className="mt-2 whitespace-pre-wrap rounded bg-surface/50 px-3 py-2 text-xs text-text-secondary">{m.summary}</p>}
+            {m.summary && (
+              <div className="mt-2">
+                <button
+                  onClick={() => toggleCollapsed(m.id)}
+                  aria-expanded={!collapsed.has(m.id)}
+                  className="flex items-center gap-1 text-[11px] font-medium text-text-muted transition hover:text-text"
+                >
+                  {collapsed.has(m.id) ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  Resumo processado
+                </button>
+                {!collapsed.has(m.id) && (
+                  <p className="mt-1 whitespace-pre-wrap rounded bg-surface/50 px-3 py-2 text-xs text-text-secondary">{m.summary}</p>
+                )}
+              </div>
+            )}
             {!m.transcript && !m.google_event_id && <p className="mt-1 text-[11px] text-text-muted">Sem transcrição — edite a reunião pra colar.</p>}
             {m.google_event_id && (
               <div className="mt-2">
