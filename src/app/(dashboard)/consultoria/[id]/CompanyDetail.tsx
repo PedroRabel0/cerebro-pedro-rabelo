@@ -476,7 +476,14 @@ function MeetingsSection({
     const res = await processMeeting(id);
     setProcessing(null);
     if ("error" in res) setMsg(res.error);
-    else { setMsg(`${res.created} tarefa(s) criada(s) — veja abaixo.`); onChange(); }
+    else {
+      setMsg(
+        res.created > 0
+          ? `${res.created} tarefa(s) criada(s) — veja abaixo.`
+          : "Resumo gerado. Nenhuma tarefa identificada nesta reunião."
+      );
+      onChange();
+    }
   }
 
   const [editId, setEditId] = useState<string | null>(null);

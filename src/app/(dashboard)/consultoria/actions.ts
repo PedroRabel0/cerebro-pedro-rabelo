@@ -311,7 +311,7 @@ ${meeting.transcript.slice(0, 14000)}`;
     const client = getClient();
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
     });
     logCost("claude-sonnet-4-6", response.usage.input_tokens, response.usage.output_tokens);
@@ -321,12 +321,15 @@ ${meeting.transcript.slice(0, 14000)}`;
       summary: string;
       key_points?: string[];
       open_questions?: { question: string; answer: string }[];
-      tasks: { description: string; owner_name?: string; due_date?: string | null }[];
+      tasks?: { description: string; owner_name?: string; due_date?: string | null }[];
     }>(text);
 
-    if (!parsed || !Array.isArray(parsed.tasks)) {
-      return { error: "Nao consegui extrair as tarefas. Tente reprocessar." };
+    // Se nem o JSON deu pra interpretar, falhou de verdade (resposta vazia/cortada).
+    if (!parsed) {
+      return { error: "Nao consegui interpretar a resposta da IA. Tente reprocessar." };
     }
+    // Reuniao sem tarefas claras nao e erro — salva o resumo e segue com 0 tarefas.
+    const tasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
 
     // Resumo rico (markdown) com resumo + pontos-chave + duvidas respondidas
     const parts: string[] = [];
@@ -346,7 +349,7 @@ ${meeting.transcript.slice(0, 14000)}`;
       await supabase.from("consulting_meetings").update({ summary: composed }).eq("id", meetingId);
     }
 
-    const rows = parsed.tasks
+    const rows = tasks
       .filter((t) => t.description?.trim())
       .map((t) => {
         const due = t.due_date && /^\d{4}-\d{2}-\d{2}$/.test(t.due_date) ? t.due_date : null;
