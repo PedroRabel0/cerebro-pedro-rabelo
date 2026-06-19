@@ -711,7 +711,6 @@ function TasksSection({
   }
 
   const pending = tasks.filter((t) => t.status !== "feita");
-  const done = tasks.filter((t) => t.status === "feita");
 
   const renderTask = (t: ConsultingTask) => (
     <TaskRow
@@ -728,15 +727,18 @@ function TasksSection({
     />
   );
 
-  // Agrupa as tarefas pendentes pela reuniao de origem (as manuais ficam em "avulsas")
+  // Pendentes primeiro, concluidas depois (mas visiveis no mesmo grupo, pra poder desmarcar)
+  const sortPendingFirst = (ts: ConsultingTask[]) =>
+    [...ts].sort((a, b) => (a.status === "feita" ? 1 : 0) - (b.status === "feita" ? 1 : 0));
+  // Agrupa as tarefas pela reuniao de origem (as manuais ficam em "avulsas")
   const meetingById = new Map(meetings.map((m) => [m.id, m]));
-  const groups: { key: string; label: string; date: string | null; tasks: ConsultingTask[] }[] = [];
+  const groups: { key: string; label: string; date: string | null; tasks: ConsultingTask[]; pendingCount: number }[] = [];
   for (const m of meetings) {
-    const ts = pending.filter((t) => t.meeting_id === m.id);
-    if (ts.length) groups.push({ key: m.id, label: m.title, date: m.held_at, tasks: ts });
+    const ts = tasks.filter((t) => t.meeting_id === m.id);
+    if (ts.length) groups.push({ key: m.id, label: m.title, date: m.held_at, tasks: sortPendingFirst(ts), pendingCount: ts.filter((t) => t.status !== "feita").length });
   }
-  const avulsas = pending.filter((t) => !t.meeting_id || !meetingById.has(t.meeting_id));
-  if (avulsas.length) groups.push({ key: "__avulsas__", label: "Tarefas avulsas", date: null, tasks: avulsas });
+  const avulsas = tasks.filter((t) => !t.meeting_id || !meetingById.has(t.meeting_id));
+  if (avulsas.length) groups.push({ key: "__avulsas__", label: "Tarefas avulsas", date: null, tasks: sortPendingFirst(avulsas), pendingCount: avulsas.filter((t) => t.status !== "feita").length });
   const hasMeetingGroups = groups.some((g) => g.key !== "__avulsas__");
 
   return (
@@ -760,8 +762,8 @@ function TasksSection({
         )}
       </div>
 
-      {pending.length === 0 ? (
-        <p className="text-xs text-text-muted">Nenhuma tarefa pendente.</p>
+      {tasks.length === 0 ? (
+        <p className="text-xs text-text-muted">Nenhuma tarefa ainda.</p>
       ) : hasMeetingGroups ? (
         <div className="space-y-3">
           {groups.map((g) => (
@@ -775,7 +777,11 @@ function TasksSection({
                 {g.key !== "__avulsas__" && <Sparkles className="h-3 w-3 text-accent" />}
                 <span className="text-text">{g.label}</span>
                 {g.date && <span>· {new Date(g.date).toLocaleDateString("pt-BR")}</span>}
-                <span>· {g.tasks.length}</span>
+                {g.pendingCount > 0 ? (
+                  <span>· {g.pendingCount} pendente(s)</span>
+                ) : (
+                  <span className="text-green">· tudo feito ✓</span>
+                )}
               </button>
               {!collapsedGroups.has(g.key) && (
                 <div className="mt-2 space-y-2 border-l border-border/40 pl-3">
@@ -786,7 +792,7 @@ function TasksSection({
           ))}
         </div>
       ) : (
-        <div className="space-y-2">{pending.map(renderTask)}</div>
+        <div className="space-y-2">{sortPendingFirst(tasks).map(renderTask)}</div>
       )}
 
       <div className="mt-3 space-y-2 rounded-lg border border-border/60 p-3">
@@ -798,19 +804,6 @@ function TasksSection({
         </div>
       </div>
 
-      {done.length > 0 && (
-        <details className="mt-3">
-          <summary className="cursor-pointer text-xs text-text-muted">{done.length} concluída(s)</summary>
-          <div className="mt-2 space-y-1">
-            {done.map((t) => (
-              <div key={t.id} className="flex items-center gap-2 text-xs text-text-muted">
-                <button onClick={() => start(async () => { await updateTask(t.id, companyId, { status: "pendente" }); onChange(); })} aria-label="Reabrir tarefa"><CheckSquare className="h-3.5 w-3.5 text-green" /></button>
-                <span className="line-through">{t.description}</span>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
     </div>
   );
 }
@@ -866,11 +859,11 @@ function TaskRow({
   return (
     <div className="rounded-lg border border-border/60 p-3">
       <div className="flex items-start gap-2">
-        <button onClick={toggleDone} aria-label="Marcar tarefa como feita" className="mt-0.5 text-text-muted hover:text-accent">
-          <Square className="h-4 w-4" />
+        <button onClick={toggleDone} aria-label={task.status === "feita" ? "Desmarcar (reabrir tarefa)" : "Marcar tarefa como feita"} className="mt-0.5 text-text-muted hover:text-accent">
+          {task.status === "feita" ? <CheckSquare className="h-4 w-4 text-green" /> : <Square className="h-4 w-4" />}
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-text">{task.description}</p>
+          <p className={`text-sm ${task.status === "feita" ? "text-text-muted line-through" : "text-text"}`}>{task.description}</p>
           <p className="mt-0.5 text-[11px] text-text-muted">
             {task.owner_name && <span><User className="mr-0.5 inline h-3 w-3 align-[-2px]" />{task.owner_name} · </span>}
             {task.due_date ? (
@@ -882,6 +875,8 @@ function TaskRow({
         <button onClick={onDelete} aria-label="Apagar tarefa" className="rounded p-1 text-text-muted hover:text-red"><Trash2 className="h-3.5 w-3.5" /></button>
       </div>
 
+      {task.status !== "feita" && (
+        <>
       <div className="mt-2 flex flex-wrap gap-2">
         <button onClick={message ? () => setOpen(!open) : generate} disabled={gen} className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] text-text hover:border-accent/40 disabled:opacity-50">
           {gen ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />}
@@ -929,6 +924,8 @@ function TaskRow({
             </button>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
