@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // processamento de IA (Alimentar) precisa de mais que os ~10s padrão
 
 import Link from "next/link";
 import { getPlaybooks, getStories, getHistoriasPessoais, getThemes } from "./actions";
