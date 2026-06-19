@@ -207,7 +207,7 @@ export async function extractFromInput(
       messages: [
         {
           role: 'user',
-          content: `INPUT (tipo: ${sourceType}):\n\n${rawContent.slice(0, 30000)}\n\n---\nORÇAMENTO DE TOKENS (CRÍTICO): sua resposta JSON DEVE terminar completa e fechada. Para caber:\n- NO MÁXIMO 4 playbooks essenciais.\n- Cada playbook CONCISO: principio em 1 frase, 2-3 passos curtos (como_executar com 1-2 itens), 1 exemplo curto, NO MÁXIMO 1 trecho_fonte.\n- historias_pessoais: NO MÁXIMO 1, com corpo_longo de NO MÁXIMO 4 frases (ou [] se não houver história pessoal do Pedro).\nPriorize COMPLETAR o JSON acima de detalhar.`,
+          content: `INPUT (tipo: ${sourceType}):\n\n${rawContent.slice(0, 6000)}\n\n---\nORÇAMENTO DE TOKENS (CRÍTICO): sua resposta JSON DEVE terminar completa e fechada. Para caber:\n- NO MÁXIMO 4 playbooks essenciais.\n- Cada playbook CONCISO: principio em 1 frase, 2-3 passos curtos (como_executar com 1-2 itens), 1 exemplo curto, NO MÁXIMO 1 trecho_fonte.\n- historias_pessoais: NO MÁXIMO 1, com corpo_longo de NO MÁXIMO 4 frases (ou [] se não houver história pessoal do Pedro).\nPriorize COMPLETAR o JSON acima de detalhar.`,
         },
       ],
     });
@@ -345,7 +345,7 @@ export async function reconcileAndLink(
 
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2000,
+      max_tokens: 1200,
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -623,13 +623,34 @@ export async function runFullPipeline(
   rawContent: string,
   sourceType: string,
 ): Promise<PipelineResult | { error: string }> {
-  // ---- PASSO 1: Extração (Sonnet) ----
-  log.info(`[KB Pipeline] Iniciando extração (${rawContent.length} chars, tipo: ${sourceType})`);
-  const extraction = await extractFromInput(rawContent, sourceType);
-
-  if ('error' in extraction) {
-    return extraction;
+  // ---- PASSO 1: Extração (Haiku) ----
+  // Uma chamada de extração só aguenta ~6000 chars sem estourar o teto de tokens.
+  // Para entradas longas (docs, transcrições grandes), dividimos em até 2 pedaços
+  // de 6000 chars e extraímos em PARALELO — recupera a riqueza sem passar dos 60s.
+  const CHUNK_SIZE = 6000;
+  const MAX_CHUNKS = 2;
+  const chunks: string[] = [];
+  for (let i = 0; i < rawContent.length && chunks.length < MAX_CHUNKS; i += CHUNK_SIZE) {
+    chunks.push(rawContent.slice(i, i + CHUNK_SIZE));
   }
+  log.info(`[KB Pipeline] Iniciando extração (${rawContent.length} chars → ${chunks.length} pedaço(s), tipo: ${sourceType})`);
+
+  const parts = await Promise.all(chunks.map((c) => extractFromInput(c, sourceType)));
+  const oks = parts.filter((p): p is ExtractionResult => !('error' in p));
+  if (oks.length === 0) {
+    return ('error' in parts[0] ? parts[0] : { error: 'Falha na extração' });
+  }
+
+  // Combina os pedaços (limita o total pra não sobrecarregar o PASSO 3)
+  const extraction: ExtractionResult = {
+    playbooks: oks.flatMap((e) => e.playbooks).slice(0, 8),
+    historias_pessoais: oks.flatMap((e) => e.historias_pessoais).slice(0, 3),
+    detected_type: oks[0].detected_type,
+    title: oks[0].title,
+    summary: oks[0].summary,
+    extracted_themes: [...new Set(oks.flatMap((e) => e.extracted_themes))],
+    speaker_verified: oks.some((e) => e.speaker_verified),
+  };
 
   log.info(
     `[KB Pipeline] Extração OK: ${extraction.playbooks.length} playbooks, ` +
