@@ -179,7 +179,7 @@ ${postsContext}
 Baseado nos padrões de DNA destes ${posts.length} posts, gere 3 sugestões de conteúdo para Pedro Sobral.`;
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 4096,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
@@ -791,7 +791,7 @@ DNA: hook=${p.dna_hook_type || "?"}, estrutura=${p.dna_structure || "?"}, tom=${
     const topTones = Object.entries(toneCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 3000,
       system: `REGRA ABSOLUTA: TODA SUA RESPOSTA DEVE SER EM PORTUGUÊS BRASILEIRO (PT-BR).
 

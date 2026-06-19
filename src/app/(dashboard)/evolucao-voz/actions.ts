@@ -43,7 +43,7 @@ export async function captureSnapshot(): Promise<void> {
 
   // 3. Use Claude to generate analysis (and comparison if previous exists)
   const anthropic = getClient();
-  const model = "claude-sonnet-4-6";
+  const model = "claude-haiku-4-5-20251001";
 
   const currentState = `
 Tom: ${identity.tone_descriptors || "Não definido"}

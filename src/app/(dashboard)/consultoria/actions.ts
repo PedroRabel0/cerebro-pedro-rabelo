@@ -310,11 +310,11 @@ ${meeting.transcript.slice(0, 14000)}`;
   try {
     const client = getClient();
     const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
     });
-    logCost("claude-sonnet-4-6", response.usage.input_tokens, response.usage.output_tokens);
+    logCost("claude-haiku-4-5-20251001", response.usage.input_tokens, response.usage.output_tokens);
 
     const text = response.content[0].type === "text" ? response.content[0].text : "";
     const parsed = parseJSON<{
