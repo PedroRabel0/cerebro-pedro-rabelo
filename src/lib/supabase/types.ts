@@ -494,6 +494,12 @@ export interface ConsultingCompany {
   contract_value: number | null;
   payment_status: PaymentStatus;
   notes: string | null;
+  // Financeiro recorrente + renovacao + health (CRM+)
+  monthly_fee: number | null;
+  billing_day: number | null;
+  contract_start: string | null;
+  contract_end: string | null;
+  last_contact_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -556,5 +562,14 @@ export interface ConsultingStep {
   target_date: string | null;
   status: "pendente" | "feita";
   ordem: number;
+  created_at: string;
+}
+
+export interface ConsultingWin {
+  id: string;
+  company_id: string;
+  description: string;
+  metric: string | null;
+  achieved_on: string | null;
   created_at: string;
 }

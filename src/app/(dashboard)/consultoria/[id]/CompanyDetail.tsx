@@ -13,6 +13,7 @@ import {
   Copy,
   Check,
   CalendarPlus,
+  CalendarClock,
   FileText,
   Upload,
   ExternalLink,
@@ -25,11 +26,16 @@ import {
   CalendarCheck,
   ChevronDown,
   ChevronRight,
+  CircleDollarSign,
+  Trophy,
+  ClipboardList,
+  PhoneCall,
 } from "lucide-react";
 import { useConfirm } from "@/components/ConfirmProvider";
 import type { CompanyDetail as CompanyDetailData } from "../actions";
 import {
   updateCompany,
+  touchCompany,
   createContact,
   deleteContact,
   createMeeting,
@@ -37,6 +43,7 @@ import {
   processMeeting,
   scheduleMeeting,
   updateMeetingOnCalendar,
+  generateMeetingAgenda,
   createTask,
   updateTask,
   deleteTask,
@@ -47,11 +54,26 @@ import {
   createStep,
   toggleStep,
   deleteStep,
+  createWin,
+  deleteWin,
   addTaskReminderToCalendar,
   askConsultoria,
   getCalendarList,
 } from "../actions";
-import type { ConsultingContact, ConsultingTask, ConsultingMeeting } from "@/lib/supabase/types";
+import type { ConsultingContact, ConsultingTask, ConsultingMeeting, ConsultingWin } from "@/lib/supabase/types";
+
+/** Formata um valor em reais (R$). Sem casas decimais quando inteiro. */
+function formatBRL(value: number): string {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: value % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+const HEALTH_DOT: Record<string, string> = { ok: "bg-green", atencao: "bg-yellow-500", risco: "bg-red" };
+const HEALTH_LABEL: Record<string, string> = { ok: "Cliente em dia", atencao: "Merece atenção", risco: "Esfriando" };
 
 const input =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none";
@@ -118,13 +140,20 @@ export default function CompanyDetail({
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
 
-      <CompanyHeader company={company} onSaved={refresh} />
-      <ContractCard company={company} onSaved={refresh} />
+      <CompanyHeader
+        company={company}
+        health={data.health}
+        daysSinceContact={data.days_since_contact}
+        onSaved={refresh}
+      />
+      <ContractCard company={company} renewalInDays={data.renewal_in_days} onSaved={refresh} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <ContactsSection companyId={company.id} contacts={data.contacts} onChange={refresh} />
         <RoadmapSection companyId={company.id} steps={data.steps} onChange={refresh} />
       </div>
+
+      <WinsSection companyId={company.id} wins={data.wins} onChange={refresh} />
 
       <MeetingsSection companyId={company.id} meetings={data.meetings} contacts={data.contacts} googleConnected={googleConnected} calendars={calendars} onChange={refresh} />
       <TasksSection
@@ -193,13 +222,38 @@ function AskBrainSection({ companyId }: { companyId: string }) {
 
 // --------------------------------------------------------------------------
 
-function CompanyHeader({ company, onSaved }: { company: CompanyDetailData["company"]; onSaved: () => void }) {
+function CompanyHeader({
+  company,
+  health,
+  daysSinceContact,
+  onSaved,
+}: {
+  company: CompanyDetailData["company"];
+  health: CompanyDetailData["health"];
+  daysSinceContact: number | null;
+  onSaved: () => void;
+}) {
   const [, start] = useTransition();
+  const [touching, setTouching] = useState(false);
   const save = (fields: Parameters<typeof updateCompany>[1]) =>
     start(async () => {
       await updateCompany(company.id, fields);
       onSaved();
     });
+
+  async function registerContact() {
+    setTouching(true);
+    await touchCompany(company.id);
+    setTouching(false);
+    onSaved();
+  }
+
+  const contactLabel =
+    daysSinceContact === null
+      ? "sem contato registrado"
+      : daysSinceContact <= 0
+        ? "último contato: hoje"
+        : `último contato há ${daysSinceContact} dia${daysSinceContact > 1 ? "s" : ""}`;
 
   return (
     <div className={card}>
@@ -217,6 +271,24 @@ function CompanyHeader({ company, onSaved }: { company: CompanyDetailData["compa
         </select>
       </div>
       {company.sector && <p className="mt-1 text-xs text-text-muted">{company.sector}</p>}
+
+      {company.status === "ativa" && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-[11px] text-text-secondary">
+            <span className={`h-2 w-2 rounded-full ${HEALTH_DOT[health]}`} />
+            {HEALTH_LABEL[health]} · {contactLabel}
+          </span>
+          <button
+            onClick={registerContact}
+            disabled={touching}
+            className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-text-muted transition hover:border-accent/40 hover:text-text disabled:opacity-50"
+          >
+            {touching ? <Loader2 className="h-3 w-3 animate-spin" /> : <PhoneCall className="h-3 w-3" />}
+            Registrar contato hoje
+          </button>
+        </div>
+      )}
+
       <textarea
         defaultValue={company.goal || ""}
         onBlur={(e) => e.target.value !== (company.goal || "") && save({ goal: e.target.value })}
@@ -229,7 +301,15 @@ function CompanyHeader({ company, onSaved }: { company: CompanyDetailData["compa
   );
 }
 
-function ContractCard({ company, onSaved }: { company: CompanyDetailData["company"]; onSaved: () => void }) {
+function ContractCard({
+  company,
+  renewalInDays,
+  onSaved,
+}: {
+  company: CompanyDetailData["company"];
+  renewalInDays: number | null;
+  onSaved: () => void;
+}) {
   const [, start] = useTransition();
   const save = (fields: Parameters<typeof updateCompany>[1]) =>
     start(async () => {
@@ -237,9 +317,29 @@ function ContractCard({ company, onSaved }: { company: CompanyDetailData["compan
       onSaved();
     });
 
+  const renewalSoon = company.status === "ativa" && renewalInDays !== null && renewalInDays <= 30;
+
   return (
     <div className={card}>
-      <SectionTitle icon={FileText}>Contrato &amp; pagamento</SectionTitle>
+      <SectionTitle icon={FileText}>Contrato, financeiro &amp; renovação</SectionTitle>
+
+      {renewalSoon && (
+        <div
+          className={`mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+            (renewalInDays as number) < 0
+              ? "border-red/30 bg-red/5 text-red"
+              : "border-yellow-500/30 bg-yellow-500/5 text-yellow-500"
+          }`}
+        >
+          <CalendarClock className="h-4 w-4 shrink-0" />
+          {(renewalInDays as number) < 0
+            ? `Contrato venceu há ${Math.abs(renewalInDays as number)} dia(s) — hora de renovar ou encerrar.`
+            : (renewalInDays as number) === 0
+              ? "O contrato vence hoje — puxe a renovação."
+              : `O contrato renova em ${renewalInDays} dia(s) — bom momento para alinhar a renovação.`}
+        </div>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="text-xs text-text-muted">
           Contrato
@@ -255,16 +355,6 @@ function ContractCard({ company, onSaved }: { company: CompanyDetailData["compan
           </select>
         </label>
         <label className="text-xs text-text-muted">
-          Valor (R$)
-          <input
-            type="number"
-            defaultValue={company.contract_value ?? ""}
-            onBlur={(e) => save({ contract_value: e.target.value ? Number(e.target.value) : null })}
-            aria-label="Valor do contrato"
-            className={`${input} mt-1`}
-          />
-        </label>
-        <label className="text-xs text-text-muted">
           Pagamento
           <select
             value={company.payment_status}
@@ -277,7 +367,151 @@ function ContractCard({ company, onSaved }: { company: CompanyDetailData["compan
             <option value="atrasado">Atrasado</option>
           </select>
         </label>
+        <label className="text-xs text-text-muted">
+          Dia do vencimento
+          <input
+            type="number"
+            min={1}
+            max={31}
+            defaultValue={company.billing_day ?? ""}
+            onBlur={(e) => {
+              const v = e.target.value ? Math.min(31, Math.max(1, Number(e.target.value))) : null;
+              if (v !== (company.billing_day ?? null)) save({ billing_day: v });
+            }}
+            placeholder="ex: 5"
+            aria-label="Dia do vencimento mensal"
+            className={`${input} mt-1`}
+          />
+        </label>
+        <label className="text-xs text-text-muted">
+          Mensalidade (R$/mês)
+          <input
+            type="number"
+            defaultValue={company.monthly_fee ?? ""}
+            onBlur={(e) => save({ monthly_fee: e.target.value ? Number(e.target.value) : null })}
+            placeholder="0"
+            aria-label="Mensalidade recorrente"
+            className={`${input} mt-1`}
+          />
+        </label>
+        <label className="text-xs text-text-muted">
+          Valor total do contrato (R$)
+          <input
+            type="number"
+            defaultValue={company.contract_value ?? ""}
+            onBlur={(e) => save({ contract_value: e.target.value ? Number(e.target.value) : null })}
+            placeholder="opcional"
+            aria-label="Valor total do contrato"
+            className={`${input} mt-1`}
+          />
+        </label>
+        <div />
+        <label className="text-xs text-text-muted">
+          Início do contrato
+          <input
+            type="date"
+            defaultValue={company.contract_start ?? ""}
+            onBlur={(e) => e.target.value !== (company.contract_start ?? "") && save({ contract_start: e.target.value || null })}
+            aria-label="Início do contrato"
+            className={`${input} mt-1`}
+          />
+        </label>
+        <label className="text-xs text-text-muted">
+          Renovação / fim do contrato
+          <input
+            type="date"
+            defaultValue={company.contract_end ?? ""}
+            onBlur={(e) => e.target.value !== (company.contract_end ?? "") && save({ contract_end: e.target.value || null })}
+            aria-label="Data de renovação ou fim do contrato"
+            className={`${input} mt-1`}
+          />
+        </label>
+        {company.monthly_fee ? (
+          <div className="flex flex-col justify-end text-xs text-text-muted">
+            <span className="flex items-center gap-1 text-green">
+              <CircleDollarSign className="h-3.5 w-3.5" /> {formatBRL(company.monthly_fee)}/mês
+            </span>
+          </div>
+        ) : (
+          <div />
+        )}
       </div>
+    </div>
+  );
+}
+
+function WinsSection({
+  companyId,
+  wins,
+  onChange,
+}: {
+  companyId: string;
+  wins: ConsultingWin[];
+  onChange: () => void;
+}) {
+  const confirm = useConfirm();
+  const [adding, setAdding] = useState(false);
+  const [description, setDescription] = useState("");
+  const [metric, setMetric] = useState("");
+  const [achievedOn, setAchievedOn] = useState("");
+  const [, start] = useTransition();
+
+  function add() {
+    if (!description.trim()) return;
+    start(async () => {
+      await createWin(companyId, { description, metric, achieved_on: achievedOn || undefined });
+      setDescription(""); setMetric(""); setAchievedOn(""); setAdding(false);
+      onChange();
+    });
+  }
+  async function remove(id: string) {
+    if (!(await confirm("Apagar esta vitória?"))) return;
+    start(async () => { await deleteWin(id, companyId); onChange(); });
+  }
+
+  return (
+    <div className={card}>
+      <SectionTitle icon={Trophy} count={wins.length}>Vitórias &amp; resultados</SectionTitle>
+      <p className="mb-3 -mt-1 text-xs text-text-muted">
+        Registre conquistas do cliente — prova de valor pra hora da renovação.
+      </p>
+      <div className="space-y-2">
+        {wins.map((w) => (
+          <div key={w.id} className="flex items-start gap-2 rounded-lg border border-border/60 px-3 py-2">
+            <Trophy className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-text">{w.description}</p>
+              <p className="mt-0.5 text-[11px] text-text-muted">
+                {w.metric && <span className="rounded bg-green/10 px-1.5 py-0.5 text-green">{w.metric}</span>}
+                {w.metric && (w.achieved_on ? " · " : "")}
+                {w.achieved_on && <span>{new Date(w.achieved_on + "T00:00:00").toLocaleDateString("pt-BR")}</span>}
+              </p>
+            </div>
+            <button onClick={() => remove(w.id)} aria-label="Apagar vitória" className="rounded p-1 text-text-muted hover:text-red">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+        {wins.length === 0 && <p className="text-xs text-text-muted">Nenhuma vitória registrada ainda.</p>}
+      </div>
+
+      {adding ? (
+        <div className="mt-3 space-y-2">
+          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="O que foi conquistado" aria-label="Descrição da vitória" className={input} autoFocus />
+          <div className="grid grid-cols-2 gap-2">
+            <input value={metric} onChange={(e) => setMetric(e.target.value)} placeholder="Métrica (ex: +30% faturamento)" aria-label="Métrica da vitória" className={input} />
+            <input type="date" value={achievedOn} onChange={(e) => setAchievedOn(e.target.value)} aria-label="Data da vitória" className="rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text focus:border-accent focus:outline-none" />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={add} disabled={!description.trim()} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50">Adicionar</button>
+            <button onClick={() => setAdding(false)} className="px-2 py-1.5 text-xs text-text-muted hover:text-text">Cancelar</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)} className="mt-3 flex items-center gap-1.5 text-xs text-accent hover:underline">
+          <Plus className="h-3.5 w-3.5" /> Registrar vitória
+        </button>
+      )}
     </div>
   );
 }
@@ -515,11 +749,31 @@ function MeetingsSection({
     onChange();
   }
 
+  // Pauta da proxima reuniao (IA)
+  const [agenda, setAgenda] = useState<string | null>(null);
+  const [agendaBusy, setAgendaBusy] = useState(false);
+  const [agendaErr, setAgendaErr] = useState<string | null>(null);
+  const [agendaCopied, setAgendaCopied] = useState(false);
+
+  async function genAgenda() {
+    setAgendaBusy(true); setAgendaErr(null);
+    const res = await generateMeetingAgenda(companyId);
+    setAgendaBusy(false);
+    if ("error" in res) { setAgendaErr(res.error); return; }
+    setAgenda(res.agenda);
+  }
+  function copyAgenda() {
+    if (agenda) { navigator.clipboard.writeText(agenda); setAgendaCopied(true); setTimeout(() => setAgendaCopied(false), 1500); }
+  }
+
   return (
     <div className={card}>
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <SectionTitle icon={Sparkles} count={meetings.length}>Reuniões</SectionTitle>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={genAgenda} disabled={agendaBusy} className="flex items-center gap-1.5 text-xs text-violet hover:underline disabled:opacity-50">
+            {agendaBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardList className="h-3.5 w-3.5" />} Gerar pauta
+          </button>
           {googleConnected && !sched && (
             <button onClick={() => { setSched(true); setSCal(calendars[0]?.id || "primary"); }} className="flex items-center gap-1.5 text-xs text-accent hover:underline">
               <CalendarPlus className="h-3.5 w-3.5" /> Agendar
@@ -532,6 +786,24 @@ function MeetingsSection({
           )}
         </div>
       </div>
+
+      {agendaErr && <p className="mb-3 text-xs text-red">{agendaErr}</p>}
+      {agenda && (
+        <div className="mb-4 rounded-lg border border-violet/20 bg-violet/5 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-violet">
+              <ClipboardList className="h-3.5 w-3.5" /> Pauta sugerida pra próxima reunião
+            </span>
+            <div className="flex items-center gap-2">
+              <button onClick={copyAgenda} className="flex items-center gap-1 text-[11px] text-text-muted hover:text-text">
+                {agendaCopied ? <Check className="h-3 w-3 text-green" /> : <Copy className="h-3 w-3" />} Copiar
+              </button>
+              <button onClick={() => setAgenda(null)} className="text-[11px] text-text-muted hover:text-text">Fechar</button>
+            </div>
+          </div>
+          <p className="whitespace-pre-wrap text-xs text-text-secondary">{agenda}</p>
+        </div>
+      )}
 
       {sched && (
         <div className="mb-4 space-y-2 rounded-lg border border-accent/30 bg-surface/40 p-3">

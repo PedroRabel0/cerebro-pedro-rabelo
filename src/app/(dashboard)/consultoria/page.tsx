@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 import { Briefcase } from "lucide-react";
-import { getConsultoriaData, getGoogleStatus } from "./actions";
+import { getConsultoriaData, getDailyDigest, getGoogleStatus } from "./actions";
 import ConsultoriaList from "./ConsultoriaList";
 
 export default async function ConsultoriaPage({
@@ -10,8 +10,9 @@ export default async function ConsultoriaPage({
 }: {
   searchParams: Promise<{ google?: string }>;
 }) {
-  const [{ companies, overview }, googleStatus, sp] = await Promise.all([
+  const [{ companies, overview }, digest, googleStatus, sp] = await Promise.all([
     getConsultoriaData(),
+    getDailyDigest(),
     getGoogleStatus(),
     searchParams,
   ]);
@@ -37,6 +38,7 @@ export default async function ConsultoriaPage({
       <ConsultoriaList
         companies={companies}
         overview={overview}
+        digest={digest}
         googleConnected={googleStatus.connected}
         googleFlash={sp.google}
       />

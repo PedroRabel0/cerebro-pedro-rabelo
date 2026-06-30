@@ -8,13 +8,18 @@ import {
   Plus,
   Loader2,
   ChevronRight,
+  ChevronDown,
   AlertTriangle,
   CheckSquare,
   FileSignature,
   Wallet,
   CalendarCheck,
   CalendarPlus,
+  CalendarClock,
+  CircleDollarSign,
+  Flame,
   Check,
+  Sun,
 } from "lucide-react";
 import {
   createCompany,
@@ -23,8 +28,30 @@ import {
   type CompanyWithCounts,
   type ConsultoriaOverview,
   type CalendarSuggestion,
+  type DailyDigest,
 } from "./actions";
 import { CalendarSearch, Download } from "lucide-react";
+
+/** Formata um valor em reais (R$). Sem casas decimais quando inteiro. */
+function formatBRL(value: number): string {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: value % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+const HEALTH_DOT: Record<string, string> = {
+  ok: "bg-green",
+  atencao: "bg-yellow-500",
+  risco: "bg-red",
+};
+const HEALTH_LABEL: Record<string, string> = {
+  ok: "Em dia",
+  atencao: "Atenção",
+  risco: "Esfriando",
+};
 
 const STATUS_STYLE: Record<string, string> = {
   ativa: "bg-green/10 text-green",
@@ -55,11 +82,13 @@ const PAYMENT_LABEL: Record<string, string> = {
 export default function ConsultoriaList({
   companies,
   overview,
+  digest,
   googleConnected,
   googleFlash,
 }: {
   companies: CompanyWithCounts[];
   overview: ConsultoriaOverview;
+  digest: DailyDigest;
   googleConnected: boolean;
   googleFlash?: string;
 }) {
@@ -90,6 +119,9 @@ export default function ConsultoriaList({
 
   return (
     <div className="space-y-6">
+      {/* Foco do dia */}
+      <DailyDigestPanel digest={digest} />
+
       {/* Google Calendar connection */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
         <div className="flex items-center gap-2 text-sm">
@@ -132,7 +164,11 @@ export default function ConsultoriaList({
       )}
 
       {/* Overview strip */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl bg-surface px-4 py-3">
+          <div className="flex items-center gap-1 text-xs text-text-muted"><CircleDollarSign className="h-3.5 w-3.5" /> Receita mensal (MRR)</div>
+          <div className="mt-0.5 text-2xl font-bold text-green">{formatBRL(overview.mrr)}</div>
+        </div>
         <div className="rounded-xl bg-surface px-4 py-3">
           <div className="text-xs text-text-muted">Empresas ativas</div>
           <div className="mt-0.5 text-2xl font-bold text-text">{overview.active_companies}</div>
@@ -146,6 +182,27 @@ export default function ConsultoriaList({
           <div className="mt-0.5 text-2xl font-bold text-red">{overview.overdue_tasks}</div>
         </div>
       </div>
+
+      {/* Alertas resumidos */}
+      {(overview.renewals_soon > 0 || overview.cooling_clients > 0 || overview.overdue_payments > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {overview.renewals_soon > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-500">
+              <CalendarClock className="h-3.5 w-3.5" /> {overview.renewals_soon} contrato(s) p/ renovar
+            </span>
+          )}
+          {overview.cooling_clients > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full border border-red/30 bg-red/10 px-3 py-1 text-xs text-red">
+              <Flame className="h-3.5 w-3.5" /> {overview.cooling_clients} cliente(s) esfriando
+            </span>
+          )}
+          {overview.overdue_payments > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full border border-red/30 bg-red/10 px-3 py-1 text-xs text-red">
+              <Wallet className="h-3.5 w-3.5" /> {overview.overdue_payments} pagamento(s) atrasado(s)
+            </span>
+          )}
+        </div>
+      )}
 
       {/* New company */}
       {adding ? (
@@ -215,6 +272,13 @@ export default function ConsultoriaList({
               <div className="mb-1.5 flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-text-muted" />
                 <span className="flex-1 truncate text-sm font-semibold text-text">{c.name}</span>
+                {c.status === "ativa" && (
+                  <span
+                    title={`${HEALTH_LABEL[c.health]}${c.days_since_contact !== null ? ` · ${c.days_since_contact} dias sem contato` : ""}`}
+                    aria-label={HEALTH_LABEL[c.health]}
+                    className={`h-2 w-2 rounded-full ${HEALTH_DOT[c.health]}`}
+                  />
+                )}
                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLE[c.status]}`}>
                   {STATUS_LABEL[c.status]}
                 </span>
@@ -222,12 +286,27 @@ export default function ConsultoriaList({
               </div>
               {c.goal && <p className="mb-3 line-clamp-1 text-xs text-text-secondary">{c.goal}</p>}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-muted">
+                {c.monthly_fee ? (
+                  <span className="flex items-center gap-1 text-green">
+                    <CircleDollarSign className="h-3 w-3" /> {formatBRL(c.monthly_fee)}/mês
+                  </span>
+                ) : null}
                 <span className="flex items-center gap-1">
                   <CheckSquare className="h-3 w-3" /> {c.pending_tasks} pendentes
                 </span>
                 {c.overdue_tasks > 0 && (
                   <span className="flex items-center gap-1 text-red">
                     <AlertTriangle className="h-3 w-3" /> {c.overdue_tasks} atrasada{c.overdue_tasks > 1 ? "s" : ""}
+                  </span>
+                )}
+                {c.status === "ativa" && c.renewal_in_days !== null && c.renewal_in_days <= 30 && (
+                  <span className={`flex items-center gap-1 ${c.renewal_in_days < 0 ? "text-red" : "text-yellow-500"}`}>
+                    <CalendarClock className="h-3 w-3" />
+                    {c.renewal_in_days < 0
+                      ? "contrato vencido"
+                      : c.renewal_in_days === 0
+                        ? "renova hoje"
+                        : `renova em ${c.renewal_in_days}d`}
                   </span>
                 )}
                 <span className="flex items-center gap-1">
@@ -376,5 +455,137 @@ function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+function DailyDigestPanel({ digest }: { digest: DailyDigest }) {
+  const total =
+    digest.tasks_today.length + digest.renewals.length + digest.payments.length + digest.cooling.length;
+  const [open, setOpen] = useState(total > 0);
+
+  return (
+    <div className="rounded-xl border border-accent/20 bg-accent/5 p-4">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 text-left"
+      >
+        {open ? <ChevronDown className="h-4 w-4 text-accent" /> : <ChevronRight className="h-4 w-4 text-accent" />}
+        <Sun className="h-4 w-4 text-accent" />
+        <span className="text-sm font-semibold text-text">Foco de hoje</span>
+        <span className="text-xs text-text-muted">
+          · {total === 0 ? "tudo sob controle" : `${total} item(ns) pedindo atenção`}
+        </span>
+      </button>
+
+      {open && (
+        total === 0 ? (
+          <p className="mt-3 text-xs text-text-muted">
+            Nada vencendo, nenhuma renovação próxima e nenhum cliente esfriando. Bom dia tranquilo. ☕
+          </p>
+        ) : (
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <DigestColumn
+              icon={<CheckSquare className="h-3.5 w-3.5" />}
+              title="Tarefas de hoje"
+              count={digest.tasks_today.length}
+              empty="Nenhuma tarefa vencendo."
+            >
+              {digest.tasks_today.map((t) => (
+                <Link
+                  key={t.id}
+                  href={`/consultoria/${t.company_id}`}
+                  className="block rounded-lg border border-border/60 bg-card px-3 py-2 transition hover:border-accent/40"
+                >
+                  <p className="truncate text-xs text-text">{t.description}</p>
+                  <p className="text-[11px] text-text-muted">
+                    {t.company_name}
+                    {t.owner_name ? ` · ${t.owner_name}` : ""}
+                    {" · "}
+                    <span className={t.overdue ? "text-red" : "text-text-muted"}>
+                      {t.overdue ? "atrasada" : "vence hoje"}
+                    </span>
+                  </p>
+                </Link>
+              ))}
+            </DigestColumn>
+
+            <div className="space-y-4">
+              <DigestColumn
+                icon={<CalendarClock className="h-3.5 w-3.5" />}
+                title="Renovações"
+                count={digest.renewals.length}
+                empty="Nenhuma renovação próxima."
+              >
+                {digest.renewals.map((a) => (
+                  <DigestAlertRow key={a.id} alert={a} tone="yellow" />
+                ))}
+              </DigestColumn>
+
+              <DigestColumn
+                icon={<Wallet className="h-3.5 w-3.5" />}
+                title="Pagamentos"
+                count={digest.payments.length}
+                empty="Tudo em dia."
+              >
+                {digest.payments.map((a) => (
+                  <DigestAlertRow key={a.id} alert={a} tone="red" />
+                ))}
+              </DigestColumn>
+
+              <DigestColumn
+                icon={<Flame className="h-3.5 w-3.5" />}
+                title="Clientes esfriando"
+                count={digest.cooling.length}
+                empty="Ninguém esfriando."
+              >
+                {digest.cooling.map((a) => (
+                  <DigestAlertRow key={a.id} alert={a} tone="red" />
+                ))}
+              </DigestColumn>
+            </div>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+function DigestColumn({
+  icon,
+  title,
+  count,
+  empty,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  count: number;
+  empty: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+        {icon} {title} {count > 0 && <span className="text-text-secondary">· {count}</span>}
+      </p>
+      {count === 0 ? (
+        <p className="text-[11px] text-text-muted/70">{empty}</p>
+      ) : (
+        <div className="space-y-1.5">{children}</div>
+      )}
+    </div>
+  );
+}
+
+function DigestAlertRow({ alert, tone }: { alert: { id: string; name: string; detail: string }; tone: "yellow" | "red" }) {
+  return (
+    <Link
+      href={`/consultoria/${alert.id}`}
+      className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-card px-3 py-1.5 transition hover:border-accent/40"
+    >
+      <span className="truncate text-xs text-text">{alert.name}</span>
+      <span className={`shrink-0 text-[11px] ${tone === "red" ? "text-red" : "text-yellow-500"}`}>{alert.detail}</span>
+    </Link>
   );
 }

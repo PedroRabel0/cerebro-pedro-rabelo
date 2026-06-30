@@ -15,10 +15,55 @@ import type {
   ConsultingTask,
   ConsultingDocument,
   ConsultingStep,
+  ConsultingWin,
 } from "@/lib/supabase/types";
 
 const PATH = "/consultoria";
 const DOCS_BUCKET = "consulting-docs";
+
+// ============================================================
+// Health (termometro de cliente) — dias sem contato
+// ============================================================
+// Mentoria/board costuma ter cadencia semanal/quinzenal. Passou de ~2 semanas
+// sem contato = atencao; passou de ~4 semanas = risco de esfriar.
+// NB: em um arquivo "use server" so e permitido EXPORTAR funcoes async (e tipos,
+// que sao apagados em runtime). Por isso estes valores ficam locais ao modulo.
+const HEALTH_ATTENTION_DAYS = 14;
+const HEALTH_RISK_DAYS = 28;
+// Janela para avisar que um contrato esta perto de vencer/renovar.
+const RENEWAL_WINDOW_DAYS = 30;
+
+export type CompanyHealth = "ok" | "atencao" | "risco";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Dias inteiros entre uma data ISO no passado e agora (null se sem data). */
+function daysSince(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  return Math.floor((Date.now() - then) / DAY_MS);
+}
+
+/** Dias ate uma data (AAAA-MM-DD); negativo se ja passou. null se sem data. */
+function daysUntilDate(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const target = new Date(`${dateStr}T00:00:00`).getTime();
+  if (Number.isNaN(target)) return null;
+  const todayMidnight = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+  return Math.round((target - todayMidnight) / DAY_MS);
+}
+
+/** Health de uma empresa a partir da ultima interacao (so faz sentido se ativa). */
+function healthFromContact(company: Pick<ConsultingCompany, "status" | "last_contact_at" | "created_at">): {
+  health: CompanyHealth;
+  daysSinceContact: number | null;
+} {
+  const days = daysSince(company.last_contact_at || company.created_at);
+  if (company.status !== "ativa" || days === null) return { health: "ok", daysSinceContact: days };
+  const health: CompanyHealth = days > HEALTH_RISK_DAYS ? "risco" : days > HEALTH_ATTENTION_DAYS ? "atencao" : "ok";
+  return { health, daysSinceContact: days };
+}
 
 // ============================================================
 // Visao geral + lista de empresas
@@ -27,12 +72,20 @@ const DOCS_BUCKET = "consulting-docs";
 export interface CompanyWithCounts extends ConsultingCompany {
   pending_tasks: number;
   overdue_tasks: number;
+  health: CompanyHealth;
+  days_since_contact: number | null;
+  renewal_in_days: number | null;
 }
 
 export interface ConsultoriaOverview {
   active_companies: number;
   pending_tasks: number;
   overdue_tasks: number;
+  // Financeiro recorrente + alertas (CRM+)
+  mrr: number;
+  overdue_payments: number;
+  renewals_soon: number;
+  cooling_clients: number;
 }
 
 export async function getConsultoriaData(): Promise<{
@@ -58,20 +111,132 @@ export async function getConsultoriaData(): Promise<{
 
   const withCounts: CompanyWithCounts[] = companies.map((c) => {
     const ts = tasks.filter((t) => t.company_id === c.id);
+    const { health, daysSinceContact } = healthFromContact(c);
+    const renewal = daysUntilDate(c.contract_end);
     return {
       ...c,
       pending_tasks: ts.length,
       overdue_tasks: ts.filter((t) => t.due_date && t.due_date < today).length,
+      health,
+      days_since_contact: daysSinceContact,
+      renewal_in_days: renewal,
     };
   });
 
+  const active = withCounts.filter((c) => c.status === "ativa");
   const overview: ConsultoriaOverview = {
-    active_companies: companies.filter((c) => c.status === "ativa").length,
+    active_companies: active.length,
     pending_tasks: tasks.length,
     overdue_tasks: tasks.filter((t) => t.due_date && t.due_date < today).length,
+    mrr: active.reduce((sum, c) => sum + (c.monthly_fee || 0), 0),
+    overdue_payments: active.filter((c) => c.payment_status === "atrasado").length,
+    renewals_soon: active.filter(
+      (c) => c.renewal_in_days !== null && c.renewal_in_days <= RENEWAL_WINDOW_DAYS
+    ).length,
+    cooling_clients: active.filter((c) => c.health !== "ok").length,
   };
 
   return { companies: withCounts, overview };
+}
+
+// ============================================================
+// Resumo do dia — foco diario consolidado de toda a carteira
+// ============================================================
+
+export interface DigestTask {
+  id: string;
+  company_id: string;
+  company_name: string;
+  description: string;
+  owner_name: string | null;
+  due_date: string | null;
+  overdue: boolean;
+}
+export interface DigestCompanyAlert {
+  id: string;
+  name: string;
+  detail: string;
+}
+export interface DailyDigest {
+  generated_for: string; // AAAA-MM-DD
+  tasks_today: DigestTask[]; // vencem hoje ou ja venceram (pendentes)
+  renewals: DigestCompanyAlert[]; // contratos vencendo/vencidos
+  payments: DigestCompanyAlert[]; // pagamentos pendentes/atrasados
+  cooling: DigestCompanyAlert[]; // clientes esfriando
+}
+
+/**
+ * Agrega tudo que precisa de atencao hoje, em toda a carteira: tarefas vencendo,
+ * renovacoes proximas, pagamentos pendentes e clientes esfriando. So leitura.
+ */
+export async function getDailyDigest(): Promise<DailyDigest> {
+  const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [companiesRes, tasksRes] = await Promise.all([
+    supabase.from("consulting_companies").select("*"),
+    supabase
+      .from("consulting_tasks")
+      .select("id, company_id, description, owner_name, due_date, status")
+      .eq("status", "pendente"),
+  ]);
+
+  const companies = (companiesRes.data ?? []) as ConsultingCompany[];
+  const byId = new Map(companies.map((c) => [c.id, c]));
+  const tasks = (tasksRes.data ?? []) as Pick<
+    ConsultingTask,
+    "id" | "company_id" | "description" | "owner_name" | "due_date"
+  >[];
+
+  const tasks_today: DigestTask[] = tasks
+    .filter((t) => t.due_date && t.due_date <= today)
+    .map((t) => ({
+      id: t.id,
+      company_id: t.company_id,
+      company_name: byId.get(t.company_id)?.name || "Empresa",
+      description: t.description,
+      owner_name: t.owner_name,
+      due_date: t.due_date,
+      overdue: !!t.due_date && t.due_date < today,
+    }))
+    .sort((a, b) => (a.due_date || "").localeCompare(b.due_date || ""));
+
+  const active = companies.filter((c) => c.status === "ativa");
+
+  const renewals: DigestCompanyAlert[] = active
+    .map((c) => ({ c, d: daysUntilDate(c.contract_end) }))
+    .filter((x) => x.d !== null && x.d <= RENEWAL_WINDOW_DAYS)
+    .sort((a, b) => (a.d as number) - (b.d as number))
+    .map(({ c, d }) => ({
+      id: c.id,
+      name: c.name,
+      detail:
+        (d as number) < 0
+          ? `contrato venceu há ${Math.abs(d as number)} dia(s)`
+          : (d as number) === 0
+            ? "contrato vence hoje"
+            : `renova em ${d} dia(s)`,
+    }));
+
+  const payments: DigestCompanyAlert[] = active
+    .filter((c) => c.payment_status !== "em_dia")
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      detail: c.payment_status === "atrasado" ? "pagamento atrasado" : "pagamento pendente",
+    }));
+
+  const cooling: DigestCompanyAlert[] = active
+    .map((c) => ({ c, h: healthFromContact(c) }))
+    .filter((x) => x.h.health !== "ok")
+    .sort((a, b) => (b.h.daysSinceContact || 0) - (a.h.daysSinceContact || 0))
+    .map(({ c, h }) => ({
+      id: c.id,
+      name: c.name,
+      detail: `${h.daysSinceContact} dias sem contato`,
+    }));
+
+  return { generated_for: today, tasks_today, renewals, payments, cooling };
 }
 
 export interface CompanyDetail {
@@ -81,6 +246,10 @@ export interface CompanyDetail {
   tasks: ConsultingTask[];
   documents: ConsultingDocument[];
   steps: ConsultingStep[];
+  wins: ConsultingWin[];
+  health: CompanyHealth;
+  days_since_contact: number | null;
+  renewal_in_days: number | null;
 }
 
 export async function getCompany(id: string): Promise<CompanyDetail | null> {
@@ -94,21 +263,29 @@ export async function getCompany(id: string): Promise<CompanyDetail | null> {
 
   if (!company) return null;
 
-  const [contacts, meetings, tasks, documents, steps] = await Promise.all([
+  const [contacts, meetings, tasks, documents, steps, wins] = await Promise.all([
     supabase.from("consulting_contacts").select("*").eq("company_id", id).order("is_primary", { ascending: false }),
     supabase.from("consulting_meetings").select("*").eq("company_id", id).order("held_at", { ascending: false }),
     supabase.from("consulting_tasks").select("*").eq("company_id", id).order("created_at", { ascending: false }),
     supabase.from("consulting_documents").select("*").eq("company_id", id).order("created_at", { ascending: false }),
     supabase.from("consulting_steps").select("*").eq("company_id", id).order("ordem", { ascending: true }),
+    supabase.from("consulting_wins").select("*").eq("company_id", id).order("achieved_on", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }),
   ]);
 
+  const co = company as ConsultingCompany;
+  const { health, daysSinceContact } = healthFromContact(co);
+
   return {
-    company: company as ConsultingCompany,
+    company: co,
     contacts: (contacts.data ?? []) as ConsultingContact[],
     meetings: (meetings.data ?? []) as ConsultingMeeting[],
     tasks: (tasks.data ?? []) as ConsultingTask[],
     documents: (documents.data ?? []) as ConsultingDocument[],
     steps: (steps.data ?? []) as ConsultingStep[],
+    wins: (wins.data ?? []) as ConsultingWin[],
+    health,
+    days_since_contact: daysSinceContact,
+    renewal_in_days: daysUntilDate(co.contract_end),
   };
 }
 
@@ -138,13 +315,30 @@ export async function createCompany(input: {
 
 export async function updateCompany(
   id: string,
-  fields: Partial<Pick<ConsultingCompany, "name" | "sector" | "goal" | "status" | "contract_status" | "contract_value" | "payment_status" | "notes">>
+  fields: Partial<Pick<ConsultingCompany, "name" | "sector" | "goal" | "status" | "contract_status" | "contract_value" | "payment_status" | "notes" | "monthly_fee" | "billing_day" | "contract_start" | "contract_end">>
 ): Promise<{ ok: true } | { error: string }> {
   await requireUser();
   const supabase = await createClient();
   const { error } = await supabase
     .from("consulting_companies")
     .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath(PATH);
+  revalidatePath(`${PATH}/${id}`);
+  return { ok: true };
+}
+
+/**
+ * Marca "contato hoje" (atualiza o termometro do cliente). Usar quando houver
+ * uma interacao que nao virou reuniao registrada (call rapida, troca no grupo).
+ */
+export async function touchCompany(id: string): Promise<{ ok: true } | { error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("consulting_companies")
+    .update({ last_contact_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) return { error: error.message };
   revalidatePath(PATH);
@@ -205,6 +399,31 @@ export async function deleteContact(id: string, companyId: string): Promise<{ ok
 // Reunioes
 // ============================================================
 
+type DbClient = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * Avanca o termometro (last_contact_at) para uma data de contato, sem nunca
+ * regredir: ignora datas futuras (reuniao agendada nao e contato ainda) e so
+ * grava se for mais recente que o ultimo contato registrado.
+ */
+async function advanceLastContact(supabase: DbClient, companyId: string, iso: string | null | undefined) {
+  if (!iso) return;
+  const when = new Date(iso).getTime();
+  if (Number.isNaN(when) || when > Date.now()) return;
+  const { data } = await supabase
+    .from("consulting_companies")
+    .select("last_contact_at")
+    .eq("id", companyId)
+    .single();
+  const current = data?.last_contact_at ? new Date(data.last_contact_at).getTime() : 0;
+  if (when > current) {
+    await supabase
+      .from("consulting_companies")
+      .update({ last_contact_at: new Date(when).toISOString() })
+      .eq("id", companyId);
+  }
+}
+
 export async function createMeeting(
   companyId: string,
   input: { title: string; held_at?: string; transcript?: string }
@@ -213,18 +432,21 @@ export async function createMeeting(
   const supabase = await createClient();
   if (!input.title?.trim()) return { error: "Titulo da reuniao e obrigatorio." };
 
+  const heldAt = input.held_at || new Date().toISOString();
   const { data, error } = await supabase
     .from("consulting_meetings")
     .insert({
       company_id: companyId,
       title: input.title.trim(),
-      held_at: input.held_at || new Date().toISOString(),
+      held_at: heldAt,
       transcript: input.transcript || null,
     })
     .select("id")
     .single();
 
   if (error) return { error: error.message };
+  await advanceLastContact(supabase, companyId, heldAt);
+  revalidatePath(PATH);
   revalidatePath(`${PATH}/${companyId}`);
   return { id: data.id };
 }
@@ -370,6 +592,9 @@ ${meeting.transcript.slice(0, 14000)}`;
       if (error) return { error: error.message };
     }
 
+    // Processar uma reuniao implica que ela aconteceu -> conta como contato.
+    await advanceLastContact(supabase, meeting.company_id, meeting.held_at);
+    revalidatePath(PATH);
     revalidatePath(`${PATH}/${meeting.company_id}`);
     return { created: rows.length };
   } catch (err) {
@@ -589,6 +814,124 @@ export async function deleteStep(id: string, companyId: string): Promise<{ ok: t
 }
 
 // ============================================================
+// Vitorias / resultados (prova de valor para renovacao)
+// ============================================================
+
+export async function createWin(
+  companyId: string,
+  input: { description: string; metric?: string; achieved_on?: string }
+): Promise<{ id: string } | { error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  if (!input.description?.trim()) return { error: "Descreva a vitoria/resultado." };
+
+  const { data, error } = await supabase
+    .from("consulting_wins")
+    .insert({
+      company_id: companyId,
+      description: input.description.trim(),
+      metric: input.metric?.trim() || null,
+      achieved_on: input.achieved_on || null,
+    })
+    .select("id")
+    .single();
+  if (error) return { error: error.message };
+  revalidatePath(`${PATH}/${companyId}`);
+  return { id: data.id };
+}
+
+export async function deleteWin(id: string, companyId: string): Promise<{ ok: true } | { error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.from("consulting_wins").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath(`${PATH}/${companyId}`);
+  return { ok: true };
+}
+
+// ============================================================
+// Pauta de reuniao (IA) — monta a agenda da proxima call
+// ============================================================
+
+/**
+ * Gera a pauta da proxima reuniao a partir do contexto da empresa: tarefas em
+ * aberto, o que ficou pendente da ultima reuniao (resumo), objetivo e vitorias
+ * recentes. So gera o texto (nao agenda nada). Retorna markdown pronto.
+ */
+export async function generateMeetingAgenda(
+  companyId: string
+): Promise<{ agenda: string } | { error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+
+  const [{ data: company }, { data: tasks }, { data: meetings }, { data: wins }] = await Promise.all([
+    supabase.from("consulting_companies").select("name, goal, sector").eq("id", companyId).single(),
+    supabase
+      .from("consulting_tasks")
+      .select("description, owner_name, due_date, status")
+      .eq("company_id", companyId)
+      .eq("status", "pendente")
+      .order("due_date", { ascending: true, nullsFirst: false }),
+    supabase
+      .from("consulting_meetings")
+      .select("title, summary, held_at")
+      .eq("company_id", companyId)
+      .order("held_at", { ascending: false })
+      .limit(1),
+    supabase
+      .from("consulting_wins")
+      .select("description, metric")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
+
+  const openTasks = (tasks ?? [])
+    .map((t) => `- ${t.description}${t.owner_name ? ` (resp: ${t.owner_name})` : ""}${t.due_date ? ` [prazo ${t.due_date}]` : ""}`)
+    .join("\n");
+  const last = (meetings ?? [])[0];
+  const winsText = (wins ?? [])
+    .map((w) => `- ${w.description}${w.metric ? ` (${w.metric})` : ""}`)
+    .join("\n");
+
+  const today = new Date().toISOString().slice(0, 10);
+  const prompt = `REGRA ABSOLUTA: responda SEMPRE em portugues brasileiro (PT-BR).
+
+Voce e o assistente de consultoria do Pedro Rabelo. Monte a PAUTA da proxima reuniao com a empresa abaixo. A pauta deve ser pratica, priorizada e cobrir: (1) acompanhamento das tarefas/combinados em aberto, (2) pontos que ficaram pendentes da ultima reuniao, (3) avanco em direcao ao objetivo, (4) proximos passos sugeridos. Seja objetivo e acionavel.
+
+EMPRESA: ${company?.name || "(cliente)"}${company?.sector ? ` — setor: ${company.sector}` : ""}
+OBJETIVO DA CONSULTORIA: ${company?.goal || "(nao definido)"}
+DATA DE HOJE: ${today}
+
+## Tarefas / combinados em aberto:
+${openTasks || "(nenhuma tarefa pendente registrada)"}
+
+## Resumo da ultima reuniao${last?.title ? ` (${last.title})` : ""}:
+${last?.summary || "(sem reuniao anterior resumida)"}
+
+## Vitorias/resultados recentes (para reforcar com o cliente):
+${winsText || "(nenhuma registrada)"}
+
+Responda SOMENTE com a pauta em markdown: um titulo curto e 4-7 topicos com bullets. Sem preambulo.`;
+
+  try {
+    const client = getClient();
+    const r = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1200,
+      messages: [{ role: "user", content: prompt }],
+    });
+    logCost("claude-sonnet-4-6", r.usage.input_tokens, r.usage.output_tokens);
+    const agenda = (r.content[0].type === "text" ? r.content[0].text : "").trim();
+    if (!agenda) return { error: "Nao consegui gerar a pauta. Tente novamente." };
+    return { agenda };
+  } catch (err) {
+    const m = err instanceof Error ? err.message : "Erro desconhecido";
+    return { error: `Falha ao gerar a pauta: ${m}` };
+  }
+}
+
+// ============================================================
 // Fase 3 — Google Calendar (lembretes reais) + Q&A do Cerebro
 // ============================================================
 
@@ -707,12 +1050,14 @@ export async function importMeetingFromCalendar(
 ): Promise<{ ok: true } | { error: string }> {
   await requireUser();
   const supabase = await createClient();
+  const when = heldAt || new Date().toISOString();
   const { error } = await supabase.from("consulting_meetings").insert({
     company_id: companyId,
     title: title || "Reuniao da agenda",
-    held_at: heldAt || new Date().toISOString(),
+    held_at: when,
   });
   if (error) return { error: error.message };
+  await advanceLastContact(supabase, companyId, when);
   revalidatePath(PATH);
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
