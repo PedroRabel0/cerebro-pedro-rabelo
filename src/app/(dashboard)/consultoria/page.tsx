@@ -10,10 +10,39 @@ export default async function ConsultoriaPage({
 }: {
   searchParams: Promise<{ google?: string }>;
 }) {
+  // Rede de seguranca: se alguma leitura falhar (hipo transitorio no banco,
+  // sessao em rotacao, etc.), a pagina DEGRADA em vez de quebrar a tela toda.
   const [{ companies, overview }, digest, googleStatus, sp] = await Promise.all([
-    getConsultoriaData(),
-    getDailyDigest(),
-    getGoogleStatus(),
+    getConsultoriaData().catch((e) => {
+      console.error("[Consultoria] getConsultoriaData falhou:", e);
+      return {
+        companies: [],
+        overview: {
+          active_companies: 0,
+          pending_tasks: 0,
+          overdue_tasks: 0,
+          mrr: 0,
+          overdue_payments: 0,
+          renewals_soon: 0,
+          cooling_clients: 0,
+        },
+      };
+    }),
+    getDailyDigest().catch((e) => {
+      console.error("[Consultoria] getDailyDigest falhou:", e);
+      return {
+        generated_for: new Date().toISOString().slice(0, 10),
+        tasks_today: [],
+        renewals: [],
+        payments: [],
+        cooling: [],
+        pending_questions: [],
+      };
+    }),
+    getGoogleStatus().catch((e) => {
+      console.error("[Consultoria] getGoogleStatus falhou:", e);
+      return { connected: false };
+    }),
     searchParams,
   ]);
 

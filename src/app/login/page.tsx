@@ -11,13 +11,16 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
+    // Cria o client aqui (no submit, no browser) e NAO no render — assim a
+    // pagina /login nao chama createClient durante o prerender do build, que
+    // exigiria as env vars do Supabase em build time (quebrava build sem env).
+    const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
