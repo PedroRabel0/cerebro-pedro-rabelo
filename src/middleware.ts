@@ -49,20 +49,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protecao por role: rotas restritas ao Pedro
-  const role = (user.app_metadata?.role ?? user.user_metadata?.role) as
-    | string
-    | undefined;
-
-  // Gate do portal do cliente: cliente so acessa /portal; equipe nao acessa /portal.
-  if (role === "cliente") {
-    if (!pathname.startsWith("/portal"))
-      return NextResponse.redirect(new URL("/portal", request.url));
-    return response;
-  }
-  if (pathname === "/portal" || pathname.startsWith("/portal/")) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
+  const role = user.user_metadata?.role as string | undefined;
   const pedroOnlyRoutes = [
     "/referencias",
     "/identidade",

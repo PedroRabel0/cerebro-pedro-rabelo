@@ -1,17 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import type { User } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
-
-/**
- * Le o papel do usuario preferindo app_metadata (fonte de verdade, so o
- * service_role escreve) e caindo para user_metadata por compatibilidade.
- */
-function roleOf(user: User): string | undefined {
-  return (user.app_metadata?.role ?? user.user_metadata?.role) as
-    | string
-    | undefined;
-}
 
 /**
  * Cron auth: exige SOMENTE o segredo compartilhado. A Vercel injeta
@@ -67,31 +55,9 @@ export async function requireUser() {
  */
 export async function requireAdmin() {
   const user = await requireUser();
-  if (roleOf(user) !== "pedro")
-    throw new Error("Acao restrita ao administrador.");
+  const role = user.user_metadata?.role as string | undefined;
+  if (role !== "pedro") throw new Error("Acao restrita ao administrador.");
   return user;
-}
-
-/**
- * Exige que o usuario seja um cliente do portal e retorna a empresa vinculada.
- * Server actions do portal DEVEM chamar isto no topo — nao confie no middleware.
- * Lanca se nao for cliente ou se nao houver empresa vinculada.
- */
-export async function requireClient(): Promise<{
-  user: User;
-  companyId: string;
-}> {
-  const user = await requireUser();
-  if (roleOf(user) !== "cliente")
-    throw new Error("Acesso restrito ao cliente.");
-  const db = await createClient();
-  const { data } = await db
-    .from("consulting_client_users")
-    .select("company_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!data) throw new Error("Cliente sem empresa vinculada.");
-  return { user, companyId: data.company_id as string };
 }
 
 /**

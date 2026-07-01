@@ -25,13 +25,7 @@ export default function LoginPage() {
     if (error) {
       setError(error.message);
     } else {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const role = (user?.app_metadata?.role ?? user?.user_metadata?.role) as
-        | string
-        | undefined;
-      router.push(role === "cliente" ? "/portal" : "/");
+      router.push("/");
       router.refresh();
     }
 

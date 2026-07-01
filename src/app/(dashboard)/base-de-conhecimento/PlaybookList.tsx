@@ -1,8 +1,8 @@
 ﻿"use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import type { Playbook, Theme } from "@/lib/supabase/types";
-import { createPlaybook, updatePlaybook, deletePlaybook, togglePlaybookOrigin, answerGapQuestion, setPlaybookShareable } from "./actions";
+import { createPlaybook, updatePlaybook, deletePlaybook, togglePlaybookOrigin, answerGapQuestion } from "./actions";
 import BookQuestionsPanel from "./BookQuestionsPanel";
 import DiffView from "./DiffView";
 import { useUserRole } from "@/lib/hooks/useUserRole";
@@ -220,46 +220,6 @@ function PlaybookForm({
   );
 }
 
-function ShareableToggle({ playbookId, value }: { playbookId: string; value: boolean }) {
-  const [on, setOn] = useState(value);
-  const [pending, startTransition] = useTransition();
-
-  function handleToggle() {
-    const next = !on;
-    setOn(next); // otimista
-    startTransition(async () => {
-      const result = await setPlaybookShareable(playbookId, next);
-      if (result && "error" in result) {
-        setOn(!next); // rollback
-      }
-    });
-  }
-
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label="Compartilhável com clientes"
-      onClick={handleToggle}
-      disabled={pending}
-      title="Compartilhável com clientes"
-      className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 transition hover:bg-surface disabled:opacity-50"
-    >
-      <span
-        className={`relative h-3.5 w-6 rounded-full transition-colors ${on ? "bg-accent" : "bg-border"}`}
-      >
-        <span
-          className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-transform ${on ? "translate-x-[13px]" : "translate-x-0.5"}`}
-        />
-      </span>
-      <span className={`font-mono text-[10px] ${on ? "text-accent" : "text-text-muted"}`}>
-        Compartilhável
-      </span>
-    </button>
-  );
-}
-
 export default function PlaybookList({
   playbooks,
   themes,
@@ -427,15 +387,7 @@ export default function PlaybookList({
                     )}
                     <CompletenessBar score={p.estrutura?.principio ? Math.max(p.completeness_score, 30) : p.completeness_score} />
                   </button>
-                  <div className="ml-3 flex shrink-0 items-center gap-1">
-                    {/* Toggle: compartilhável com clientes (admin) */}
-                    {isPedro && (
-                      <ShareableToggle
-                        key={`share-${p.id}-${String(p.is_shareable ?? false)}`}
-                        playbookId={p.id}
-                        value={p.is_shareable ?? false}
-                      />
-                    )}
+                  <div className="ml-3 flex shrink-0 gap-1">
                     {/* Toggle origin: Pedro ↔ Outros */}
                     <button
                       onClick={async () => {

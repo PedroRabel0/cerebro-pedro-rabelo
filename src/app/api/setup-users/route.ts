@@ -46,7 +46,6 @@ export async function GET(request: Request) {
       password: user.password,
       email_confirm: true,
       user_metadata: { name: user.name, role: user.role },
-      app_metadata: { role: user.role },
     });
 
     if (error) {
@@ -61,7 +60,6 @@ export async function GET(request: Request) {
           const { error: updateError } =
             await supabase.auth.admin.updateUserById(existing.id, {
               user_metadata: { name: user.name, role: user.role },
-              app_metadata: { role: user.role },
             });
           results.push({
             email: user.email,

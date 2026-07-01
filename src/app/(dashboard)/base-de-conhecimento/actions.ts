@@ -2,7 +2,6 @@
 
 
 import { log } from '@/lib/logger';
-import { requireAdmin } from "@/lib/api-guards";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { analyzeCompleteness, generateBookQuestions } from "@/lib/ai";
@@ -117,22 +116,6 @@ export async function deletePlaybook(id: string) {
   const { error } = await supabase.from("playbooks").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/base-de-conhecimento");
-}
-
-/**
- * Marca/desmarca um playbook como compartilhável com clientes do portal.
- * Restrito ao administrador (Pedro) — valida auth no topo (não confia no middleware).
- */
-export async function setPlaybookShareable(playbookId: string, value: boolean) {
-  await requireAdmin();
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("playbooks")
-    .update({ is_shareable: value })
-    .eq("id", playbookId);
-  if (error) return { error: error.message };
-  revalidatePath("/base-de-conhecimento");
-  return { ok: true };
 }
 
 // --- Histórias Pessoais (Epiphany Bridge) ---

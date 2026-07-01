@@ -20,7 +20,6 @@ import {
   Flame,
   Check,
   Sun,
-  HelpCircle,
 } from "lucide-react";
 import {
   createCompany,
@@ -300,11 +299,6 @@ export default function ConsultoriaList({
                     <AlertTriangle className="h-3 w-3" /> {c.overdue_tasks} atrasada{c.overdue_tasks > 1 ? "s" : ""}
                   </span>
                 )}
-                {c.pending_questions > 0 && (
-                  <span className="flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-accent">
-                    <HelpCircle className="h-3 w-3" /> {c.pending_questions} pergunta{c.pending_questions > 1 ? "s" : ""}
-                  </span>
-                )}
                 {c.status === "ativa" && c.renewal_in_days !== null && c.renewal_in_days <= 30 && (
                   <span className={`flex items-center gap-1 ${c.renewal_in_days < 0 ? "text-red" : "text-yellow-500"}`}>
                     <CalendarClock className="h-3 w-3" />
@@ -466,11 +460,7 @@ function ImportFromAgenda({ companies }: { companies: CompanyWithCounts[] }) {
 
 function DailyDigestPanel({ digest }: { digest: DailyDigest }) {
   const total =
-    digest.tasks_today.length +
-    digest.renewals.length +
-    digest.payments.length +
-    digest.cooling.length +
-    digest.pending_questions.length;
+    digest.tasks_today.length + digest.renewals.length + digest.payments.length + digest.cooling.length;
   const [open, setOpen] = useState(total > 0);
 
   return (
@@ -551,17 +541,6 @@ function DailyDigestPanel({ digest }: { digest: DailyDigest }) {
               >
                 {digest.cooling.map((a) => (
                   <DigestAlertRow key={a.id} alert={a} tone="red" />
-                ))}
-              </DigestColumn>
-
-              <DigestColumn
-                icon={<HelpCircle className="h-3.5 w-3.5" />}
-                title="Perguntas pendentes"
-                count={digest.pending_questions.length}
-                empty="Nenhuma pergunta aguardando."
-              >
-                {digest.pending_questions.map((a) => (
-                  <DigestAlertRow key={a.id} alert={a} tone="yellow" />
                 ))}
               </DigestColumn>
             </div>

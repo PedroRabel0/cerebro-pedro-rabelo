@@ -30,9 +30,6 @@ import {
   Trophy,
   ClipboardList,
   PhoneCall,
-  MessagesSquare,
-  HelpCircle,
-  KeyRound,
 } from "lucide-react";
 import { useConfirm } from "@/components/ConfirmProvider";
 import type { CompanyDetail as CompanyDetailData } from "../actions";
@@ -62,8 +59,6 @@ import {
   addTaskReminderToCalendar,
   askConsultoria,
   getCalendarList,
-  answerPendingQuestion,
-  createClientUser,
 } from "../actions";
 import type { ConsultingContact, ConsultingTask, ConsultingMeeting, ConsultingWin } from "@/lib/supabase/types";
 
@@ -173,9 +168,6 @@ export default function CompanyDetail({
         onChange={refresh}
       />
       <AskBrainSection companyId={company.id} />
-      <PendingQuestionsSection companyId={company.id} questions={data.pending_questions} onChange={refresh} />
-      <ClientChatSection chat={data.client_chat} />
-      <ClientAccessSection companyId={company.id} onChange={refresh} />
       <DocumentsSection companyId={company.id} documents={data.documents} onChange={refresh} />
     </div>
   );
@@ -224,166 +216,6 @@ function AskBrainSection({ companyId }: { companyId: string }) {
           {answer}
         </div>
       )}
-    </div>
-  );
-}
-
-function PendingQuestionsSection({
-  companyId,
-  questions,
-  onChange,
-}: {
-  companyId: string;
-  questions: CompanyDetailData["pending_questions"];
-  onChange: () => void;
-}) {
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [, start] = useTransition();
-
-  function respond(id: string) {
-    const text = (answers[id] || "").trim();
-    if (!text) return;
-    setError(null);
-    setBusy(id);
-    start(async () => {
-      const res = await answerPendingQuestion(id, text);
-      setBusy(null);
-      if ("error" in res) {
-        setError(res.error);
-        return;
-      }
-      setAnswers((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-      onChange();
-    });
-  }
-
-  return (
-    <div className={card}>
-      <SectionTitle icon={HelpCircle} count={questions.length}>Perguntas pendentes</SectionTitle>
-      <p className="mb-3 -mt-1 text-xs text-text-muted">
-        Perguntas do cliente que o Cérebro não respondeu sozinho — sua resposta vira um playbook.
-      </p>
-      {questions.length === 0 ? (
-        <p className="text-xs text-text-muted">Nenhuma pergunta aguardando resposta.</p>
-      ) : (
-        <div className="space-y-3">
-          {questions.map((q) => (
-            <div key={q.id} className="rounded-lg border border-border/60 p-3">
-              <p className="text-sm text-text">{q.question}</p>
-              <p className="mt-0.5 text-[11px] text-text-muted">
-                {q.asked_by_name || "Cliente"} · {new Date(q.created_at).toLocaleString("pt-BR")}
-              </p>
-              <textarea
-                value={answers[q.id] || ""}
-                onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                placeholder="Escreva a resposta para o cliente..."
-                aria-label="Resposta à pergunta"
-                rows={3}
-                className={`${input} mt-2 resize-none`}
-              />
-              <div className="mt-2 flex justify-end">
-                <button
-                  onClick={() => respond(q.id)}
-                  disabled={busy === q.id || !(answers[q.id] || "").trim()}
-                  className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
-                >
-                  {busy === q.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                  Responder
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {error && <p className="mt-2 text-xs text-red">{error}</p>}
-    </div>
-  );
-}
-
-function ClientChatSection({ chat }: { chat: CompanyDetailData["client_chat"] }) {
-  return (
-    <div className={card}>
-      <SectionTitle icon={MessagesSquare} count={chat.length}>Conversas do cliente</SectionTitle>
-      {chat.length === 0 ? (
-        <p className="text-xs text-text-muted">O cliente ainda não conversou pelo portal.</p>
-      ) : (
-        <div className="space-y-3">
-          {chat.map((m) => (
-            <div key={m.id} className="rounded-lg border border-border/60 p-3">
-              <p className="text-sm font-medium text-text">{m.question}</p>
-              {m.answer ? (
-                <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-surface/60 px-3 py-2 text-xs text-text-secondary">
-                  {m.answer}
-                </p>
-              ) : (
-                <p className="mt-1.5 text-[11px] text-yellow-500">Aguardando resposta.</p>
-              )}
-              <p className="mt-1 text-[11px] text-text-muted">{new Date(m.created_at).toLocaleString("pt-BR")}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ClientAccessSection({ companyId, onChange }: { companyId: string; onChange: () => void }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [, start] = useTransition();
-
-  function create() {
-    if (!name.trim() || !email.trim() || !password.trim()) return;
-    setError(null);
-    setDone(false);
-    setBusy(true);
-    start(async () => {
-      const res = await createClientUser(companyId, { name, email, password });
-      setBusy(false);
-      if ("error" in res) {
-        setError(res.error);
-        return;
-      }
-      setName(""); setEmail(""); setPassword(""); setDone(true);
-      onChange();
-    });
-  }
-
-  return (
-    <div className={card}>
-      <SectionTitle icon={KeyRound}>Acesso do cliente</SectionTitle>
-      <p className="mb-3 -mt-1 text-xs text-text-muted">
-        Crie o login do cliente no portal (ele vê o próprio painel e conversa com o Cérebro).
-      </p>
-      <div className="space-y-2">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do cliente" aria-label="Nome do cliente" className={input} />
-        <div className="grid gap-2 sm:grid-cols-2">
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" aria-label="E-mail do cliente" className={input} />
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha (mín. 6 caracteres)" aria-label="Senha do cliente" className={input} />
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={create}
-            disabled={busy || !name.trim() || !email.trim() || !password.trim()}
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
-          >
-            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
-            Criar acesso
-          </button>
-          {done && <span className="flex items-center gap-1 text-xs text-green"><Check className="h-3.5 w-3.5" /> Acesso criado.</span>}
-        </div>
-        {error && <p className="text-xs text-red">{error}</p>}
-      </div>
     </div>
   );
 }
