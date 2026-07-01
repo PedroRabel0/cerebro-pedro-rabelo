@@ -140,7 +140,7 @@ export default function BookQuestionsPanel({
       {/* Header with badge */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <BookCheck className="h-4 w-4 text-purple" />
+          <BookCheck className="h-4 w-4 text-red" />
           <h4 className="font-mono text-xs uppercase tracking-wider text-text-secondary">
             Pronto pro Livro
           </h4>

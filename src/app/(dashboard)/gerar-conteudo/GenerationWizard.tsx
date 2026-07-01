@@ -1003,11 +1003,11 @@ function ImagePromptDisplay({ prompt }: { prompt: string }) {
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-purple/20 bg-purple/5 p-3">
+    <div className="mt-3 rounded-xl border border-accent/20 bg-accent/5 p-3">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <ImageIcon className="h-3.5 w-3.5 text-purple" />
-          <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-purple">
+          <ImageIcon className="h-3.5 w-3.5 text-accent" />
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-accent">
             Prompt de imagem
           </span>
         </div>
@@ -1020,7 +1020,7 @@ function ImagePromptDisplay({ prompt }: { prompt: string }) {
           </button>
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 rounded-lg bg-purple/10 px-2.5 py-1 font-mono text-[10px] text-purple transition hover:bg-purple/20"
+            className="flex items-center gap-1 rounded-lg bg-accent/10 px-2.5 py-1 font-mono text-[10px] text-accent transition hover:bg-accent/20"
           >
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
             {copied ? "Copiado!" : "Copiar prompt"}
@@ -1033,7 +1033,7 @@ function ImagePromptDisplay({ prompt }: { prompt: string }) {
       {!expanded && prompt.length > 200 && (
         <button
           onClick={() => setExpanded(true)}
-          className="mt-1 font-mono text-[10px] text-purple hover:text-purple/80"
+          className="mt-1 font-mono text-[10px] text-accent hover:text-accent/80"
         >
           Ver prompt completo →
         </button>
@@ -1245,15 +1245,15 @@ function ResultCard({
 
       {/* Generated image preview */}
       {generatedImageUrl && (
-        <div className="mt-3 rounded-xl border border-violet/20 bg-violet/5 p-3">
+        <div className="mt-3 rounded-xl border border-accent/20 bg-accent/5 p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-violet">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-accent">
               Imagem gerada
             </span>
             <a
               href={generatedImageUrl}
               download={`${result.contentType}-image.webp`}
-              className="flex items-center gap-1 rounded-lg bg-violet/10 px-2.5 py-1 font-mono text-[11px] text-violet transition hover:bg-violet/20"
+              className="flex items-center gap-1 rounded-lg bg-accent/10 px-2.5 py-1 font-mono text-[11px] text-accent transition hover:bg-accent/20"
             >
               Baixar
             </a>
@@ -1526,7 +1526,7 @@ function ResultCard({
             setGeneratingImage(false);
           }}
           disabled={generatingImage}
-          className="flex items-center gap-1.5 rounded-xl border border-violet/30 bg-violet/10 px-3 py-1.5 font-mono text-xs text-violet transition hover:bg-violet/20 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 px-3 py-1.5 font-mono text-xs text-accent transition hover:bg-accent/20 disabled:opacity-50"
         >
           {generatingImage ? (
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -1759,7 +1759,7 @@ export default function GenerationWizard({
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {themes.map((theme) => {
                 const isSelected = !customTopic && state.topic === theme.name;
-                const color = theme.color || "#d4783c";
+                const color = theme.color || "#ff0000";
                 return (
                   <button
                     key={theme.id}
@@ -2032,8 +2032,8 @@ export default function GenerationWizard({
 
       {/* Generating animation with timer */}
       {generating && (
-        <div className="animate-slide-in rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-violet/5 p-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/10 to-violet/10">
+        <div className="animate-slide-in rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-accent/5 p-6 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/10 to-accent/10">
             <Sparkles className="h-6 w-6 text-accent animate-pulse" />
           </div>
           <p className="text-sm font-medium text-text">

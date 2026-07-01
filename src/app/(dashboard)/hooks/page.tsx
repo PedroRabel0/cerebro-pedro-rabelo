@@ -11,7 +11,7 @@ export default async function HooksPage() {
     <div>
       <div className="mb-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 to-purple/20">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 to-red/20">
             <Anchor className="h-5 w-5 text-accent" />
           </div>
           <div>

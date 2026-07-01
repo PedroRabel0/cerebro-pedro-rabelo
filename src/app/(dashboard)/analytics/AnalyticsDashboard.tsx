@@ -301,7 +301,7 @@ export default function AnalyticsDashboard({
           value={formatNumber(stats.totalComments)}
         />
         <StatCard
-          icon={<Bookmark className="h-4 w-4 text-purple-400" />}
+          icon={<Bookmark className="h-4 w-4 text-red-400" />}
           label="Melhor Plataforma"
           value={stats.bestPlatform}
         />

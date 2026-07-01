@@ -160,7 +160,7 @@ function EnrichedProposalInfo({ proposal }: { proposal: Proposal }) {
         <div className="flex flex-wrap gap-1.5 items-center">
           <Link2 className="h-3 w-3 text-text-muted" />
           {fazParte.length > 0 && (
-            <span className="rounded-full bg-purple/10 text-purple border border-purple/20 px-2 py-0.5 font-mono text-[10px]">
+            <span className="rounded-full bg-red/10 text-red border border-red/20 px-2 py-0.5 font-mono text-[10px]">
               Parte de {fazParte.length} playbook{fazParte.length > 1 ? "s" : ""}
             </span>
           )}

@@ -27,8 +27,8 @@ export default async function TendenciasPage() {
     <div>
       <div className="mb-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500/20 to-accent/20">
-            <TrendingUp className="h-5 w-5 text-purple-400" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500/20 to-accent/20">
+            <TrendingUp className="h-5 w-5 text-red-400" />
           </div>
           <div>
             <h1 className="font-display text-2xl font-bold text-text sm:text-3xl">

@@ -208,13 +208,13 @@ function RadarTab({
   return (
     <div className="space-y-6">
       {/* Scan CTA */}
-      <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-500/10 via-card to-accent/5 p-6">
-        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-purple-500/5" />
+      <div className="relative overflow-hidden rounded-2xl border border-red-500/30 bg-gradient-to-br from-red-500/10 via-card to-accent/5 p-6">
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-red-500/5" />
         <div className="relative">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="flex items-center gap-2 text-lg font-bold text-text">
-                <Radar className="h-5 w-5 text-purple-400" />
+                <Radar className="h-5 w-5 text-red-400" />
                 Radar de Referências
               </h3>
               <p className="mt-1 text-sm text-text-secondary">
@@ -225,7 +225,7 @@ function RadarTab({
             <button
               onClick={handleScan}
               disabled={isScanning}
-              className="flex shrink-0 items-center gap-2 rounded-xl bg-purple-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-600 disabled:opacity-60"
+              className="flex shrink-0 items-center gap-2 rounded-xl bg-red-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-red-500/20 transition-all hover:bg-red-600 disabled:opacity-60"
             >
               {isScanning ? (
                 <>
@@ -242,10 +242,10 @@ function RadarTab({
           </div>
 
           {isScanning && (
-            <div className="mt-4 rounded-lg border border-purple-500/20 bg-purple-500/5 px-4 py-3">
+            <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3">
               <div className="flex items-center gap-2">
-                <div className="h-2 w-2 animate-pulse rounded-full bg-purple-400" />
-                <p className="text-xs text-purple-300">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
+                <p className="text-xs text-red-300">
                   Scraping perfis, analisando posts e gerando insights com IA... Isso pode levar de
                   30s a 2min.
                 </p>
@@ -362,13 +362,13 @@ function RadarTab({
 
           {/* Cross-Profile Insights */}
           {scanResult.cross_profile_insights && (
-            <div className="rounded-xl border border-purple-500/20 bg-card">
+            <div className="rounded-xl border border-red-500/20 bg-card">
               <button
                 onClick={() => setExpandedInsights(!expandedInsights)}
                 className="flex w-full items-center justify-between px-5 py-4"
               >
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-purple-400" />
+                  <Sparkles className="h-4 w-4 text-red-400" />
                   <h3 className="text-sm font-semibold text-text">Insights Cruzados</h3>
                 </div>
                 {expandedInsights ? (

@@ -188,7 +188,7 @@ function AskBrainSection({ companyId }: { companyId: string }) {
   }
 
   return (
-    <div className="rounded-xl border border-violet/20 bg-violet/5 p-4">
+    <div className="rounded-xl border border-red/20 bg-red/5 p-4">
       <SectionTitle icon={Sparkles}>Perguntar ao Cérebro</SectionTitle>
       <p className="mb-3 -mt-1 text-xs text-text-muted">
         Embasado nos playbooks do Pedro + o contexto desta empresa
@@ -206,7 +206,7 @@ function AskBrainSection({ companyId }: { companyId: string }) {
           onClick={ask}
           disabled={loading || !question.trim()}
           aria-label="Perguntar"
-          className="flex items-center gap-1.5 rounded-lg bg-violet px-3 text-white transition hover:brightness-110 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg bg-red px-3 text-white transition hover:brightness-110 disabled:opacity-50"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </button>
@@ -771,7 +771,7 @@ function MeetingsSection({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <SectionTitle icon={Sparkles} count={meetings.length}>Reuniões</SectionTitle>
         <div className="flex flex-wrap items-center gap-3">
-          <button onClick={genAgenda} disabled={agendaBusy} className="flex items-center gap-1.5 text-xs text-violet hover:underline disabled:opacity-50">
+          <button onClick={genAgenda} disabled={agendaBusy} className="flex items-center gap-1.5 text-xs text-red hover:underline disabled:opacity-50">
             {agendaBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardList className="h-3.5 w-3.5" />} Gerar pauta
           </button>
           {googleConnected && !sched && (
@@ -789,9 +789,9 @@ function MeetingsSection({
 
       {agendaErr && <p className="mb-3 text-xs text-red">{agendaErr}</p>}
       {agenda && (
-        <div className="mb-4 rounded-lg border border-violet/20 bg-violet/5 p-3">
+        <div className="mb-4 rounded-lg border border-red/20 bg-red/5 p-3">
           <div className="mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-violet">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-red">
               <ClipboardList className="h-3.5 w-3.5" /> Pauta sugerida pra próxima reunião
             </span>
             <div className="flex items-center gap-2">
@@ -1141,7 +1141,7 @@ function TaskRow({
             {task.due_date ? (
               <span className={overdue ? "text-red" : ""}>{overdue ? "venceu " : "até "}{new Date(task.due_date + "T00:00:00").toLocaleDateString("pt-BR")}</span>
             ) : "sem prazo"}
-            {task.source === "ai" && <span className="ml-1.5 rounded bg-violet/10 px-1.5 py-0.5 text-[9px] text-violet">IA</span>}
+            {task.source === "ai" && <span className="ml-1.5 rounded bg-red/10 px-1.5 py-0.5 text-[9px] text-red">IA</span>}
           </p>
         </div>
         <button onClick={onDelete} aria-label="Apagar tarefa" className="rounded p-1 text-text-muted hover:text-red"><Trash2 className="h-3.5 w-3.5" /></button>

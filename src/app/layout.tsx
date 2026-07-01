@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Inter, JetBrains_Mono, Bebas_Neue } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
@@ -13,17 +13,18 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+// Fonte de títulos da marca — pesada, condensada, caixa alta (igual ao site do Pedro)
+const bebasNeue = Bebas_Neue({
+  variable: "--font-bebas",
   subsets: ["latin"],
-  weight: ["500", "700"],
+  weight: "400",
 });
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   // zoom permitido (WCAG 1.4.4) — nao bloquear maximumScale/userScalable
-  themeColor: "#09090b",
+  themeColor: "#0a0a0a",
 };
 
 export const metadata: Metadata = {
@@ -48,7 +49,7 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${inter.variable} ${jetbrainsMono.variable} ${spaceGrotesk.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${bebasNeue.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans bg-bg text-text">
         {children}

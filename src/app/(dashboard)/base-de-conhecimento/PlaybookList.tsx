@@ -394,7 +394,7 @@ export default function PlaybookList({
                         const newOrigin = (!p.created_by || p.created_by === "pedro") ? "outros" : "pedro";
                         await togglePlaybookOrigin(p.id, newOrigin);
                       }}
-                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-purple transition hover:bg-purple/10"
+                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-red/10"
                       title={(!p.created_by || p.created_by === "pedro") ? "Mover para Outros" : "Mover para Pedro"}
                     >
                       {(!p.created_by || p.created_by === "pedro") ? "→ Outros" : "→ Pedro"}
@@ -443,7 +443,7 @@ export default function PlaybookList({
                           {p.proveniencia?.nivel && (
                             <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] ${
                               p.proveniencia.nivel === "dito_por_voce" ? "bg-green/10 text-green" :
-                              p.proveniencia.nivel === "fonte_externa" ? "bg-purple/10 text-purple" :
+                              p.proveniencia.nivel === "fonte_externa" ? "bg-red/10 text-red" :
                               "bg-surface text-text-muted"
                             }`}>
                               {p.proveniencia.nivel === "dito_por_voce" ? "Dito pelo Pedro" :

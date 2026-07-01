@@ -249,8 +249,8 @@ export default function BrainChat() {
           </button>
 
           <div className="flex items-center gap-2 flex-1">
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-violet/15 to-accent/15">
-              <Zap className="h-3 w-3 text-violet" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-red/15 to-accent/15">
+              <Zap className="h-3 w-3 text-red" />
             </div>
             <span className="font-mono text-[11px] uppercase tracking-wider text-text-muted">
               {activeChatId ? (chats.find(c => c.id === activeChatId)?.title || "Conversa") : "Cerebro IA"}
@@ -294,8 +294,8 @@ export default function BrainChat() {
             {/* Empty: chat selected but no messages */}
             {activeChatId && messages.length === 0 && !loading && (
               <div className="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/10 to-violet/10">
-                  <Brain className="h-6 w-6 text-violet" />
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/10 to-red/10">
+                  <Brain className="h-6 w-6 text-red" />
                 </div>
                 <p className="text-sm text-text-secondary mb-5">
                   O que voce quer saber?
@@ -327,18 +327,18 @@ export default function BrainChat() {
                   <div className={`shrink-0 mt-1 flex h-8 w-8 items-center justify-center rounded-xl ${
                     msg.role === "user"
                       ? "bg-accent/15"
-                      : "bg-gradient-to-br from-violet/20 to-accent/10"
+                      : "bg-gradient-to-br from-red/20 to-accent/10"
                   }`}>
                     {msg.role === "user"
                       ? <User className="h-3.5 w-3.5 text-accent" />
-                      : <Brain className="h-3.5 w-3.5 text-violet" />
+                      : <Brain className="h-3.5 w-3.5 text-red" />
                     }
                   </div>
 
                   {/* Bubble */}
                   <div className={`max-w-[75%] ${msg.role === "user" ? "ml-auto" : "mr-auto"}`}>
                     {/* Label */}
-                    <p className={`mb-1 font-mono text-[11px] ${msg.role === "user" ? "text-right text-accent/60" : "text-violet/60"}`}>
+                    <p className={`mb-1 font-mono text-[11px] ${msg.role === "user" ? "text-right text-accent/60" : "text-red/60"}`}>
                       {msg.role === "user" ? "Voce" : "Cerebro"}
                     </p>
                     {/* Content */}
@@ -358,18 +358,18 @@ export default function BrainChat() {
               {/* Loading */}
               {loading && (
                 <div className="animate-fade-in flex gap-3">
-                  <div className="shrink-0 mt-1 flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet/20 to-accent/10">
-                    <Brain className="h-3.5 w-3.5 animate-pulse text-violet" />
+                  <div className="shrink-0 mt-1 flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-red/20 to-accent/10">
+                    <Brain className="h-3.5 w-3.5 animate-pulse text-red" />
                   </div>
                   <div>
-                    <p className="mb-1 font-mono text-[11px] text-violet/60">Cerebro</p>
+                    <p className="mb-1 font-mono text-[11px] text-red/60">Cerebro</p>
                     <div className="glass-card rounded-2xl rounded-tl-md px-4 py-3">
                       <span className="inline-flex items-center gap-2 text-sm text-text-muted">
                         <span className="animate-pulse">Pensando</span>
                         <span className="inline-flex gap-0.5">
-                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-violet/40" style={{ animationDelay: "0ms" }} />
-                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-violet/40" style={{ animationDelay: "150ms" }} />
-                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-violet/40" style={{ animationDelay: "300ms" }} />
+                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-red/40" style={{ animationDelay: "0ms" }} />
+                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-red/40" style={{ animationDelay: "150ms" }} />
+                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-red/40" style={{ animationDelay: "300ms" }} />
                         </span>
                       </span>
                     </div>

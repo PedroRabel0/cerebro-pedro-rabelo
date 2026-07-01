@@ -1,39 +1,39 @@
 @import "tailwindcss";
 
 /* ========================================
-   DESIGN SYSTEM — "Midnight Ember"
-   Dark Premium Editorial
+   DESIGN SYSTEM — Pedro Rabelo (Preto & Vermelho)
+   Marca pessoal: fundo preto + destaque vermelho (#FF0000)
    ======================================== */
 
 :root {
-  /* Fundos — preto com subtom azul-violeta */
-  --bg: #09090b;
-  --bg-card: #12121a;
-  --bg-card-hover: #1a1a28;
-  --bg-surface: #1c1c2e;
+  /* Fundos — preto neutro da marca */
+  --bg: #0a0a0a;
+  --bg-card: #141414;
+  --bg-card-hover: #1e1e1e;
+  --bg-surface: #181818;
 
-  /* Bordas — tom frio discreto */
-  --border: #252538;
-  --border-light: #35354a;
+  /* Bordas — cinza escuro neutro */
+  --border: #262626;
+  --border-light: #383838;
 
-  /* Textos — escala tonal quente (creme) */
-  --text: #eee8db;
-  --text-secondary: #b5ad9e;
-  --text-muted: #8a8378;
+  /* Textos — off-white neutro sobre preto */
+  --text: #f5f5f5;
+  --text-secondary: #a3a3a3;
+  --text-muted: #6b6b6b;
 
-  /* Accent — Cobre quente (autoridade, premium) */
-  --accent: #d4783c;
-  --accent-hover: #e8924f;
+  /* Accent — Vermelho da marca (#FF0000) */
+  --accent: #ff0000;
+  --accent-hover: #ff3b3b;
 
-  /* Violeta — IA e tecnologia */
-  --violet: #8b5cf6;
-  --violet-hover: #a78bfa;
+  /* Segundo tom de vermelho (gradientes / realces de IA) */
+  --violet: #cc0000;
+  --violet-hover: #e02020;
 
   /* Semânticas */
   --blue: #60a5fa;
   --green: #4ade80;
   --red: #f87171;
-  --purple: #a78bfa;
+  --purple: #cc0000;
   --amber: #fbbf24;
 }
 
@@ -56,7 +56,7 @@
   --color-red: var(--red);
   --color-purple: var(--purple);
   --color-amber: var(--amber);
-  --font-display: var(--font-space-grotesk);
+  --font-display: var(--font-bebas);
   --font-mono: var(--font-jetbrains-mono);
   --font-sans: var(--font-inter);
 }
@@ -107,9 +107,10 @@ input, select, textarea, button {
 /* ========================================
    Typography
    ======================================== */
-h1 { letter-spacing: -0.03em; }
-h2 { letter-spacing: -0.02em; }
-h3 { letter-spacing: -0.01em; }
+/* Bebas Neue é condensada — tracking levemente positivo evita letras coladas */
+h1 { letter-spacing: 0.01em; }
+h2 { letter-spacing: 0.01em; }
+h3 { letter-spacing: 0; }
 
 /* ========================================
    Page header accent line
@@ -130,7 +131,7 @@ h3 { letter-spacing: -0.01em; }
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .card-hover:hover {
-  border-color: rgba(212, 120, 60, 0.15);
+  border-color: rgba(255, 0, 0, 0.15);
   transform: translateY(-2px);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.03),
@@ -141,16 +142,16 @@ h3 { letter-spacing: -0.01em; }
    Button styles
    ======================================== */
 .btn-primary {
-  /* copper escurecido para branco atingir contraste AA (>=4.5:1) — WCAG 1.4.3 */
-  background: linear-gradient(135deg, #b3611f, #9a5016);
+  /* vermelho da marca (#FF0000 -> #CC0000), texto branco */
+  background: linear-gradient(135deg, #ff0000, #cc0000);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 .btn-primary:hover {
-  background: linear-gradient(135deg, #c26b23, #a85518);
+  background: linear-gradient(135deg, #ff3b3b, #e00000);
   box-shadow:
-    0 4px 16px rgba(212, 120, 60, 0.25),
+    0 4px 16px rgba(255, 0, 0, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
   transform: translateY(-1px);
 }
@@ -185,20 +186,20 @@ h3 { letter-spacing: -0.01em; }
    Nav item styles
    ======================================== */
 .nav-item-active {
-  background: rgba(212, 120, 60, 0.08);
+  background: rgba(255, 0, 0, 0.08);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 .nav-item-hover:hover {
-  background: rgba(212, 120, 60, 0.04);
+  background: rgba(255, 0, 0, 0.04);
 }
 
 /* ========================================
    Stat card gradients
    ======================================== */
-.stat-accent { background: radial-gradient(ellipse at top left, rgba(212, 120, 60, 0.06), transparent 70%); }
+.stat-accent { background: radial-gradient(ellipse at top left, rgba(255, 0, 0, 0.06), transparent 70%); }
 .stat-blue { background: radial-gradient(ellipse at top left, rgba(96, 165, 250, 0.06), transparent 70%); }
 .stat-green { background: radial-gradient(ellipse at top left, rgba(74, 222, 128, 0.06), transparent 70%); }
-.stat-purple { background: radial-gradient(ellipse at top left, rgba(167, 139, 250, 0.06), transparent 70%); }
+.stat-purple { background: radial-gradient(ellipse at top left, rgba(204, 0, 0, 0.06), transparent 70%); }
 .stat-red { background: radial-gradient(ellipse at top left, rgba(248, 113, 113, 0.06), transparent 70%); }
 
 /* ========================================
@@ -208,7 +209,7 @@ h3 { letter-spacing: -0.01em; }
   border: 1px solid transparent;
   background:
     linear-gradient(var(--bg-surface), var(--bg-surface)) padding-box,
-    linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(212, 120, 60, 0.15)) border-box;
+    linear-gradient(135deg, rgba(204, 0, 0, 0.15), rgba(255, 0, 0, 0.15)) border-box;
 }
 
 /* ========================================
@@ -220,8 +221,8 @@ h3 { letter-spacing: -0.01em; }
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 5px rgba(212, 120, 60, 0.15); }
-  50% { box-shadow: 0 0 24px rgba(212, 120, 60, 0.3); }
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 0, 0, 0.15); }
+  50% { box-shadow: 0 0 24px rgba(255, 0, 0, 0.3); }
 }
 .processing-glow { animation: pulse-glow 2s ease-in-out infinite; }
 
@@ -242,7 +243,7 @@ h3 { letter-spacing: -0.01em; }
   100% { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, var(--bg-card) 0%, rgba(139, 92, 246, 0.04) 50%, var(--bg-card) 100%);
+  background: linear-gradient(90deg, var(--bg-card) 0%, rgba(204, 0, 0, 0.04) 50%, var(--bg-card) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
@@ -272,8 +273,8 @@ h3 { letter-spacing: -0.01em; }
 .logo-gradient {
   background: linear-gradient(135deg, var(--accent), var(--violet));
   box-shadow:
-    0 0 20px rgba(212, 120, 60, 0.2),
-    0 0 40px rgba(139, 92, 246, 0.1);
+    0 0 20px rgba(255, 0, 0, 0.2),
+    0 0 40px rgba(204, 0, 0, 0.1);
 }
 
 /* ========================================
@@ -289,14 +290,14 @@ h3 { letter-spacing: -0.01em; }
 .ambient-orb-accent {
   width: 400px;
   height: 400px;
-  background: rgba(212, 120, 60, 0.06);
+  background: rgba(255, 0, 0, 0.06);
   top: 20%;
   left: 30%;
 }
 .ambient-orb-violet {
   width: 350px;
   height: 350px;
-  background: rgba(139, 92, 246, 0.05);
+  background: rgba(204, 0, 0, 0.05);
   bottom: 20%;
   right: 25%;
 }
@@ -307,18 +308,18 @@ h3 { letter-spacing: -0.01em; }
 .glass-card {
   background: rgba(18, 18, 26, 0.7);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(139, 92, 246, 0.06);
+  border: 1px solid rgba(204, 0, 0, 0.06);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.02),
     0 4px 24px rgba(0, 0, 0, 0.4);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glass-card:hover {
-  border-color: rgba(139, 92, 246, 0.12);
+  border-color: rgba(204, 0, 0, 0.12);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.03),
     0 8px 40px rgba(0, 0, 0, 0.5),
-    0 0 60px rgba(139, 92, 246, 0.03);
+    0 0 60px rgba(204, 0, 0, 0.03);
 }
 
 /* ========================================
@@ -333,23 +334,23 @@ h3 { letter-spacing: -0.01em; }
 .btn-secondary:hover {
   border-color: var(--accent);
   color: var(--accent);
-  background: rgba(212, 120, 60, 0.05);
+  background: rgba(255, 0, 0, 0.05);
 }
 
 /* ========================================
    Violet button (for AI actions)
    ======================================== */
 .btn-violet {
-  background: linear-gradient(135deg, var(--violet), #7c3aed);
+  background: linear-gradient(135deg, var(--violet), #990000);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   color: white;
 }
 .btn-violet:hover {
-  background: linear-gradient(135deg, var(--violet-hover), #8b5cf6);
+  background: linear-gradient(135deg, var(--violet-hover), #cc0000);
   box-shadow:
-    0 4px 16px rgba(139, 92, 246, 0.25),
+    0 4px 16px rgba(204, 0, 0, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
   transform: translateY(-1px);
 }
@@ -370,7 +371,7 @@ h3 { letter-spacing: -0.01em; }
 .glow-ring {
   box-shadow:
     0 0 0 2px var(--bg),
-    0 0 0 3px rgba(212, 120, 60, 0.3);
+    0 0 0 3px rgba(255, 0, 0, 0.3);
 }
 
 /* ========================================

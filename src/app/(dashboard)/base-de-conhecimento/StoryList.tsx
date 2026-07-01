@@ -235,7 +235,7 @@ export default function StoryList({ stories }: { stories: Story[] }) {
                         const newOrigin = (!s.created_by || s.created_by === "pedro") ? "outros" : "pedro";
                         await toggleStoryOrigin(s.id, newOrigin);
                       }}
-                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-purple transition hover:bg-purple/10"
+                      className="rounded-lg px-2 py-1 font-mono text-[10px] text-red transition hover:bg-red/10"
                       title={(!s.created_by || s.created_by === "pedro") ? "Mover para Outros" : "Mover para Pedro"}
                     >
                       {(!s.created_by || s.created_by === "pedro") ? "→ Outros" : "→ Pedro"}

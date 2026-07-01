@@ -214,8 +214,8 @@ export default function DecisionRules({ initialRules }: Props) {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-purple/20 to-accent/20">
-            <Brain className="h-5 w-5 text-purple" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-red/20 to-accent/20">
+            <Brain className="h-5 w-5 text-red" />
           </div>
           <div>
             <h2 className="font-display text-xl font-bold text-text sm:text-2xl">

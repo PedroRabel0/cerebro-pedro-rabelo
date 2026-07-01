@@ -126,7 +126,7 @@ export default function TestVoicePage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: isProcessing ? "#d4783c33" : isRecording ? "#dc2626" : "#1a1a1c",
+            background: isProcessing ? "#ff000033" : isRecording ? "#dc2626" : "#1a1a1c",
             color: isRecording ? "white" : "#999",
             animation: isRecording ? "pulse 1.5s infinite" : "none",
           }}

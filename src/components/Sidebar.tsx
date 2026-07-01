@@ -211,7 +211,7 @@ export default function Sidebar() {
       {/* User */}
       <div className="border-t border-border px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-accent/20 to-violet/20">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-accent/20 to-red/20">
             <User className="h-3 w-3 text-accent" />
           </div>
           <div className="flex-1 min-w-0">

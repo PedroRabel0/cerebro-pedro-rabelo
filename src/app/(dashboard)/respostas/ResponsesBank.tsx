@@ -23,7 +23,7 @@ import {
 const CATEGORIES: Record<string, { label: string; color: string }> = {
   geral: { label: "Geral", color: "bg-zinc-500/20 text-zinc-400" },
   vendas: { label: "Vendas", color: "bg-green-500/20 text-green-400" },
-  mindset: { label: "Mindset", color: "bg-purple-500/20 text-purple-400" },
+  mindset: { label: "Mindset", color: "bg-red-500/20 text-red-400" },
   lideranca: { label: "Lideranca", color: "bg-amber-500/20 text-amber-400" },
   negocios: { label: "Negocios", color: "bg-blue-500/20 text-blue-400" },
   pessoal: { label: "Pessoal", color: "bg-pink-500/20 text-pink-400" },
