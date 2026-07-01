@@ -73,6 +73,19 @@ export async function requireAdmin() {
 }
 
 /**
+ * Exige que o usuario seja da EQUIPE (Pedro ou Henrique) — bloqueia clientes do
+ * portal. Use em acoes da Consultoria/admin que um cliente autenticado NAO pode
+ * chamar (server actions sao POST publicos; nao confie so no middleware).
+ */
+export async function requireStaff() {
+  const user = await requireUser();
+  const role = roleOf(user);
+  if (role !== "pedro" && role !== "henrique")
+    throw new Error("Acao restrita a equipe.");
+  return user;
+}
+
+/**
  * Exige que o usuario seja um cliente do portal e retorna a empresa vinculada.
  * Server actions do portal DEVEM chamar isto no topo — nao confie no middleware.
  * Lanca se nao for cliente ou se nao houver empresa vinculada.

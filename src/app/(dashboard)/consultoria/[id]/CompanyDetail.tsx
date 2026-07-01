@@ -348,14 +348,19 @@ function ClientAccessSection({ companyId, onChange }: { companyId: string; onCha
     setDone(false);
     setBusy(true);
     start(async () => {
-      const res = await createClientUser(companyId, { name, email, password });
-      setBusy(false);
-      if ("error" in res) {
-        setError(res.error);
-        return;
+      try {
+        const res = await createClientUser(companyId, { name, email, password });
+        if ("error" in res) {
+          setError(res.error);
+          return;
+        }
+        setName(""); setEmail(""); setPassword(""); setDone(true);
+        onChange();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Falha ao criar acesso.");
+      } finally {
+        setBusy(false);
       }
-      setName(""); setEmail(""); setPassword(""); setDone(true);
-      onChange();
     });
   }
 

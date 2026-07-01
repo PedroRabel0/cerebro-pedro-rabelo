@@ -6,7 +6,7 @@ import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { findSimilarPlaybooks, updatePlaybookEmbedding } from "@/lib/ai/embeddings";
 import { buildContentGenerationSystemPrompt } from "@/lib/ai/prompts";
 import { isGoogleConnected, createCalendarEvent, createTimedCalendarEvent, listCalendars, listUpcomingEvents, getCalendarEvent, patchCalendarEvent } from "@/lib/google-calendar";
-import { requireUser, requireAdmin } from "@/lib/api-guards";
+import { requireUser, requireStaff } from "@/lib/api-guards";
 import { log } from "@/lib/logger";
 import type {
   ConsultingCompany,
@@ -1417,7 +1417,7 @@ export async function answerPendingQuestion(
   id: string,
   answer: string
 ): Promise<{ ok: true } | { error: string }> {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   if (!answer.trim()) return { error: "Escreva a resposta." };
   const supabase = await createClient();
 
@@ -1486,7 +1486,7 @@ export async function createClientUser(
   companyId: string,
   input: { name: string; email: string; password: string }
 ): Promise<{ ok: true } | { error: string }> {
-  await requireAdmin();
+  await requireStaff();
   if (!input.name?.trim()) return { error: "Nome do cliente e obrigatorio." };
   if (!input.email?.trim()) return { error: "E-mail e obrigatorio." };
   if (!input.password || input.password.length < 6)
