@@ -3,10 +3,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
-import { findSimilarPlaybooks } from "@/lib/ai/embeddings";
+import { findSimilarPlaybooks, updatePlaybookEmbedding } from "@/lib/ai/embeddings";
 import { buildContentGenerationSystemPrompt } from "@/lib/ai/prompts";
 import { isGoogleConnected, createCalendarEvent, createTimedCalendarEvent, listCalendars, listUpcomingEvents, getCalendarEvent, patchCalendarEvent } from "@/lib/google-calendar";
-import { requireUser } from "@/lib/api-guards";
+import { requireUser, requireAdmin } from "@/lib/api-guards";
 import { log } from "@/lib/logger";
 import type {
   ConsultingCompany,
@@ -72,6 +72,7 @@ function healthFromContact(company: Pick<ConsultingCompany, "status" | "last_con
 export interface CompanyWithCounts extends ConsultingCompany {
   pending_tasks: number;
   overdue_tasks: number;
+  pending_questions: number;
   health: CompanyHealth;
   days_since_contact: number | null;
   renewal_in_days: number | null;
@@ -95,7 +96,7 @@ export async function getConsultoriaData(): Promise<{
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [companiesRes, tasksRes] = await Promise.all([
+  const [companiesRes, tasksRes, pendingRes] = await Promise.all([
     supabase
       .from("consulting_companies")
       .select("*")
@@ -104,10 +105,15 @@ export async function getConsultoriaData(): Promise<{
       .from("consulting_tasks")
       .select("company_id, status, due_date")
       .eq("status", "pendente"),
+    supabase
+      .from("consulting_pending_questions")
+      .select("company_id")
+      .eq("status", "pendente"),
   ]);
 
   const companies = (companiesRes.data ?? []) as ConsultingCompany[];
   const tasks = tasksRes.data ?? [];
+  const pending = (pendingRes.data ?? []) as { company_id: string }[];
 
   const withCounts: CompanyWithCounts[] = companies.map((c) => {
     const ts = tasks.filter((t) => t.company_id === c.id);
@@ -117,6 +123,7 @@ export async function getConsultoriaData(): Promise<{
       ...c,
       pending_tasks: ts.length,
       overdue_tasks: ts.filter((t) => t.due_date && t.due_date < today).length,
+      pending_questions: pending.filter((p) => p.company_id === c.id).length,
       health,
       days_since_contact: daysSinceContact,
       renewal_in_days: renewal,
@@ -163,6 +170,7 @@ export interface DailyDigest {
   renewals: DigestCompanyAlert[]; // contratos vencendo/vencidos
   payments: DigestCompanyAlert[]; // pagamentos pendentes/atrasados
   cooling: DigestCompanyAlert[]; // clientes esfriando
+  pending_questions: DigestCompanyAlert[]; // perguntas do cliente aguardando resposta
 }
 
 /**
@@ -173,16 +181,21 @@ export async function getDailyDigest(): Promise<DailyDigest> {
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [companiesRes, tasksRes] = await Promise.all([
+  const [companiesRes, tasksRes, pendingRes] = await Promise.all([
     supabase.from("consulting_companies").select("*"),
     supabase
       .from("consulting_tasks")
       .select("id, company_id, description, owner_name, due_date, status")
       .eq("status", "pendente"),
+    supabase
+      .from("consulting_pending_questions")
+      .select("company_id")
+      .eq("status", "pendente"),
   ]);
 
   const companies = (companiesRes.data ?? []) as ConsultingCompany[];
   const byId = new Map(companies.map((c) => [c.id, c]));
+  const pendingQ = (pendingRes.data ?? []) as { company_id: string }[];
   const tasks = (tasksRes.data ?? []) as Pick<
     ConsultingTask,
     "id" | "company_id" | "description" | "owner_name" | "due_date"
@@ -236,7 +249,17 @@ export async function getDailyDigest(): Promise<DailyDigest> {
       detail: `${h.daysSinceContact} dias sem contato`,
     }));
 
-  return { generated_for: today, tasks_today, renewals, payments, cooling };
+  const pending_questions: DigestCompanyAlert[] = companies
+    .map((c) => ({ c, n: pendingQ.filter((p) => p.company_id === c.id).length }))
+    .filter((x) => x.n > 0)
+    .sort((a, b) => b.n - a.n)
+    .map(({ c, n }) => ({
+      id: c.id,
+      name: c.name,
+      detail: `${n} pergunta(s) pendente(s)`,
+    }));
+
+  return { generated_for: today, tasks_today, renewals, payments, cooling, pending_questions };
 }
 
 export interface CompanyDetail {
@@ -247,6 +270,8 @@ export interface CompanyDetail {
   documents: ConsultingDocument[];
   steps: ConsultingStep[];
   wins: ConsultingWin[];
+  client_chat: { id: string; question: string; answer: string | null; has_context: boolean; created_at: string }[];
+  pending_questions: { id: string; question: string; asked_by_name: string | null; created_at: string }[];
   health: CompanyHealth;
   days_since_contact: number | null;
   renewal_in_days: number | null;
@@ -263,13 +288,15 @@ export async function getCompany(id: string): Promise<CompanyDetail | null> {
 
   if (!company) return null;
 
-  const [contacts, meetings, tasks, documents, steps, wins] = await Promise.all([
+  const [contacts, meetings, tasks, documents, steps, wins, chat, pending] = await Promise.all([
     supabase.from("consulting_contacts").select("*").eq("company_id", id).order("is_primary", { ascending: false }),
     supabase.from("consulting_meetings").select("*").eq("company_id", id).order("held_at", { ascending: false }),
     supabase.from("consulting_tasks").select("*").eq("company_id", id).order("created_at", { ascending: false }),
     supabase.from("consulting_documents").select("*").eq("company_id", id).order("created_at", { ascending: false }),
     supabase.from("consulting_steps").select("*").eq("company_id", id).order("ordem", { ascending: true }),
     supabase.from("consulting_wins").select("*").eq("company_id", id).order("achieved_on", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }),
+    supabase.from("consulting_chat_messages").select("id, question, answer, has_context, created_at").eq("company_id", id).order("created_at", { ascending: true }),
+    supabase.from("consulting_pending_questions").select("id, question, asked_by_name, created_at").eq("company_id", id).eq("status", "pendente").order("created_at", { ascending: true }),
   ]);
 
   const co = company as ConsultingCompany;
@@ -283,6 +310,8 @@ export async function getCompany(id: string): Promise<CompanyDetail | null> {
     documents: (documents.data ?? []) as ConsultingDocument[],
     steps: (steps.data ?? []) as ConsultingStep[],
     wins: (wins.data ?? []) as ConsultingWin[],
+    client_chat: (chat.data ?? []) as CompanyDetail["client_chat"],
+    pending_questions: (pending.data ?? []) as CompanyDetail["pending_questions"],
     health,
     days_since_contact: daysSinceContact,
     renewal_in_days: daysUntilDate(co.contract_end),
@@ -1332,4 +1361,160 @@ Responda de forma pratica e direta, no tom do Pedro, usando o conhecimento acima
     const m = err instanceof Error ? err.message : "Erro desconhecido";
     return { error: `Falha ao consultar o Cerebro: ${m}` };
   }
+}
+
+// ============================================================
+// Portal do cliente (admin) — chat, perguntas pendentes, acesso
+// ============================================================
+
+/** Historico de conversa do cliente (chat do portal) desta empresa. So leitura. */
+export async function getCompanyChat(companyId: string): Promise<
+  { id: string; question: string; answer: string | null; has_context: boolean; created_at: string }[]
+> {
+  await requireUser();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("consulting_chat_messages")
+    .select("id, question, answer, has_context, created_at")
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: true });
+  return (data ?? []) as {
+    id: string;
+    question: string;
+    answer: string | null;
+    has_context: boolean;
+    created_at: string;
+  }[];
+}
+
+/** Perguntas do cliente que aguardam resposta do Pedro. So leitura. */
+export async function getPendingQuestions(companyId: string): Promise<
+  { id: string; question: string; asked_by_name: string | null; created_at: string }[]
+> {
+  await requireUser();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("consulting_pending_questions")
+    .select("id, question, asked_by_name, created_at")
+    .eq("company_id", companyId)
+    .eq("status", "pendente")
+    .order("created_at", { ascending: true });
+  return (data ?? []) as {
+    id: string;
+    question: string;
+    asked_by_name: string | null;
+    created_at: string;
+  }[];
+}
+
+/**
+ * Pedro responde uma pergunta pendente do cliente. Alem de registrar a resposta,
+ * cria um playbook novo (rascunho, nao compartilhavel) espelhando o padrao do
+ * insights-pedro, gera o embedding em background e vincula a resposta ao chat
+ * do cliente (a mensagem que ficou pendente).
+ */
+export async function answerPendingQuestion(
+  id: string,
+  answer: string
+): Promise<{ ok: true } | { error: string }> {
+  const admin = await requireAdmin();
+  if (!answer.trim()) return { error: "Escreva a resposta." };
+  const supabase = await createClient();
+
+  const { data: pending } = await supabase
+    .from("consulting_pending_questions")
+    .select("company_id, question")
+    .eq("id", id)
+    .single();
+  if (!pending) return { error: "Pergunta nao encontrada." };
+
+  const question = pending.question as string;
+  const companyId = pending.company_id as string;
+  const adminName =
+    (admin.user_metadata?.name as string) || admin.email || "Pedro";
+
+  // Cria um playbook novo espelhando o padrao do insights-pedro (createNewPlaybook)
+  const title = question.length > 80 ? `${question.slice(0, 77)}...` : question;
+  const principio = answer.slice(0, 300);
+  const { data: newPlaybook, error: pbError } = await supabase
+    .from("playbooks")
+    .insert({
+      title,
+      subtitle: "Resposta ao cliente",
+      body_markdown: `**Pergunta:** ${question}\n\n**Resposta:** ${answer}`,
+      estrutura: { principio },
+      status: "rascunho",
+      is_shareable: false,
+      created_by: null,
+    })
+    .select("id, title")
+    .single();
+  if (pbError) return { error: pbError.message };
+
+  // Embedding em background (nao bloqueia a resposta)
+  updatePlaybookEmbedding(newPlaybook.id, newPlaybook.title, principio).catch(() => {});
+
+  // Marca a pergunta como respondida
+  const { error: updErr } = await supabase
+    .from("consulting_pending_questions")
+    .update({
+      status: "respondida",
+      answer,
+      answered_by: adminName,
+      playbook_id: newPlaybook.id,
+      answered_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (updErr) return { error: updErr.message };
+
+  // Vincula a resposta a mensagem do chat do cliente que ficou pendente
+  await supabase
+    .from("consulting_chat_messages")
+    .update({ answer, has_context: true })
+    .eq("pending_question_id", id);
+
+  revalidatePath(PATH);
+  revalidatePath(`${PATH}/${companyId}`);
+  return { ok: true };
+}
+
+/**
+ * Cria o acesso de um cliente ao portal: usuario no Supabase Auth (role 'cliente'
+ * + company_id no app_metadata) e o vinculo em consulting_client_users.
+ */
+export async function createClientUser(
+  companyId: string,
+  input: { name: string; email: string; password: string }
+): Promise<{ ok: true } | { error: string }> {
+  await requireAdmin();
+  if (!input.name?.trim()) return { error: "Nome do cliente e obrigatorio." };
+  if (!input.email?.trim()) return { error: "E-mail e obrigatorio." };
+  if (!input.password || input.password.length < 6)
+    return { error: "A senha precisa ter ao menos 6 caracteres." };
+
+  const db = await createClient();
+  const { data: created, error } = await db.auth.admin.createUser({
+    email: input.email.trim(),
+    password: input.password,
+    email_confirm: true,
+    user_metadata: { name: input.name.trim() },
+    app_metadata: { role: "cliente", company_id: companyId },
+  });
+  if (error) {
+    const msg = /already|registered|exists/i.test(error.message)
+      ? "Ja existe um usuario com este e-mail."
+      : error.message;
+    return { error: msg };
+  }
+
+  const { error: linkErr } = await db.from("consulting_client_users").insert({
+    user_id: created.user.id,
+    company_id: companyId,
+    name: input.name.trim(),
+    email: input.email.trim(),
+  });
+  if (linkErr) return { error: linkErr.message };
+
+  revalidatePath(`${PATH}/${companyId}`);
+  return { ok: true };
 }

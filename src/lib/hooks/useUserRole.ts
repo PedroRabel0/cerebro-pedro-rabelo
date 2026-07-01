@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export type UserRole = "pedro" | "henrique";
+export type UserRole = "pedro" | "henrique" | "cliente";
 
 export function useUserRole() {
   const [role, setRole] = useState<UserRole | null>(null);
@@ -12,7 +12,9 @@ export function useUserRole() {
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      const r = user?.user_metadata?.role as UserRole | undefined;
+      const r = (user?.app_metadata?.role ?? user?.user_metadata?.role) as
+        | UserRole
+        | undefined;
       setRole(r ?? null);
       setLoading(false);
     });
@@ -23,5 +25,6 @@ export function useUserRole() {
     loading,
     isPedro: role === "pedro",
     isHenrique: role === "henrique",
+    isCliente: role === "cliente",
   };
 }
