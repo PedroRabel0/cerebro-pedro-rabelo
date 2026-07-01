@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Loader2, Send, Sparkles, AlertTriangle } from "lucide-react";
+import { Loader2, Send, Sparkles, AlertTriangle, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { askClient } from "../actions";
 
 type ChatMessage = {
@@ -38,6 +40,14 @@ export default function PortalChat({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  async function logout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -70,7 +80,7 @@ export default function PortalChat({
   return (
     <div className="flex flex-col gap-4">
       {/* Cabecalho */}
-      <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-accent" />
           <div>
@@ -78,6 +88,13 @@ export default function PortalChat({
             <p className="text-xs text-text-muted">{company.name}</p>
           </div>
         </div>
+        <button
+          onClick={logout}
+          aria-label="Sair da conta"
+          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-text-muted transition hover:border-accent/40 hover:text-text"
+        >
+          <LogOut className="h-3.5 w-3.5" /> Sair
+        </button>
       </div>
 
       {/* Lista de mensagens */}
