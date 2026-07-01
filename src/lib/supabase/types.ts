@@ -7,7 +7,7 @@ export interface ApiCostLog {
   created_at: string;
 }
 
-export type UserRole = "pedro" | "henrique";
+export type UserRole = "pedro" | "henrique" | "cliente";
 
 export interface UserProfile {
   id: string;
@@ -98,6 +98,7 @@ export interface Playbook {
   relacoes?: PlaybookRelacoes;
   perguntas_abertas?: PerguntaAberta[];
   status?: PlaybookStatus;
+  is_shareable?: boolean; // compartilhável com clientes do portal
   // Campos legado de completude (mantidos para compatibilidade)
   completeness_score: number;
   has_example: boolean;
