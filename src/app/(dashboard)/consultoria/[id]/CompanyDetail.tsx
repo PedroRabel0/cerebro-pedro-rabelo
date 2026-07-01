@@ -64,6 +64,7 @@ import {
   getCalendarList,
   answerPendingQuestion,
   createClientUser,
+  deleteClientUser,
 } from "../actions";
 import type { ConsultingContact, ConsultingTask, ConsultingMeeting, ConsultingWin } from "@/lib/supabase/types";
 
@@ -175,7 +176,7 @@ export default function CompanyDetail({
       <AskBrainSection companyId={company.id} />
       <PendingQuestionsSection companyId={company.id} questions={data.pending_questions} onChange={refresh} />
       <ClientChatSection chat={data.client_chat} />
-      <ClientAccessSection companyId={company.id} onChange={refresh} />
+      <ClientAccessSection companyId={company.id} clientUsers={data.client_users} onChange={refresh} />
       <DocumentsSection companyId={company.id} documents={data.documents} onChange={refresh} />
     </div>
   );
@@ -333,14 +334,35 @@ function ClientChatSection({ chat }: { chat: CompanyDetailData["client_chat"] })
   );
 }
 
-function ClientAccessSection({ companyId, onChange }: { companyId: string; onChange: () => void }) {
+function ClientAccessSection({ companyId, clientUsers, onChange }: { companyId: string; clientUsers: CompanyDetailData["client_users"]; onChange: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [, start] = useTransition();
+
+  function remove(userId: string) {
+    setError(null);
+    setDone(false);
+    setRemovingId(userId);
+    start(async () => {
+      try {
+        const res = await deleteClientUser(companyId, userId);
+        if ("error" in res) {
+          setError(res.error);
+          return;
+        }
+        onChange();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Falha ao remover acesso.");
+      } finally {
+        setRemovingId(null);
+      }
+    });
+  }
 
   function create() {
     if (!name.trim() || !email.trim() || !password.trim()) return;
@@ -370,6 +392,27 @@ function ClientAccessSection({ companyId, onChange }: { companyId: string; onCha
       <p className="mb-3 -mt-1 text-xs text-text-muted">
         Crie o login do cliente no portal (ele vê o próprio painel e conversa com o Cérebro).
       </p>
+      {clientUsers.length > 0 && (
+        <div className="mb-3 space-y-1.5">
+          {clientUsers.map((u) => (
+            <div key={u.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-1.5">
+              <div className="min-w-0">
+                <p className="truncate text-xs text-text">{u.name || "Cliente"}</p>
+                <p className="truncate text-[11px] text-text-muted">{u.email}</p>
+              </div>
+              <button
+                onClick={() => remove(u.user_id)}
+                disabled={removingId === u.user_id}
+                aria-label="Remover acesso"
+                className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-text-muted transition hover:border-red/40 hover:text-red disabled:opacity-50"
+              >
+                {removingId === u.user_id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                Remover
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="space-y-2">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do cliente" aria-label="Nome do cliente" className={input} />
         <div className="grid gap-2 sm:grid-cols-2">

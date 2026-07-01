@@ -272,6 +272,7 @@ export interface CompanyDetail {
   wins: ConsultingWin[];
   client_chat: { id: string; question: string; answer: string | null; has_context: boolean; created_at: string }[];
   pending_questions: { id: string; question: string; asked_by_name: string | null; created_at: string }[];
+  client_users: { id: string; user_id: string; name: string | null; email: string | null }[];
   health: CompanyHealth;
   days_since_contact: number | null;
   renewal_in_days: number | null;
@@ -288,7 +289,7 @@ export async function getCompany(id: string): Promise<CompanyDetail | null> {
 
   if (!company) return null;
 
-  const [contacts, meetings, tasks, documents, steps, wins, chat, pending] = await Promise.all([
+  const [contacts, meetings, tasks, documents, steps, wins, chat, pending, clientUsers] = await Promise.all([
     supabase.from("consulting_contacts").select("*").eq("company_id", id).order("is_primary", { ascending: false }),
     supabase.from("consulting_meetings").select("*").eq("company_id", id).order("held_at", { ascending: false }),
     supabase.from("consulting_tasks").select("*").eq("company_id", id).order("created_at", { ascending: false }),
@@ -297,6 +298,7 @@ export async function getCompany(id: string): Promise<CompanyDetail | null> {
     supabase.from("consulting_wins").select("*").eq("company_id", id).order("achieved_on", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }),
     supabase.from("consulting_chat_messages").select("id, question, answer, has_context, created_at").eq("company_id", id).order("created_at", { ascending: true }),
     supabase.from("consulting_pending_questions").select("id, question, asked_by_name, created_at").eq("company_id", id).eq("status", "pendente").order("created_at", { ascending: true }),
+    supabase.from("consulting_client_users").select("id, user_id, name, email").eq("company_id", id).order("created_at", { ascending: true }),
   ]);
 
   const co = company as ConsultingCompany;
@@ -312,6 +314,7 @@ export async function getCompany(id: string): Promise<CompanyDetail | null> {
     wins: (wins.data ?? []) as ConsultingWin[],
     client_chat: (chat.data ?? []) as CompanyDetail["client_chat"],
     pending_questions: (pending.data ?? []) as CompanyDetail["pending_questions"],
+    client_users: (clientUsers.data ?? []) as CompanyDetail["client_users"],
     health,
     days_since_contact: daysSinceContact,
     renewal_in_days: daysUntilDate(co.contract_end),
@@ -1514,6 +1517,28 @@ export async function createClientUser(
     email: input.email.trim(),
   });
   if (linkErr) return { error: linkErr.message };
+
+  revalidatePath(`${PATH}/${companyId}`);
+  return { ok: true };
+}
+
+/**
+ * Remove o acesso de um cliente ao portal: apaga o usuario do Supabase Auth
+ * (revoga o login) e o vinculo em consulting_client_users. Equipe (requireStaff).
+ */
+export async function deleteClientUser(
+  companyId: string,
+  userId: string
+): Promise<{ ok: true } | { error: string }> {
+  await requireStaff();
+  const db = await createClient();
+
+  const { error } = await db.auth.admin.deleteUser(userId);
+  if (error && !/not.*found/i.test(error.message)) {
+    return { error: error.message };
+  }
+
+  await db.from("consulting_client_users").delete().eq("user_id", userId);
 
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
