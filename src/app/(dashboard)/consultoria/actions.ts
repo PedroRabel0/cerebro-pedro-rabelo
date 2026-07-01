@@ -1543,3 +1543,24 @@ export async function deleteClientUser(
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }
+
+/**
+ * Redefine a senha do login do cliente. NAO existe como "ver" a senha antiga
+ * (fica em hash); a equipe define uma nova e repassa ao cliente. requireStaff.
+ */
+export async function resetClientPassword(
+  companyId: string,
+  userId: string,
+  newPassword: string
+): Promise<{ ok: true } | { error: string }> {
+  await requireStaff();
+  if (!newPassword || newPassword.length < 6)
+    return { error: "A senha precisa ter ao menos 6 caracteres." };
+  const db = await createClient();
+  const { error } = await db.auth.admin.updateUserById(userId, {
+    password: newPassword,
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`${PATH}/${companyId}`);
+  return { ok: true };
+}

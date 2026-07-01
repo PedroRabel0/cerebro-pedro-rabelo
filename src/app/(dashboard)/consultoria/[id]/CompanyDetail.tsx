@@ -7,6 +7,8 @@ import {
   ArrowLeft,
   Plus,
   Trash2,
+  Eye,
+  EyeOff,
   Loader2,
   Wand2,
   MessageSquare,
@@ -65,6 +67,7 @@ import {
   answerPendingQuestion,
   createClientUser,
   deleteClientUser,
+  resetClientPassword,
 } from "../actions";
 import type { ConsultingContact, ConsultingTask, ConsultingMeeting, ConsultingWin } from "@/lib/supabase/types";
 
@@ -342,7 +345,33 @@ function ClientAccessSection({ companyId, clientUsers, onChange }: { companyId: 
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
+  const [resetId, setResetId] = useState<string | null>(null);
+  const [resetPw, setResetPw] = useState("");
+  const [resetDone, setResetDone] = useState<string | null>(null);
   const [, start] = useTransition();
+
+  function doReset(userId: string) {
+    if (resetPw.length < 6) {
+      setError("A nova senha precisa ter ao menos 6 caracteres.");
+      return;
+    }
+    setError(null);
+    start(async () => {
+      try {
+        const res = await resetClientPassword(companyId, userId, resetPw);
+        if ("error" in res) {
+          setError(res.error);
+          return;
+        }
+        setResetDone(userId);
+        setResetId(null);
+        setResetPw("");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Falha ao redefinir senha.");
+      }
+    });
+  }
 
   function remove(userId: string) {
     setError(null);
@@ -395,20 +424,53 @@ function ClientAccessSection({ companyId, clientUsers, onChange }: { companyId: 
       {clientUsers.length > 0 && (
         <div className="mb-3 space-y-1.5">
           {clientUsers.map((u) => (
-            <div key={u.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-1.5">
-              <div className="min-w-0">
-                <p className="truncate text-xs text-text">{u.name || "Cliente"}</p>
-                <p className="truncate text-[11px] text-text-muted">{u.email}</p>
+            <div key={u.id} className="rounded-lg border border-border bg-surface px-3 py-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-text">{u.name || "Cliente"}</p>
+                  <p className="truncate text-[11px] text-text-muted">{u.email}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => { setResetId(resetId === u.user_id ? null : u.user_id); setResetPw(""); setResetDone(null); setError(null); }}
+                    aria-label="Redefinir senha"
+                    className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-text-muted transition hover:border-accent/40 hover:text-accent"
+                  >
+                    <KeyRound className="h-3 w-3" /> Senha
+                  </button>
+                  <button
+                    onClick={() => remove(u.user_id)}
+                    disabled={removingId === u.user_id}
+                    aria-label="Remover acesso"
+                    className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-text-muted transition hover:border-red/40 hover:text-red disabled:opacity-50"
+                  >
+                    {removingId === u.user_id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                    Remover
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => remove(u.user_id)}
-                disabled={removingId === u.user_id}
-                aria-label="Remover acesso"
-                className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-text-muted transition hover:border-red/40 hover:text-red disabled:opacity-50"
-              >
-                {removingId === u.user_id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                Remover
-              </button>
+              {resetId === u.user_id && (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={resetPw}
+                    onChange={(e) => setResetPw(e.target.value)}
+                    placeholder="Nova senha (mín. 6) — visível p/ copiar"
+                    aria-label="Nova senha do cliente"
+                    className={input}
+                  />
+                  <button
+                    onClick={() => doReset(u.user_id)}
+                    disabled={resetPw.length < 6}
+                    className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
+                  >
+                    Salvar
+                  </button>
+                </div>
+              )}
+              {resetDone === u.user_id && (
+                <p className="mt-1 text-[11px] text-green">Senha atualizada — repasse ao cliente.</p>
+              )}
             </div>
           ))}
         </div>
@@ -417,7 +479,12 @@ function ClientAccessSection({ companyId, clientUsers, onChange }: { companyId: 
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do cliente" aria-label="Nome do cliente" className={input} />
         <div className="grid gap-2 sm:grid-cols-2">
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" aria-label="E-mail do cliente" className={input} />
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha (mín. 6 caracteres)" aria-label="Senha do cliente" className={input} />
+          <div className="relative">
+            <input type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha (mín. 6 caracteres)" aria-label="Senha do cliente" className={`${input} pr-9`} />
+            <button type="button" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Ocultar senha" : "Mostrar senha"} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted transition hover:text-text">
+              {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
