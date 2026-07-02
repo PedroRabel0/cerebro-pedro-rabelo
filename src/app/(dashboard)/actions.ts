@@ -11,6 +11,7 @@ import type { PipelineResult, EnrichedProposal } from "@/lib/ai/kb-pipeline";
 import { scrapeInstagramPost } from "@/lib/ai/apify";
 import { analyzeDNA } from "@/lib/ai";
 import { getClient, logCost } from "@/lib/ai/client";
+import { findSimilarPlaybooks } from "@/lib/ai/embeddings";
 import type { CaptureSourceType } from "@/lib/supabase/types";
 
 // --- Universal Input ---
@@ -661,15 +662,54 @@ export async function getDashboardStats() {
 
 // --- Brain Chat ---
 
+// --- Brain Knowledge Retrieval (RAG) ---
+
+/**
+ * Fetch the playbooks most relevant to `question` via semantic (vector) search,
+ * then load their full body_markdown so the brain answers with the complete
+ * content (match_playbooks only returns the short `principio`).
+ *
+ * Falls back to the 30 most recent playbooks if the embedding lookup returns
+ * nothing — OpenAI timeout, RPC error, or no playbook has an embedding yet — so
+ * the brain never answers against an empty knowledge base.
+ */
+async function fetchRelevantPlaybooks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  question: string
+): Promise<{ title: string; body_markdown: string | null }[]> {
+  const similar = await findSimilarPlaybooks(question, 0.3, 12);
+
+  if (similar.length > 0) {
+    const ids = similar.map((s) => s.id);
+    const { data } = await supabase
+      .from("playbooks")
+      .select("id, title, body_markdown")
+      .in("id", ids);
+
+    if (data && data.length > 0) {
+      // Preserve the similarity ranking returned by the RPC.
+      const byId = new Map(data.map((p) => [p.id, p]));
+      return ids
+        .map((id) => byId.get(id))
+        .filter((p): p is NonNullable<typeof p> => Boolean(p))
+        .map((p) => ({ title: p.title, body_markdown: p.body_markdown }));
+    }
+  }
+
+  // Fallback: recent playbooks (previous behavior).
+  const { data } = await supabase
+    .from("playbooks")
+    .select("title, body_markdown")
+    .limit(30);
+  return data ?? [];
+}
+
 export async function askBrain(question: string): Promise<string> {
   const supabase = await createClient();
 
   const [identity, playbooks, stories, recentRefs, brainRulesRes] = await Promise.all([
     supabase.from("identity").select("*").limit(1).single(),
-    supabase
-      .from("playbooks")
-      .select("id, title, body_markdown")
-      .limit(30),
+    fetchRelevantPlaybooks(supabase, question),
     supabase
       .from("stories")
       .select("id, title, summary, body_markdown, tags")
@@ -696,14 +736,14 @@ export async function askBrain(question: string): Promise<string> {
     );
   }
 
-  if (playbooks.data && playbooks.data.length > 0) {
-    const playbookText = playbooks.data
+  if (playbooks.length > 0) {
+    const playbookText = playbooks
       .map(
         (p) =>
           `### ${p.title}\n${p.body_markdown || "(sem conteúdo)"}`
       )
       .join("\n\n");
-    parts.push(`## Playbooks (${playbooks.data.length})\n${playbookText}`);
+    parts.push(`## Playbooks (${playbooks.length})\n${playbookText}`);
   }
 
   if (stories.data && stories.data.length > 0) {
@@ -841,10 +881,7 @@ export async function sendChatMessage(
   // 3. Fetch knowledge context (same as askBrain)
   const [identity, playbooks, stories, recentRefs, chatRulesRes] = await Promise.all([
     supabase.from("identity").select("*").limit(1).single(),
-    supabase
-      .from("playbooks")
-      .select("id, title, body_markdown")
-      .limit(30),
+    fetchRelevantPlaybooks(supabase, question),
     supabase
       .from("stories")
       .select("id, title, summary, body_markdown, tags")
@@ -870,14 +907,14 @@ export async function sendChatMessage(
     );
   }
 
-  if (playbooks.data && playbooks.data.length > 0) {
-    const playbookText = playbooks.data
+  if (playbooks.length > 0) {
+    const playbookText = playbooks
       .map(
         (p) =>
           `### ${p.title}\n${p.body_markdown || "(sem conteúdo)"}`
       )
       .join("\n\n");
-    parts.push(`## Playbooks (${playbooks.data.length})\n${playbookText}`);
+    parts.push(`## Playbooks (${playbooks.length})\n${playbookText}`);
   }
 
   if (stories.data && stories.data.length > 0) {
