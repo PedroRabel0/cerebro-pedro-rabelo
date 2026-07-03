@@ -1683,15 +1683,19 @@ export default function GenerationWizard({
 
       const res = await createWizardContent(payload);
 
-      if (!("error" in res) && res.results.length > 0) {
+      if ("error" in res) {
+        // Antes: falha muda — o spinner sumia e nada acontecia
+        setError(`Falha ao regenerar: ${res.error}`);
+      } else if (res.results.length > 0) {
         setResults((prev) =>
           prev.map((r) =>
             r.contentType === contentType ? res.results[0] : r
           )
         );
+        setError("");
       }
     } catch {
-      // silent
+      setError("Falha ao regenerar. Tente de novo.");
     } finally {
       setRegeneratingType(null);
     }
@@ -1701,7 +1705,7 @@ export default function GenerationWizard({
     try {
       await updateContentStatus(id, "draft", rating);
     } catch {
-      // silent
+      setError("Falha ao registrar o feedback. Tente de novo.");
     }
   }
 

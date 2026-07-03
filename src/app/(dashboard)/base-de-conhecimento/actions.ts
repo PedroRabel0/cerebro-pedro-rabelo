@@ -9,7 +9,7 @@ import { analyzeCompleteness, generateBookQuestions } from "@/lib/ai";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { updatePlaybookEmbedding } from "@/lib/ai/embeddings";
 import { calculateCompletude, generateGapQuestions } from "@/lib/ai/kb-pipeline";
-import type { PlaybookEstrutura, PerguntaAberta } from "@/lib/supabase/types";
+import type { Playbook, PlaybookEstrutura, PerguntaAberta } from "@/lib/supabase/types";
 
 // --- Themes ---
 
@@ -49,12 +49,19 @@ export async function deleteTheme(id: string) {
 export async function getPlaybooks() {
   await requireStaff();
   const supabase = await createClient();
+  // Colunas explicitas para NAO serializar `embedding vector(1536)` (~15-20KB
+  // por linha como string) ate o browser em toda visita a Base — com 100
+  // playbooks eram ~2MB de peso morto por page-load.
   const { data, error } = await supabase
     .from("playbooks")
-    .select("*, theme:themes!playbooks_theme_id_fkey(*)")
+    .select(
+      "id, theme_id, subtema_id, title, subtitle, body_markdown, estrutura, proveniencia, relacoes, perguntas_abertas, status, is_shareable, version_current, version_previous, completeness_score, has_example, has_story, has_origin, has_counterexample, created_by, created_at, updated_at, theme:themes!playbooks_theme_id_fkey(*)"
+    )
     .order("updated_at", { ascending: false });
   if (error) throw error;
-  return data;
+  // Em runtime o PostgREST retorna `theme` como OBJETO (FK to-one); o parser
+  // de tipos do supabase-js infere array porque a tabela nao esta em types.ts.
+  return (data ?? []) as unknown as Playbook[];
 }
 
 export async function getPlaybook(id: string) {

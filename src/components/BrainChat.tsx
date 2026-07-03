@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useTransition } from "react";
 import { Brain, Send, User, Plus, Trash2, MessageSquare, PanelLeftClose, PanelLeft, Sparkles, Zap } from "lucide-react";
 import VoiceButton from "@/components/VoiceButton";
+import { useConfirm } from "@/components/ConfirmProvider";
 import {
   getChats,
   createChat,
@@ -45,6 +46,11 @@ export default function BrainChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Drawer mobile SEPARADO do painel desktop: com um state so (default true),
+  // toda visita no celular abria com o drawer cobrindo o chat inteiro.
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [uiError, setUiError] = useState<string | null>(null);
+  const confirm = useConfirm();
   const [isPending, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -85,12 +91,25 @@ export default function BrainChat() {
   }
 
   async function handleDeleteChat(chatId: string) {
+    // Apagar e permanente (mensagens + conversa) — confirmar antes, como no
+    // resto do app (ConfirmProvider).
+    const chat = chats.find((c) => c.id === chatId);
+    const ok = await confirm({
+      title: "Apagar conversa",
+      message: `Apagar "${chat?.title || "esta conversa"}"? As mensagens serao excluidas permanentemente.`,
+      confirmLabel: "Apagar",
+    });
+    if (!ok) return;
+
     startTransition(async () => {
       try {
         await deleteChat(chatId);
         setChats((prev) => prev.filter((c) => c.id !== chatId));
         if (activeChatId === chatId) { setActiveChatId(null); setMessages([]); }
-      } catch {}
+        setUiError(null);
+      } catch {
+        setUiError("Nao foi possivel apagar a conversa. Tente de novo.");
+      }
     });
   }
 
@@ -241,7 +260,7 @@ export default function BrainChat() {
           )}
           {/* Mobile menu */}
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={() => setMobileDrawerOpen(true)}
             aria-label="Abrir menu de conversas"
             className="md:hidden rounded-lg p-1.5 text-text-muted hover:text-text"
           >
@@ -263,6 +282,12 @@ export default function BrainChat() {
             </span>
           )}
         </div>
+
+        {uiError && (
+          <div className="border-b border-red/20 bg-red/5 px-4 py-2 text-xs text-red md:px-6" role="alert">
+            {uiError}
+          </div>
+        )}
 
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto" aria-live="polite" aria-atomic="false">
@@ -421,9 +446,9 @@ export default function BrainChat() {
       </div>
 
       {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
+      {mobileDrawerOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden" onClick={() => setSidebarOpen(false)} />
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden" onClick={() => setMobileDrawerOpen(false)} />
           <div className="fixed inset-y-0 left-0 z-50 w-64 border-r border-border bg-card md:hidden">
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
@@ -433,7 +458,7 @@ export default function BrainChat() {
                   </div>
                   <span className="font-display text-sm font-bold text-text">Conversas</span>
                 </div>
-                <button onClick={() => setSidebarOpen(false)} aria-label="Fechar painel de conversas" className="rounded-lg p-1 text-text-muted hover:text-text">
+                <button onClick={() => setMobileDrawerOpen(false)} aria-label="Fechar painel de conversas" className="rounded-lg p-1 text-text-muted hover:text-text">
                   <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
@@ -445,16 +470,19 @@ export default function BrainChat() {
               <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5">
                 {chats.map((chat) => (
                   <div key={chat.id} role="button" tabIndex={0} aria-label={`Abrir conversa: ${chat.title}`}
-                    onClick={() => { setActiveChatId(chat.id); setSidebarOpen(false); }}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveChatId(chat.id); setSidebarOpen(false); } }}
+                    onClick={() => { setActiveChatId(chat.id); setMobileDrawerOpen(false); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveChatId(chat.id); setMobileDrawerOpen(false); } }}
                     className={`group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-all ${activeChatId === chat.id ? "nav-item-active text-accent" : "text-text-secondary hover:bg-surface/40"}`}>
                     <MessageSquare className={`h-3 w-3 shrink-0 ${activeChatId === chat.id ? "text-accent" : "text-text-muted/40"}`} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px]">{chat.title}</p>
                       <p className="font-mono text-[11px] text-text-muted/60">{relativeTime(chat.updated_at)}</p>
                     </div>
+                    {/* No touch nao existe hover: a lixeira fica sempre visivel
+                        (antes: opacity-0 + group-hover = botao invisivel mas
+                        clicavel, apagando historico em toques acidentais) */}
                     <button onClick={(e) => { e.stopPropagation(); handleDeleteChat(chat.id); }} aria-label={`Apagar conversa: ${chat.title}`}
-                      className="shrink-0 rounded p-1 text-text-muted/30 opacity-0 hover:bg-red/10 hover:text-red group-hover:opacity-100">
+                      className="shrink-0 rounded p-1 text-text-muted/50 hover:bg-red/10 hover:text-red">
                       <Trash2 className="h-3 w-3" aria-hidden="true" />
                     </button>
                   </div>

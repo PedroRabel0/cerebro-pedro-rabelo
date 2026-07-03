@@ -20,7 +20,11 @@ export async function getCaptures() {
     .from("captures")
     .select("*")
     .neq("status", "stored")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    // raw_content carrega transcricoes inteiras de videos — sem limite o
+    // payload da pagina cresce sem teto. (A UI usa raw_content no detalhe,
+    // entao a coluna fica; o limite segura o tamanho total.)
+    .limit(50);
   if (error) throw error;
   return data;
 }

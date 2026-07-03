@@ -106,16 +106,20 @@ function InlineEditor({
 }) {
   const [text, setText] = useState(initialText);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function handleSave() {
     setSaving(true);
     try {
       await updateContentText(contentId, text);
+      setSaving(false);
+      onClose();
     } catch {
-      // silent
+      // Falha NAO fecha o editor: fechar com cara de sucesso descartava a
+      // edicao do usuario em silencio.
+      setSaving(false);
+      setSaveError("Falha ao salvar a edicao. Tente de novo — seu texto continua aqui.");
     }
-    setSaving(false);
-    onClose();
   }
 
   return (
@@ -127,6 +131,9 @@ function InlineEditor({
         aria-label="Editar conteudo"
         className="w-full rounded-xl border border-accent/30 bg-card px-3 py-2 text-sm text-text leading-relaxed focus:border-accent focus:outline-none resize-none"
       />
+      {saveError && (
+        <p className="text-xs text-red" role="alert">{saveError}</p>
+      )}
       <div className="flex gap-2">
         <button
           onClick={handleSave}
@@ -269,17 +276,20 @@ function PublishedUrlInput({
 }) {
   const [url, setUrl] = useState(currentUrl ?? "");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function handleSave() {
     if (!url.trim()) return;
     setSaving(true);
     try {
       await savePublishedUrl(contentId, url.trim());
+      setSaving(false);
+      onClose();
     } catch {
-      // silent
+      // Falha nao fecha o input com cara de sucesso
+      setSaving(false);
+      setSaveError("Falha ao salvar a URL. Tente de novo.");
     }
-    setSaving(false);
-    onClose();
   }
 
   return (
@@ -289,7 +299,9 @@ function PublishedUrlInput({
         onChange={(e) => setUrl(e.target.value)}
         placeholder="Cole a URL de publicação..."
         aria-label="URL de publicação"
-        className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:ring-1 focus:ring-accent"
+        aria-invalid={saveError ? true : undefined}
+        title={saveError || undefined}
+        className={`min-w-0 flex-1 rounded-xl border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:ring-1 focus:ring-accent ${saveError ? "border-red/50" : "border-border"}`}
       />
       <button
         onClick={handleSave}

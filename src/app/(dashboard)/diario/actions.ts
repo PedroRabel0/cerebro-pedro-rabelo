@@ -41,7 +41,7 @@ export async function saveEntry(data: {
   highlights?: string;
   challenges?: string;
   decisions?: string;
-}) {
+}): Promise<{ id: string }> {
   await requireStaff();
   const supabase = await createClient();
 
@@ -53,6 +53,8 @@ export async function saveEntry(data: {
     .eq("author", "henrique")
     .limit(1)
     .maybeSingle();
+
+  let id: string;
 
   if (existing) {
     // Update
@@ -67,20 +69,28 @@ export async function saveEntry(data: {
       })
       .eq("id", existing.id);
     if (error) throw error;
+    id = existing.id as string;
   } else {
-    // Insert
-    const { error } = await supabase.from("journal_entries").insert({
-      entry_date: data.entry_date,
-      author: "henrique",
-      content: data.content,
-      highlights: data.highlights || null,
-      challenges: data.challenges || null,
-      decisions: data.decisions || null,
-    });
+    // Insert — retorna o id para o client nao precisar de
+    // window.location.reload() na primeira entrada do dia.
+    const { data: inserted, error } = await supabase
+      .from("journal_entries")
+      .insert({
+        entry_date: data.entry_date,
+        author: "henrique",
+        content: data.content,
+        highlights: data.highlights || null,
+        challenges: data.challenges || null,
+        decisions: data.decisions || null,
+      })
+      .select("id")
+      .single();
     if (error) throw error;
+    id = inserted.id as string;
   }
 
   revalidatePath(PATH);
+  return { id };
 }
 
 export async function deleteEntry(id: string) {

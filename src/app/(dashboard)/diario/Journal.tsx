@@ -68,28 +68,39 @@ function TodayEditor({
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  // Falha de save NAO pode ser silenciosa: o usuario continua escrevendo
+  // achando que o auto-save de 2s esta funcionando e perde o texto do dia.
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [entryId, setEntryId] = useState<string | null>(entry?.id ?? null);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const doSave = useCallback(async () => {
-    if (!content.trim()) return;
+  const doSave = useCallback(async (): Promise<string | null> => {
+    if (!content.trim()) return null;
     setSaving(true);
     try {
-      await saveEntry({
+      const { id } = await saveEntry({
         entry_date: today,
         content,
         highlights: highlights || undefined,
         challenges: challenges || undefined,
         decisions: decisions || undefined,
       });
+      setEntryId(id);
+      setSaveError(null);
       setLastSaved(
         new Date().toLocaleTimeString("pt-BR", {
           hour: "2-digit",
           minute: "2-digit",
         })
       );
+      return id;
     } catch (err) {
       console.error("Save failed:", err);
+      setSaveError(
+        "Falha ao salvar — suas ultimas alteracoes NAO foram gravadas."
+      );
+      return null;
     } finally {
       setSaving(false);
     }
@@ -113,24 +124,18 @@ function TodayEditor({
   async function handleGenerateSummary() {
     if (!content.trim()) return;
 
-    // Save first if needed
-    await doSave();
+    // Salva antes e usa o id retornado — sem o window.location.reload() que
+    // jogava o usuario pra fora do fluxo de escrita na primeira entrada do dia.
+    const savedId = (await doSave()) || entryId;
+    if (!savedId) return; // save falhou; o erro ja esta visivel na UI
 
     setGenerating(true);
     try {
-      // We need the entry ID. If it was just created, refetch
-      // For simplicity, save returns void, so we call generate after save
-      // The entry should exist after save
-      const entryId = entry?.id;
-      if (!entryId) {
-        // Entry was just created, we need to reload page to get the ID
-        window.location.reload();
-        return;
-      }
-      const summary = await generateDaySummary(entryId);
+      const summary = await generateDaySummary(savedId);
       setAiSummary(summary);
     } catch (err) {
       console.error("Generate summary failed:", err);
+      setSaveError("Falha ao gerar o resumo do dia. Tente novamente.");
     } finally {
       setGenerating(false);
     }
@@ -146,10 +151,22 @@ function TodayEditor({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {lastSaved && (
-            <span className="text-xs text-text-muted">
-              Salvo as {lastSaved}
+          {saveError ? (
+            <span className="flex items-center gap-2 text-xs text-red" role="alert">
+              {saveError}
+              <button
+                onClick={doSave}
+                className="rounded border border-red/30 px-2 py-0.5 font-medium hover:bg-red/10"
+              >
+                Tentar novamente
+              </button>
             </span>
+          ) : (
+            lastSaved && (
+              <span className="text-xs text-text-muted">
+                Salvo as {lastSaved}
+              </span>
+            )
           )}
           <button
             onClick={doSave}

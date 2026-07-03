@@ -177,7 +177,11 @@ export async function getGeneratedContents() {
     .select(
       "*, playbook:playbooks(id, title), story:stories(id, title), format:content_formats(*)"
     )
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    // Sem limite, a pagina principal de trabalho carregava a tabela INTEIRA
+    // (content_text completo por linha) a cada visita — payload multi-MB
+    // crescendo linearmente com o uso.
+    .limit(50);
   if (error) throw error;
   return data;
 }
