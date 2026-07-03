@@ -640,7 +640,9 @@ export interface WizardResult {
 
 export async function createWizardContent(
   payload: WizardPayload
-): Promise<{ results: WizardResult[] } | { error: string }> {
+): Promise<
+  { results: WizardResult[]; partialError?: string } | { error: string }
+> {
   await requireStaff();
   const supabase = await createClient();
 
@@ -722,10 +724,13 @@ export async function createWizardContent(
       .map((s) => `### ${s.title}\n${s.summary || ""}\n${(s.body_markdown || "").slice(0, 1000)}`)
       .join("\n\n");
 
-    // Generate content for each selected type
-    const results: WizardResult[] = [];
-
-    for (const contentType of payload.contentTypes) {
+    // Gera UM tipo de conteudo (Sonnet + prompt de imagem + insert no DB).
+    // Extraido para rodar em paralelo por tipo: no loop sequencial antigo,
+    // 2-3 tipos somavam 60-150s e a Vercel matava a funcao (maxDuration 60s)
+    // — o usuario perdia tudo. Lanca em caso de falha; o chamador agrega.
+    const generateForType = async (
+      contentType: string
+    ): Promise<WizardResult> => {
       const details = payload.typeDetails[contentType] || {};
 
       // Build type-specific instructions
@@ -1131,7 +1136,7 @@ INSTRUCOES FINAIS:
       });
 
       if ("error" in result) {
-        return { error: result.error };
+        throw new Error(result.error);
       }
 
       // For instagram_frase, append a clean quote-card design prompt
@@ -1263,7 +1268,7 @@ REGRAS:
         suggestion: `Essa história sobre "${s.title}" caberia neste post. Você pode adicioná-la na legenda como exemplo real ou case pessoal.`,
       }));
 
-      results.push({
+      return {
         id: inserted.id,
         contentType: contentType as ContentType,
         content: result.content_text,
@@ -1271,12 +1276,39 @@ REGRAS:
         imagePrompt,
         source: payload.source as "base_only" | "references_only" | "both",
         storySuggestions: storySuggestions.length > 0 ? storySuggestions : undefined,
-      });
+      };
+    };
+
+    // Todos os tipos em paralelo; allSettled para nao perder os que deram
+    // certo quando um falha (antes, o primeiro erro descartava tudo).
+    const settled = await Promise.allSettled(
+      payload.contentTypes.map((ct) => generateForType(ct))
+    );
+
+    const results: WizardResult[] = [];
+    const failures: string[] = [];
+    settled.forEach((s, i) => {
+      if (s.status === "fulfilled") {
+        results.push(s.value);
+      } else {
+        const reason =
+          s.reason instanceof Error ? s.reason.message : String(s.reason);
+        failures.push(`${payload.contentTypes[i]}: ${reason}`);
+      }
+    });
+
+    if (results.length === 0) {
+      throw new Error(failures[0] || "Erro desconhecido");
     }
 
     revalidatePath(PATH);
 
-    return { results };
+    return {
+      results,
+      ...(failures.length > 0
+        ? { partialError: `Alguns formatos falharam — ${failures.join("; ")}` }
+        : {}),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
     log.error("[WizardContent] Error:" + " " + String(message));
@@ -1692,7 +1724,15 @@ export async function generateImageForContent(
       imagePrompt = promptResult.image_prompt;
     }
 
-    // Step 2: Generate the actual image
+    // Step 2: Salva o prompt no DB ANTES de gerar — se a Vercel matar a
+    // funcao no meio da geracao (timeout), o prompt caro nao se perde e o
+    // usuario pode tentar de novo sem pagar outra chamada de prompt.
+    await supabase.from("generated_contents").update({
+      image_prompt: imagePrompt,
+      image_model: 'prompt-only',
+    }).eq("id", contentId);
+
+    // Step 3: Generate the actual image
     log.info(`[ImageForContent] Generating image (${imagePrompt.length} char prompt)...`);
 
     // Choose size based on content type
@@ -1709,14 +1749,15 @@ export async function generateImageForContent(
 
     const imageResult = await generateImage(imagePrompt, {
       size: sizeMap[contentType] || '1024x1024',
-      quality: 'high',
+      // 'medium' e suficiente para infografico bold de alto contraste e custa
+      // ~4x menos que 'high' ($0.042 vs $0.167) — alem de gerar mais rapido,
+      // o que importa com o teto de 60s.
+      quality: 'medium',
       format: 'webp',
     });
 
     if ("error" in imageResult) {
-      // Save prompt even if image fails
       await supabase.from("generated_contents").update({
-        image_prompt: imagePrompt,
         image_model: 'gpt-image-1-failed',
       }).eq("id", contentId);
       revalidatePath(PATH);

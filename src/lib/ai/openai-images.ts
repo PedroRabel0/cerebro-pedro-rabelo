@@ -16,6 +16,9 @@ interface BrandColors {
 function getOpenAIClient(): OpenAI {
   return new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
+    // Sem timeout explicito o SDK espera ate 10min — muito alem do maxDuration
+    // de 60s da Vercel; o fallback de prompt tem que falhar rapido.
+    timeout: 20_000,
   });
 }
 

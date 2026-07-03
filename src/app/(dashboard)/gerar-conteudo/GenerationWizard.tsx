@@ -1679,6 +1679,8 @@ export default function GenerationWizard({
         } else {
           setResults(res.results);
           setStep("result");
+          // Sucesso parcial: mostra os formatos que vieram e avisa dos que falharam
+          if (res.partialError) setError(res.partialError);
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

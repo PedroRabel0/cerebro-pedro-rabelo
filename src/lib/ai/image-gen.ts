@@ -48,7 +48,9 @@ export async function generateImage(
         quality,
         output_format: format,
       }),
-      signal: AbortSignal.timeout(120_000), // 2 min timeout for image gen
+      // 45s: precisa caber no maxDuration de 60s da Vercel junto com a geracao
+      // do prompt — 120s fazia a plataforma matar a funcao antes do catch rodar.
+      signal: AbortSignal.timeout(45_000),
     });
 
     if (!response.ok) {
@@ -75,14 +77,15 @@ export async function generateImage(
       return { error: 'A API nao retornou imagem. Tente novamente.' };
     }
 
-    // Log cost (approximate: gpt-image-1 ~$0.04 for medium quality 1024x1024)
+    // Log cost — precos reais do gpt-image-1 (1024x1024; retrato/paisagem
+    // custam ~50% mais). O map antigo subestimava 'high' em ~50%.
     const costMap: Record<string, number> = {
-      'low': 0.02,
-      'medium': 0.04,
-      'high': 0.08,
-      'auto': 0.04,
+      'low': 0.011,
+      'medium': 0.042,
+      'high': 0.167,
+      'auto': 0.042,
     };
-    logApiCost('openai', 'gpt-image-1', costMap[quality] || 0.04, {
+    logApiCost('openai', 'gpt-image-1', costMap[quality] || 0.042, {
       unit: 'image',
       quantity: 1,
     });

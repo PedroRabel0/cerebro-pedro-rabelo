@@ -34,17 +34,8 @@ export async function GET(request: Request) {
     return Response.json({ message: "Nenhum perfil ativo encontrado", processed: 0 });
   }
 
-  const results: Array<{
-    profile: string;
-    handle: string;
-    posts_scraped: number;
-    posts_new: number;
-    posts_analyzed: number;
-    error?: string;
-  }> = [];
-
-  // 2. Process each profile
-  for (const profile of profiles) {
+  // 2. Processa um perfil: scrape + dedup + DNA em lotes + insert em lote.
+  async function processProfile(profile: NonNullable<typeof profiles>[number]) {
     const profileResult = {
       profile: profile.display_name,
       handle: profile.handle,
@@ -57,8 +48,7 @@ export async function GET(request: Request) {
     try {
       if (profile.platform !== "instagram") {
         profileResult.error = `Plataforma ${profile.platform} não suportada`;
-        results.push(profileResult);
-        continue;
+        return profileResult;
       }
 
       log.info(`[Cron Antena] Scraping @${profile.handle}...`);
@@ -68,7 +58,6 @@ export async function GET(request: Request) {
 
       if ("error" in scraped) {
         profileResult.error = scraped.error;
-        results.push(profileResult);
 
         await supabase.from("activity_log").insert({
           actor: "ia",
@@ -77,7 +66,7 @@ export async function GET(request: Request) {
           entity_id: profile.id,
           entity_title: profile.display_name,
         });
-        continue;
+        return profileResult;
       }
 
       profileResult.posts_scraped = scraped.length;
@@ -123,32 +112,36 @@ export async function GET(request: Request) {
           })
         );
 
-        // Save all posts from this batch
-        for (const { post, dna } of batchResults) {
-          const postUrl = post.owner_username
+        // Salva o lote em UM insert (antes: 1 round-trip por post). O client
+        // Supabase nao lanca — checar { error } e propagar pro catch do perfil.
+        const rows = batchResults.map(({ post, dna }) => ({
+          profile_id: profile.id,
+          platform: "instagram",
+          url: post.owner_username
             ? `https://www.instagram.com/${post.owner_username}/`
-            : null;
+            : null,
+          thumbnail_url: post.thumbnail_url,
+          caption_text: post.caption,
+          likes: post.likes,
+          comments: post.comments,
+          engagement_rate: post.engagement_rate,
+          posted_at: post.posted_at,
+          dna_hook_type: dna.hook_type || null,
+          dna_structure: dna.structure || null,
+          dna_length: dna.length || null,
+          dna_tone: dna.tone || null,
+          dna_cta_type: dna.cta_type || null,
+          dna_main_theme: dna.main_theme || null,
+          dna_sub_theme: dna.sub_theme || null,
+          dna_thesis: dna.thesis || null,
+          saved_as_reference: true,
+        }));
 
-          await supabase.from("reference_posts").insert({
-            profile_id: profile.id,
-            platform: "instagram",
-            url: postUrl,
-            thumbnail_url: post.thumbnail_url,
-            caption_text: post.caption,
-            likes: post.likes,
-            comments: post.comments,
-            engagement_rate: post.engagement_rate,
-            posted_at: post.posted_at,
-            dna_hook_type: dna.hook_type || null,
-            dna_structure: dna.structure || null,
-            dna_length: dna.length || null,
-            dna_tone: dna.tone || null,
-            dna_cta_type: dna.cta_type || null,
-            dna_main_theme: dna.main_theme || null,
-            dna_sub_theme: dna.sub_theme || null,
-            dna_thesis: dna.thesis || null,
-            saved_as_reference: true,
-          });
+        if (rows.length > 0) {
+          const { error: insertError } = await supabase
+            .from("reference_posts")
+            .insert(rows);
+          if (insertError) throw new Error(insertError.message);
         }
       }
 
@@ -176,8 +169,12 @@ export async function GET(request: Request) {
       log.error(`[Cron Antena] Error processing @${profile.handle}:` + " " + String(message));
     }
 
-    results.push(profileResult);
+    return profileResult;
   }
+
+  // Todos os perfis em PARALELO — sequencial, 3+ perfis estouravam o
+  // maxDuration de 60s; falha de um perfil nao derruba os demais.
+  const results = await Promise.all(profiles.map(processProfile));
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   const totalNew = results.reduce((sum, r) => sum + r.posts_new, 0);

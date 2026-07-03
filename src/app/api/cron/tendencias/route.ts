@@ -32,67 +32,77 @@ export async function GET(request: Request) {
     return Response.json({ message: "Nenhum perfil ativo", profiles_processed: 0 });
   }
 
-  // 2. Scrape each Instagram profile
-  let totalNewPosts = 0;
-  const scrapeResults: Array<{ handle: string; posts_new: number; error?: string }> = [];
+  // 2. Scrape todos os perfis em PARALELO — sequencial, 3+ perfis (~10-30s
+  // cada no Apify) estouravam o maxDuration de 60s e o scan do dia morria
+  // sem ser salvo. Falha de um perfil nao derruba os demais.
+  const scrapeResults = await Promise.all(
+    profiles.map(
+      async (profile): Promise<{ handle: string; posts_new: number; error?: string }> => {
+        if (profile.platform !== "instagram") {
+          return { handle: profile.handle, posts_new: 0, error: "Plataforma nao suportada" };
+        }
 
-  for (const profile of profiles) {
-    if (profile.platform !== "instagram") {
-      scrapeResults.push({ handle: profile.handle, posts_new: 0, error: "Plataforma nao suportada" });
-      continue;
-    }
+        try {
+          const scraped = await scrapeInstagramProfile(profile.handle, 15);
+          if ("error" in scraped) {
+            return { handle: profile.handle, posts_new: 0, error: scraped.error };
+          }
 
-    try {
-      const scraped = await scrapeInstagramProfile(profile.handle, 15);
-      if ("error" in scraped) {
-        scrapeResults.push({ handle: profile.handle, posts_new: 0, error: scraped.error });
-        continue;
+          // Dedup
+          const { data: existing } = await supabase
+            .from("reference_posts")
+            .select("caption_text")
+            .eq("profile_id", profile.id);
+
+          const existingCaptions = new Set(
+            (existing || []).map((p) => p.caption_text?.slice(0, 100)?.toLowerCase()).filter(Boolean)
+          );
+
+          const rows = scraped
+            .filter(
+              (post) =>
+                !(post.caption && existingCaptions.has(post.caption.slice(0, 100).toLowerCase()))
+            )
+            .map((post) => ({
+              profile_id: profile.id,
+              platform: "instagram",
+              url: post.owner_username ? `https://www.instagram.com/${post.owner_username}/` : null,
+              thumbnail_url: post.thumbnail_url,
+              caption_text: post.caption,
+              likes: post.likes,
+              comments: post.comments,
+              engagement_rate: post.engagement_rate,
+              posted_at: post.posted_at,
+              saved_as_reference: true,
+            }));
+
+          if (rows.length > 0) {
+            // Insert em LOTE (antes: 1 round-trip por post). O client Supabase
+            // NAO lanca — checar { error } de verdade.
+            const { error: insertError } = await supabase.from("reference_posts").insert(rows);
+            if (insertError) {
+              return { handle: profile.handle, posts_new: 0, error: insertError.message };
+            }
+          }
+
+          await supabase
+            .from("reference_profiles")
+            .update({ last_scraped_at: new Date().toISOString() })
+            .eq("id", profile.id);
+
+          return { handle: profile.handle, posts_new: rows.length };
+        } catch (err) {
+          return {
+            handle: profile.handle,
+            posts_new: 0,
+            error: err instanceof Error ? err.message : "Erro",
+          };
+        }
       }
+    )
+  );
 
-      // Dedup
-      const { data: existing } = await supabase
-        .from("reference_posts")
-        .select("caption_text")
-        .eq("profile_id", profile.id);
-
-      const existingCaptions = new Set(
-        (existing || []).map((p) => p.caption_text?.slice(0, 100)?.toLowerCase()).filter(Boolean)
-      );
-
-      let newCount = 0;
-      for (const post of scraped) {
-        if (post.caption && existingCaptions.has(post.caption.slice(0, 100).toLowerCase())) continue;
-
-        await supabase.from("reference_posts").insert({
-          profile_id: profile.id,
-          platform: "instagram",
-          url: post.owner_username ? `https://www.instagram.com/${post.owner_username}/` : null,
-          thumbnail_url: post.thumbnail_url,
-          caption_text: post.caption,
-          likes: post.likes,
-          comments: post.comments,
-          engagement_rate: post.engagement_rate,
-          posted_at: post.posted_at,
-          saved_as_reference: true,
-        });
-        newCount++;
-      }
-
-      await supabase
-        .from("reference_profiles")
-        .update({ last_scraped_at: new Date().toISOString() })
-        .eq("id", profile.id);
-
-      totalNewPosts += newCount;
-      scrapeResults.push({ handle: profile.handle, posts_new: newCount });
-    } catch (err) {
-      scrapeResults.push({
-        handle: profile.handle,
-        posts_new: 0,
-        error: err instanceof Error ? err.message : "Erro",
-      });
-    }
-  }
+  const totalNewPosts = scrapeResults.reduce((sum, r) => sum + r.posts_new, 0);
 
   // 3. Fetch all posts from last 30 days for analysis
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -224,20 +234,21 @@ Gere JSON:
     }
   }
 
-  // 7. Save scan
-  try {
-    await supabase.from("trend_scans").insert({
-      scanned_at: new Date().toISOString(),
-      profiles_scanned: profiles.length,
-      total_posts_analyzed: posts.length,
-      new_posts_found: totalNewPosts,
-      cross_profile_insights: crossInsights,
-      top_themes: topThemes,
-      content_recommendations: contentRecs,
-      per_profile_summary: perProfileSummary,
-    });
-  } catch {
-    log.error("[Cron Tendencias] Failed to save scan — table may not exist");
+  // 7. Save scan — o client Supabase NAO lanca excecao (o try/catch antigo
+  // era codigo morto): checar { error } de verdade, senao o radar do dia
+  // falha em silencio e o cron reporta sucesso.
+  const { error: scanError } = await supabase.from("trend_scans").insert({
+    scanned_at: new Date().toISOString(),
+    profiles_scanned: profiles.length,
+    total_posts_analyzed: posts.length,
+    new_posts_found: totalNewPosts,
+    cross_profile_insights: crossInsights,
+    top_themes: topThemes,
+    content_recommendations: contentRecs,
+    per_profile_summary: perProfileSummary,
+  });
+  if (scanError) {
+    log.error("[Cron Tendencias] Failed to save scan:" + " " + scanError.message);
   }
 
   // 8. Log
@@ -249,6 +260,22 @@ Gere JSON:
   });
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+  // Scan nao salvo = o radar do dia nao existe. Retornar 500 faz a Vercel
+  // marcar a execucao do cron como falha (visivel no dashboard) em vez de
+  // reportar sucesso com o resultado perdido.
+  if (scanError) {
+    return Response.json(
+      {
+        error: "Radar rodou mas o scan nao foi salvo",
+        details: scanError.message,
+        profiles_processed: profiles.length,
+        total_new_posts: totalNewPosts,
+        scrape_results: scrapeResults,
+      },
+      { status: 500 }
+    );
+  }
 
   return Response.json({
     message: `Radar concluido em ${elapsed}s`,
