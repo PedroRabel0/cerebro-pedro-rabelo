@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
 import { generateImagePrompt } from "@/lib/ai/gemini";
 import { generateImage } from "@/lib/ai/image-gen";
+import { uploadImageToStorage } from "@/lib/supabase/storage";
 import { findSimilarPlaybooks } from "@/lib/ai/embeddings";
 import type { ContentType } from "@/lib/supabase/types";
 import { requireStaff } from "@/lib/api-guards";
@@ -1765,8 +1766,17 @@ export async function generateImageForContent(
       return { error: imageResult.error };
     }
 
-    // Step 3: Save to DB
-    const imageUrl = `data:image/${imageResult.format};base64,${imageResult.base64}`;
+    // Step 4: Sobe a imagem pro Supabase Storage e salva so a URL publica.
+    // Antes o data URL base64 (1-3MB) era gravado direto em image_url no
+    // Postgres: a listagem crescia megabytes por post e a resposta da action
+    // podia estourar o limite de ~4.5MB da Vercel DEPOIS de pagar a geracao.
+    const dataUrl = `data:image/${imageResult.format};base64,${imageResult.base64}`;
+    const publicUrl = await uploadImageToStorage(dataUrl, contentId);
+    if (!publicUrl) {
+      // Fallback: nao perde a imagem ja paga se o Storage falhar
+      log.error("[ImageForContent] Storage upload failed — saving data URL as fallback");
+    }
+    const imageUrl = publicUrl || dataUrl;
 
     await supabase.from("generated_contents").update({
       image_url: imageUrl,

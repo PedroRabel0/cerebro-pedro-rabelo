@@ -14,6 +14,7 @@ import {
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
+import { parseCarouselSlides } from "./carousel";
 import { useConfirm } from "@/components/ConfirmProvider";
 import {
   MessageSquare,
@@ -306,30 +307,6 @@ function PublishedUrlInput({
       </button>
     </div>
   );
-}
-
-function parseCarouselSlides(content: string): {
-  slides: string[];
-  hook: string;
-  cta: string;
-} {
-  const parts = content
-    .split(/---|\n\n(?=\d+\.)/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (parts.length >= 3) {
-    return {
-      hook: parts[0],
-      slides: parts.slice(1, -1),
-      cta: parts[parts.length - 1],
-    };
-  }
-  const lines = content.split(/\n\n+/).filter((s) => s.trim());
-  return {
-    hook: lines[0] || "",
-    slides: lines.slice(1, -1),
-    cta: lines[lines.length - 1] || "",
-  };
 }
 
 // --- Image Upload Button for content card ---

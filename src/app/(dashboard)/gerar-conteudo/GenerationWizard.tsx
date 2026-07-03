@@ -6,6 +6,7 @@ import { createWizardContent, updateContentStatus, generateImageForContent, uplo
 import type { StorySuggestion } from "./actions";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
+import { parseCarouselSlides } from "./carousel";
 import {
   Sparkles,
   Copy,
@@ -937,34 +938,6 @@ function SourceMapDisplay({ sourceMap }: { sourceMap: Record<string, unknown> | 
       ))}
     </div>
   );
-}
-
-// --- Carousel Parsing ---
-
-function parseCarouselSlides(content: string): {
-  slides: string[];
-  hook: string;
-  cta: string;
-} {
-  // Try splitting by --- or numbered markers (1., 2., etc.)
-  const parts = content
-    .split(/---|\n\n(?=\d+\.)/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (parts.length >= 3) {
-    return {
-      hook: parts[0],
-      slides: parts.slice(1, -1),
-      cta: parts[parts.length - 1],
-    };
-  }
-  // Fallback: split by double newlines
-  const lines = content.split(/\n\n+/).filter((s) => s.trim());
-  return {
-    hook: lines[0] || "",
-    slides: lines.slice(1, -1),
-    cta: lines[lines.length - 1] || "",
-  };
 }
 
 function CarouselDesignPreview({
