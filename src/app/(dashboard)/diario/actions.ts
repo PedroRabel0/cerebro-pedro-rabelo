@@ -4,12 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getClient, logCost } from "@/lib/ai/client";
 import { log } from "@/lib/logger";
 import { revalidatePath } from "next/cache";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/diario";
 
 // --- Journal Entries ---
 
 export async function getEntries(limit = 30) {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("journal_entries")
@@ -21,6 +23,7 @@ export async function getEntries(limit = 30) {
 }
 
 export async function getEntryByDate(date: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("journal_entries")
@@ -39,6 +42,7 @@ export async function saveEntry(data: {
   challenges?: string;
   decisions?: string;
 }) {
+  await requireStaff();
   const supabase = await createClient();
 
   // Check if entry already exists for this date + author
@@ -80,6 +84,7 @@ export async function saveEntry(data: {
 }
 
 export async function deleteEntry(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("journal_entries")
@@ -90,6 +95,7 @@ export async function deleteEntry(id: string) {
 }
 
 export async function generateDaySummary(entryId: string) {
+  await requireStaff();
   const supabase = await createClient();
 
   // 1. Fetch the journal entry

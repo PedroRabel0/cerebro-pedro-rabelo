@@ -27,6 +27,7 @@ export type RuleCategory =
 // Categories: conteudo, formato, plataforma, metrica, marca, geral
 
 export async function getRules(): Promise<DecisionRule[]> {
+  await requireAdmin();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("decision_rules")

@@ -6,7 +6,7 @@ import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { findSimilarPlaybooks, updatePlaybookEmbedding } from "@/lib/ai/embeddings";
 import { buildContentGenerationSystemPrompt } from "@/lib/ai/prompts";
 import { isGoogleConnected, createCalendarEvent, createTimedCalendarEvent, listCalendars, listUpcomingEvents, getCalendarEvent, patchCalendarEvent } from "@/lib/google-calendar";
-import { requireUser, requireStaff } from "@/lib/api-guards";
+import { requireStaff } from "@/lib/api-guards";
 import { log } from "@/lib/logger";
 import type {
   ConsultingCompany,
@@ -93,6 +93,7 @@ export async function getConsultoriaData(): Promise<{
   companies: CompanyWithCounts[];
   overview: ConsultoriaOverview;
 }> {
+  await requireStaff();
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -178,6 +179,7 @@ export interface DailyDigest {
  * renovacoes proximas, pagamentos pendentes e clientes esfriando. So leitura.
  */
 export async function getDailyDigest(): Promise<DailyDigest> {
+  await requireStaff();
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -279,6 +281,7 @@ export interface CompanyDetail {
 }
 
 export async function getCompany(id: string): Promise<CompanyDetail | null> {
+  await requireStaff();
   const supabase = await createClient();
 
   const { data: company } = await supabase
@@ -330,7 +333,7 @@ export async function createCompany(input: {
   sector?: string;
   goal?: string;
 }): Promise<{ id: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   if (!input.name?.trim()) return { error: "Nome da empresa e obrigatorio." };
 
@@ -349,7 +352,7 @@ export async function updateCompany(
   id: string,
   fields: Partial<Pick<ConsultingCompany, "name" | "sector" | "goal" | "status" | "contract_status" | "contract_value" | "payment_status" | "notes" | "monthly_fee" | "billing_day" | "contract_start" | "contract_end">>
 ): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("consulting_companies")
@@ -366,7 +369,7 @@ export async function updateCompany(
  * uma interacao que nao virou reuniao registrada (call rapida, troca no grupo).
  */
 export async function touchCompany(id: string): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("consulting_companies")
@@ -379,7 +382,7 @@ export async function touchCompany(id: string): Promise<{ ok: true } | { error: 
 }
 
 export async function deleteCompany(id: string): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_companies").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -395,7 +398,7 @@ export async function createContact(
   companyId: string,
   input: { name: string; role?: string; whatsapp?: string; email?: string; is_primary?: boolean; consent?: boolean }
 ): Promise<{ id: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   if (!input.name?.trim()) return { error: "Nome do contato e obrigatorio." };
 
@@ -419,7 +422,7 @@ export async function createContact(
 }
 
 export async function deleteContact(id: string, companyId: string): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_contacts").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -460,7 +463,7 @@ export async function createMeeting(
   companyId: string,
   input: { title: string; held_at?: string; transcript?: string }
 ): Promise<{ id: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   if (!input.title?.trim()) return { error: "Titulo da reuniao e obrigatorio." };
 
@@ -484,7 +487,7 @@ export async function createMeeting(
 }
 
 export async function deleteMeeting(id: string, companyId: string): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_meetings").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -499,7 +502,7 @@ export async function deleteMeeting(id: string, companyId: string): Promise<{ ok
 export async function processMeeting(
   meetingId: string
 ): Promise<{ created: number } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
 
   const { data: meeting } = await supabase
@@ -644,7 +647,7 @@ export async function createTask(
   companyId: string,
   input: { description: string; owner_name?: string; due_date?: string; contact_id?: string }
 ): Promise<{ id: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   if (!input.description?.trim()) return { error: "Descricao da tarefa e obrigatoria." };
 
@@ -672,7 +675,7 @@ export async function updateTask(
   companyId: string,
   fields: Partial<Pick<ConsultingTask, "description" | "owner_name" | "due_date" | "remind_at" | "status" | "contact_id">>
 ): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("consulting_tasks")
@@ -684,7 +687,7 @@ export async function updateTask(
 }
 
 export async function deleteTask(id: string, companyId: string): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_tasks").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -699,7 +702,7 @@ export async function deleteTask(id: string, companyId: string): Promise<{ ok: t
 export async function generateTaskMessage(
   taskId: string
 ): Promise<{ message: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
 
   const { data: task } = await supabase.from("consulting_tasks").select("*").eq("id", taskId).single();
@@ -748,7 +751,7 @@ export async function uploadDocument(
   companyId: string,
   formData: FormData
 ): Promise<{ id: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const file = formData.get("file") as File | null;
   const kind = ((formData.get("kind") as string) || "outro") as ConsultingDocument["kind"];
@@ -775,7 +778,7 @@ export async function uploadDocument(
 }
 
 export async function getDocumentUrl(docId: string): Promise<{ url: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { data: doc } = await supabase.from("consulting_documents").select("storage_path").eq("id", docId).single();
   if (!doc) return { error: "Documento nao encontrado." };
@@ -785,7 +788,7 @@ export async function getDocumentUrl(docId: string): Promise<{ url: string } | {
 }
 
 export async function deleteDocument(id: string, companyId: string): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { data: doc } = await supabase.from("consulting_documents").select("storage_path").eq("id", id).single();
   if (doc?.storage_path) {
@@ -805,7 +808,7 @@ export async function createStep(
   companyId: string,
   input: { title: string; target_date?: string }
 ): Promise<{ id: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   if (!input.title?.trim()) return { error: "Titulo do passo e obrigatorio." };
 
@@ -825,7 +828,7 @@ export async function createStep(
 }
 
 export async function toggleStep(id: string, companyId: string, done: boolean): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("consulting_steps")
@@ -837,7 +840,7 @@ export async function toggleStep(id: string, companyId: string, done: boolean): 
 }
 
 export async function deleteStep(id: string, companyId: string): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_steps").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -853,7 +856,7 @@ export async function createWin(
   companyId: string,
   input: { description: string; metric?: string; achieved_on?: string }
 ): Promise<{ id: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   if (!input.description?.trim()) return { error: "Descreva a vitoria/resultado." };
 
@@ -873,7 +876,7 @@ export async function createWin(
 }
 
 export async function deleteWin(id: string, companyId: string): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_wins").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -893,7 +896,7 @@ export async function deleteWin(id: string, companyId: string): Promise<{ ok: tr
 export async function generateMeetingAgenda(
   companyId: string
 ): Promise<{ agenda: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
 
   const [{ data: company }, { data: tasks }, { data: meetings }, { data: wins }] = await Promise.all([
@@ -968,7 +971,7 @@ Responda SOMENTE com a pauta em markdown: um titulo curto e 4-7 topicos com bull
 // ============================================================
 
 export async function getGoogleStatus(): Promise<{ connected: boolean }> {
-  const user = await requireUser();
+  const user = await requireStaff();
   return { connected: await isGoogleConnected(user.id) };
 }
 
@@ -980,7 +983,7 @@ export async function addTaskReminderToCalendar(
   taskId: string,
   calendarId: string = "primary"
 ): Promise<{ ok: true } | { error: string }> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const supabase = await createClient();
 
   const { data: task } = await supabase.from("consulting_tasks").select("*").eq("id", taskId).single();
@@ -1003,7 +1006,7 @@ export async function addTaskReminderToCalendar(
 
 /** Lista as agendas em que da pra escrever (sua + as do Pedro compartilhadas). */
 export async function getCalendarList(): Promise<{ id: string; summary: string }[]> {
-  const user = await requireUser();
+  const user = await requireStaff();
   return listCalendars(user.id);
 }
 
@@ -1024,7 +1027,7 @@ export async function getCalendarSuggestions(): Promise<{
   suggestions: CalendarSuggestion[];
   calendars: string[];
 }> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const supabase = await createClient();
 
   const [events, cals, companiesRes, contactsRes] = await Promise.all([
@@ -1080,7 +1083,7 @@ export async function importMeetingFromCalendar(
   title: string,
   heldAt: string
 ): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const when = heldAt || new Date().toISOString();
   const { error } = await supabase.from("consulting_meetings").insert({
@@ -1115,7 +1118,7 @@ export async function scheduleMeeting(
     attendees?: string[]; // emails dos convidados
   }
 ): Promise<{ ok: true } | { error: string }> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const supabase = await createClient();
 
   if (!input.title?.trim()) return { error: "Titulo da reuniao e obrigatorio." };
@@ -1183,7 +1186,7 @@ export async function updateMeetingOnCalendar(
   meetingId: string,
   instruction: string
 ): Promise<{ ok: true; summary: string } | { error: string }> {
-  const user = await requireUser();
+  const user = await requireStaff();
   const supabase = await createClient();
   if (!instruction.trim()) return { error: "Escreva o que mudar." };
 
@@ -1301,7 +1304,7 @@ export async function askConsultoria(
   companyId: string,
   question: string
 ): Promise<{ answer: string } | { error: string }> {
-  await requireUser();
+  await requireStaff();
   if (!question.trim()) return { error: "Faca uma pergunta." };
   const supabase = await createClient();
 
@@ -1374,7 +1377,7 @@ Responda de forma pratica e direta, no tom do Pedro, usando o conhecimento acima
 export async function getCompanyChat(companyId: string): Promise<
   { id: string; question: string; answer: string | null; has_context: boolean; created_at: string }[]
 > {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { data } = await supabase
     .from("consulting_chat_messages")
@@ -1394,7 +1397,7 @@ export async function getCompanyChat(companyId: string): Promise<
 export async function getPendingQuestions(companyId: string): Promise<
   { id: string; question: string; asked_by_name: string | null; created_at: string }[]
 > {
-  await requireUser();
+  await requireStaff();
   const supabase = await createClient();
   const { data } = await supabase
     .from("consulting_pending_questions")

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { isAuthorizedAdmin } from "@/lib/api-guards";
 
 // Credentials from environment variables — NEVER hardcode
 const USERS = [
@@ -18,10 +19,8 @@ const USERS = [
 ];
 
 export async function GET(request: Request) {
-  // Security: require ADMIN_SECRET in all environments
-  const url = new URL(request.url);
-  const secret = url.searchParams.get("secret");
-  if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
+  // Security: Authorization: Bearer $ADMIN_SECRET (header, timing-safe)
+  if (!isAuthorizedAdmin(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

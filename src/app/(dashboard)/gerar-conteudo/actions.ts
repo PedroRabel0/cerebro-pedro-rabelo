@@ -9,6 +9,7 @@ import { generateImagePrompt } from "@/lib/ai/gemini";
 import { generateImage } from "@/lib/ai/image-gen";
 import { findSimilarPlaybooks } from "@/lib/ai/embeddings";
 import type { ContentType } from "@/lib/supabase/types";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/gerar-conteudo";
 
@@ -131,6 +132,7 @@ async function findRelevantKnowledge(
 // --- Content Formats ---
 
 export async function getFormats() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("content_formats")
@@ -141,6 +143,7 @@ export async function getFormats() {
 }
 
 export async function createFormat(formData: FormData) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("content_formats").insert({
     name: formData.get("name") as string,
@@ -153,6 +156,7 @@ export async function createFormat(formData: FormData) {
 }
 
 export async function deleteFormat(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("content_formats")
@@ -165,6 +169,7 @@ export async function deleteFormat(id: string) {
 // --- Generated Contents ---
 
 export async function getGeneratedContents() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("generated_contents")
@@ -177,6 +182,7 @@ export async function getGeneratedContents() {
 }
 
 export async function createGeneratedContent(formData: FormData) {
+  await requireStaff();
   const supabase = await createClient();
   const sourceType = formData.get("source_type") as string;
   const playbookId = (formData.get("playbook_id") as string) || null;
@@ -284,6 +290,7 @@ export async function createGeneratedContent(formData: FormData) {
 export async function createQuickContent(
   formData: FormData
 ): Promise<{ content: string; id: string } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
   const topic = formData.get("topic") as string;
   const contentType = formData.get("content_type") as string;
@@ -440,6 +447,7 @@ export async function updateContentStatus(
   feedbackRating?: string,
   feedbackText?: string
 ) {
+  await requireStaff();
   const supabase = await createClient();
   const update: Record<string, unknown> = { status };
   if (feedbackRating !== undefined) update.feedback_rating = feedbackRating;
@@ -454,6 +462,7 @@ export async function updateContentStatus(
 }
 
 export async function deleteContent(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("generated_contents")
@@ -466,6 +475,7 @@ export async function deleteContent(id: string) {
 // --- Lookup data ---
 
 export async function getPlaybooks() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("playbooks")
@@ -476,6 +486,7 @@ export async function getPlaybooks() {
 }
 
 export async function getStories() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("stories")
@@ -486,6 +497,7 @@ export async function getStories() {
 }
 
 export async function getThemes() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("themes")
@@ -498,6 +510,7 @@ export async function getThemes() {
 // --- AI Topic Suggestions ---
 
 export async function suggestTopics(): Promise<{ topics: string[] } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
 
   try {
@@ -628,6 +641,7 @@ export interface WizardResult {
 export async function createWizardContent(
   payload: WizardPayload
 ): Promise<{ results: WizardResult[] } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
 
   if (!payload.contentTypes || payload.contentTypes.length === 0) {
@@ -1302,6 +1316,7 @@ export async function uploadImageToContent(
   contentId: string,
   formData: FormData
 ): Promise<{ imageUrl: string } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
 
   try {
@@ -1382,6 +1397,7 @@ export async function refineContent(
   _alsoRefinePrompt?: boolean,
   currentPrompt?: string | null,
 ): Promise<{ text: string; imagePrompt?: string | null } | { error: string }> {
+  await requireStaff();
   try {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 50_000, maxRetries: 0 });
@@ -1494,6 +1510,7 @@ Responda APENAS com o JSON, nada antes ou depois.`;
 export async function removeContentImage(
   contentId: string
 ): Promise<{ success: boolean } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
 
   try {
@@ -1553,6 +1570,7 @@ export async function addStoryToContent(
   currentText: string,
   contentType: string,
 ): Promise<{ text: string } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
 
   try {
@@ -1626,6 +1644,7 @@ Responda APENAS com o conteúdo atualizado. Nada antes, nada depois.`,
 }
 
 export async function savePublishedUrl(contentId: string, url: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("generated_contents")
@@ -1636,6 +1655,7 @@ export async function savePublishedUrl(contentId: string, url: string) {
 }
 
 export async function updateContentText(id: string, text: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("generated_contents")
@@ -1655,6 +1675,7 @@ export async function generateImageForContent(
   contentText: string,
   contentType: string,
 ): Promise<{ imageUrl: string; imagePrompt: string } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
 
   try {

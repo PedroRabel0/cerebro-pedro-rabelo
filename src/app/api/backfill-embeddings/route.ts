@@ -1,15 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { updatePlaybookEmbedding } from "@/lib/ai/embeddings";
 import { NextResponse } from "next/server";
+import { isAuthorizedAdmin } from "@/lib/api-guards";
 
 // Gera embeddings para os playbooks que ainda nao tem (embedding IS NULL) —
 // necessario para o RAG do chat do cerebro funcionar sobre a base ja existente.
 // Idempotente e re-executavel: rode ate `restantes` chegar a 0.
-// Protegido por ADMIN_SECRET. Uso: GET /api/backfill-embeddings?secret=...&limit=50
+// Protegido por ADMIN_SECRET via header (timing-safe). Uso:
+//   curl -H "Authorization: Bearer $ADMIN_SECRET" .../api/backfill-embeddings?limit=50
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const secret = url.searchParams.get("secret");
-  if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
+  if (!isAuthorizedAdmin(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

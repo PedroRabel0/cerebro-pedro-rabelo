@@ -2,7 +2,7 @@
 
 
 import { log } from '@/lib/logger';
-import { requireAdmin } from "@/lib/api-guards";
+import { requireAdmin, requireStaff } from "@/lib/api-guards";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { analyzeCompleteness, generateBookQuestions } from "@/lib/ai";
@@ -14,6 +14,7 @@ import type { PlaybookEstrutura, PerguntaAberta } from "@/lib/supabase/types";
 // --- Themes ---
 
 export async function getThemes() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("themes")
@@ -24,6 +25,7 @@ export async function getThemes() {
 }
 
 export async function createTheme(formData: FormData) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("themes").insert({
     name: formData.get("name") as string,
@@ -35,6 +37,7 @@ export async function createTheme(formData: FormData) {
 }
 
 export async function deleteTheme(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("themes").delete().eq("id", id);
   if (error) throw error;
@@ -44,6 +47,7 @@ export async function deleteTheme(id: string) {
 // --- Playbooks ---
 
 export async function getPlaybooks() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("playbooks")
@@ -54,6 +58,7 @@ export async function getPlaybooks() {
 }
 
 export async function getPlaybook(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("playbooks")
@@ -65,6 +70,7 @@ export async function getPlaybook(id: string) {
 }
 
 export async function createPlaybook(formData: FormData) {
+  await requireStaff();
   const supabase = await createClient();
   const createdBy = (formData.get("created_by") as string) || "pedro";
   const { error } = await supabase.from("playbooks").insert({
@@ -88,6 +94,7 @@ export async function createPlaybook(formData: FormData) {
 }
 
 export async function updatePlaybook(id: string, formData: FormData) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("playbooks")
@@ -103,6 +110,7 @@ export async function updatePlaybook(id: string, formData: FormData) {
 }
 
 export async function togglePlaybookOrigin(id: string, newOrigin: "pedro" | "outros") {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("playbooks")
@@ -113,6 +121,7 @@ export async function togglePlaybookOrigin(id: string, newOrigin: "pedro" | "out
 }
 
 export async function deletePlaybook(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("playbooks").delete().eq("id", id);
   if (error) throw error;
@@ -138,6 +147,7 @@ export async function setPlaybookShareable(playbookId: string, value: boolean) {
 // --- Histórias Pessoais (Epiphany Bridge) ---
 
 export async function getHistoriasPessoais() {
+  await requireStaff();
   const supabase = await createClient();
   try {
     const { data, error } = await supabase
@@ -156,6 +166,7 @@ export async function getHistoriasPessoais() {
 }
 
 export async function deleteHistoriaPessoal(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("historias_pessoais").delete().eq("id", id);
   if (error) throw error;
@@ -165,6 +176,7 @@ export async function deleteHistoriaPessoal(id: string) {
 // --- Stories ---
 
 export async function getStories() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("stories")
@@ -175,6 +187,7 @@ export async function getStories() {
 }
 
 export async function getStory(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("stories")
@@ -186,6 +199,7 @@ export async function getStory(id: string) {
 }
 
 export async function createStory(formData: FormData) {
+  await requireStaff();
   const supabase = await createClient();
   const createdBy = (formData.get("created_by") as string) || "pedro";
   const tagsRaw = formData.get("tags") as string;
@@ -216,6 +230,7 @@ export async function createStory(formData: FormData) {
 }
 
 export async function updateStory(id: string, formData: FormData) {
+  await requireStaff();
   const supabase = await createClient();
   const tagsRaw = formData.get("tags") as string;
   const tags = tagsRaw
@@ -238,6 +253,7 @@ export async function updateStory(id: string, formData: FormData) {
 }
 
 export async function toggleStoryOrigin(id: string, newOrigin: "pedro" | "outros") {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("stories")
@@ -248,6 +264,7 @@ export async function toggleStoryOrigin(id: string, newOrigin: "pedro" | "outros
 }
 
 export async function deleteStory(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("stories").delete().eq("id", id);
   if (error) throw error;
@@ -257,6 +274,7 @@ export async function deleteStory(id: string) {
 // --- Playbook Completeness Analysis ---
 
 export async function analyzePlaybookCompleteness(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { data: playbook, error } = await supabase
     .from("playbooks")
@@ -294,6 +312,7 @@ export async function analyzePlaybookCompleteness(id: string) {
 // --- Book Questions ---
 
 export async function getBookQuestions(playbookId: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { data: playbook, error } = await supabase
     .from("playbooks")
@@ -316,6 +335,7 @@ export async function saveQuestionAnswer(
   questionText: string,
   answer: string
 ) {
+  await requireStaff();
   const supabase = await createClient();
   const { data: playbook, error } = await supabase
     .from("playbooks")
@@ -368,6 +388,7 @@ export async function answerGapQuestion(
   questionIndex: number,
   answer: string,
 ): Promise<{ success: boolean; error?: string }> {
+  await requireStaff();
   const supabase = await createClient();
 
   const { data: playbook, error: fetchError } = await supabase
@@ -466,6 +487,7 @@ Responda SOMENTE com o JSON.`;
  * Retorna o id do playbook migrado ou erro.
  */
 export async function migratePlaybookToV2(playbookId: string): Promise<{ success: boolean; error?: string }> {
+  await requireStaff();
   const supabase = await createClient();
 
   const { data: playbook, error: fetchError } = await supabase
@@ -575,6 +597,7 @@ export async function migrateAllPlaybooks(): Promise<{
   skipped: number;
   errors: string[];
 }> {
+  await requireStaff();
   const supabase = await createClient();
 
   const { data: playbooks, error } = await supabase

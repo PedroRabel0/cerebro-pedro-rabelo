@@ -7,12 +7,14 @@ import { revalidatePath } from "next/cache";
 import { processCapture } from "@/lib/ai";
 import { updatePlaybookEmbedding } from "@/lib/ai/embeddings";
 import { generateGapQuestions, calculateCompletude } from "@/lib/ai/kb-pipeline";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/insights-pedro";
 
 // --- Captures ---
 
 export async function getCaptures() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("captures")
@@ -24,6 +26,7 @@ export async function getCaptures() {
 }
 
 export async function createCapture(formData: FormData) {
+  await requireStaff();
   const supabase = await createClient();
   const rawContent = (formData.get("raw_content") as string) || null;
   const sourceType = formData.get("source_type") as string;
@@ -75,6 +78,7 @@ export async function createCapture(formData: FormData) {
 }
 
 export async function deleteCapture(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("captures").delete().eq("id", id);
   if (error) throw error;
@@ -84,6 +88,7 @@ export async function deleteCapture(id: string) {
 // --- Proposals ---
 
 export async function getProposalsByCapture(captureId: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("proposals")
@@ -98,6 +103,7 @@ export async function updateProposalStatus(
   id: string,
   status: "approved" | "rejected"
 ) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("proposals")
@@ -160,6 +166,7 @@ export async function approveProposal(
   proposalId: string,
   origin: "pedro" | "outros" = "pedro"
 ) {
+  await requireStaff();
   const supabase = await createClient();
 
   // 1. Read the proposal
@@ -283,6 +290,7 @@ export async function approveProposal(
 }
 
 export async function rejectProposal(proposalId: string) {
+  await requireStaff();
   const supabase = await createClient();
 
   // 1. Read the proposal for logging
@@ -316,6 +324,7 @@ export async function rejectProposal(proposalId: string) {
 // --- Activity Log ---
 
 export async function getActivityLog() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("activity_log")

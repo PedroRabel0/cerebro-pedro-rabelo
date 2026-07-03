@@ -3,8 +3,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { log } from "@/lib/logger";
+import { requireStaff } from "@/lib/api-guards";
 
 export async function uploadExternalContent(formData: FormData) {
+  await requireStaff();
   const supabase = await createClient();
 
   const title = (formData.get("title") as string) || "Post externo";
@@ -83,6 +85,7 @@ export async function uploadExternalContent(formData: FormData) {
 }
 
 export async function getExternalUploads() {
+  await requireStaff();
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -110,6 +113,7 @@ export interface LinkableContent {
  * de design (carrossel em PDF/imagens) e herdar a legenda automaticamente.
  */
 export async function getLinkableContents(): Promise<LinkableContent[]> {
+  await requireStaff();
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -145,6 +149,7 @@ export async function getLinkableContents(): Promise<LinkableContent[]> {
 export async function uploadSingleSlide(
   formData: FormData
 ): Promise<{ url: string } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
   const file = formData.get("slide") as File | null;
   if (!file || file.size === 0) return { error: "Arquivo vazio." };
@@ -186,6 +191,7 @@ export async function saveDesignUpload(input: {
   title?: string;
   linkedContentId?: string | null;
 }): Promise<{ id: string } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
   const { slideUrls, caption, contentType, title, linkedContentId } = input;
 

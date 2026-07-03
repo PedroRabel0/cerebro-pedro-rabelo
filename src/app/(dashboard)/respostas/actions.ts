@@ -6,12 +6,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { revalidatePath } from "next/cache";
 import type { FaqResponse } from "@/lib/supabase/types";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/respostas";
 
 // --- Fetch responses ---
 
 export async function getResponses(category?: string) {
+  await requireStaff();
   const supabase = await createClient();
   let query = supabase
     .from("faq_responses")
@@ -34,6 +36,7 @@ export async function createResponse(
   answer: string,
   category: string
 ) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("faq_responses").insert({
     question,
@@ -48,6 +51,7 @@ export async function createResponse(
 // --- Delete response ---
 
 export async function deleteResponse(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("faq_responses")
@@ -60,6 +64,7 @@ export async function deleteResponse(id: string) {
 // --- Increment usage ---
 
 export async function incrementUsage(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { data: row, error: fetchError } = await supabase
     .from("faq_responses")
@@ -79,6 +84,7 @@ export async function incrementUsage(id: string) {
 // --- Copy response (tracks usage) ---
 
 export async function copyResponse(id: string) {
+  await requireStaff();
   return incrementUsage(id);
 }
 
@@ -94,6 +100,7 @@ export async function generateResponses(
   topic: string,
   count: number = 5
 ): Promise<{ responses: FaqResponse[] } | { error: string }> {
+  await requireStaff();
   const anthropic = getClient();
   const supabase = await createClient();
 

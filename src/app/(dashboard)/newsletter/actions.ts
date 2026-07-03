@@ -5,12 +5,14 @@ import { revalidatePath } from "next/cache";
 import { getClient, logCost } from "@/lib/ai/client";
 import { buildContentGenerationSystemPrompt } from "@/lib/ai/prompts";
 import type { Newsletter, NewsletterStatus } from "@/lib/supabase/types";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/newsletter";
 
 // --- Fetch all newsletters ---
 
 export async function getNewsletters(): Promise<Newsletter[]> {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("newsletters")
@@ -26,6 +28,7 @@ export async function generateNewsletter(
   theme: string,
   weekLabel?: string
 ): Promise<Newsletter> {
+  await requireStaff();
   const supabase = await createClient();
 
   // Fetch EVERYTHING from this week: identity, content, captures, proposals, activity
@@ -220,6 +223,7 @@ export async function updateNewsletterStatus(
   id: string,
   status: NewsletterStatus
 ) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("newsletters")
@@ -232,6 +236,7 @@ export async function updateNewsletterStatus(
 // --- Update newsletter body ---
 
 export async function updateNewsletterBody(id: string, body: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("newsletters")
@@ -244,6 +249,7 @@ export async function updateNewsletterBody(id: string, body: string) {
 // --- Delete newsletter ---
 
 export async function deleteNewsletter(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("newsletters")

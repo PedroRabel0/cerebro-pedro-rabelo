@@ -2,12 +2,14 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/calendario";
 
 // --- Calendar Entries ---
 
 export async function getCalendarEntries(startDate?: string, endDate?: string) {
+  await requireStaff();
   const supabase = await createClient();
 
   // Default to current month if no range provided
@@ -37,6 +39,7 @@ export async function createCalendarEntry(data: {
   platform: string;
   notes?: string;
 }) {
+  await requireStaff();
   const supabase = await createClient();
 
   const { error } = await supabase.from("calendar_entries").insert({
@@ -61,6 +64,7 @@ export async function updateCalendarEntry(
     notes: string;
   }>
 ) {
+  await requireStaff();
   const supabase = await createClient();
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -79,6 +83,7 @@ export async function updateCalendarEntry(
 }
 
 export async function deleteCalendarEntry(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("calendar_entries")
@@ -89,6 +94,7 @@ export async function deleteCalendarEntry(id: string) {
 }
 
 export async function getUnscheduledContents() {
+  await requireStaff();
   const supabase = await createClient();
 
   // Fetch generated contents that have NO calendar entry linked, with status draft or approved
@@ -120,6 +126,7 @@ export async function scheduleContentFromDraft(
   contentId: string,
   scheduledFor: string
 ) {
+  await requireStaff();
   const supabase = await createClient();
 
   // Fetch the content to get its type and text for the title

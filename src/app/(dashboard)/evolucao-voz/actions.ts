@@ -4,12 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getClient, logCost } from "@/lib/ai/client";
 import { revalidatePath } from "next/cache";
 import type { VoiceSnapshot } from "@/lib/supabase/types";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/evolucao-voz";
 
 // --- Fetch all snapshots ---
 
 export async function getSnapshots(): Promise<VoiceSnapshot[]> {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("voice_snapshots")
@@ -22,6 +24,7 @@ export async function getSnapshots(): Promise<VoiceSnapshot[]> {
 // --- Capture current identity as a new snapshot ---
 
 export async function captureSnapshot(): Promise<void> {
+  await requireStaff();
   const supabase = await createClient();
 
   // 1. Read current identity
@@ -140,6 +143,7 @@ Responda EXATAMENTE neste formato JSON:
 // --- Delete a snapshot ---
 
 export async function deleteSnapshot(id: string): Promise<void> {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("voice_snapshots")

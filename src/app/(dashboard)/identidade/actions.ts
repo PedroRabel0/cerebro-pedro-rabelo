@@ -20,6 +20,7 @@ export interface Identity {
 }
 
 export async function getIdentity(): Promise<Identity | null> {
+  await requireAdmin();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("identity")

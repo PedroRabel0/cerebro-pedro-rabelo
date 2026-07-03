@@ -7,6 +7,7 @@ import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";
 import { revalidatePath } from "next/cache";
 import type { Trend, ReferenceProfile, ReferencePost } from "@/lib/supabase/types";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/tendencias";
 
@@ -15,6 +16,7 @@ const PATH = "/tendencias";
 // ============================================================
 
 export async function getTrends(): Promise<Trend[]> {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("trends")
@@ -30,6 +32,7 @@ export async function createTrend(
   description?: string,
   sourceText?: string
 ) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("trends").insert({
     title,
@@ -45,6 +48,7 @@ export async function createTrend(
 export async function analyzeTrend(
   id: string
 ): Promise<{ success: true } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
   const anthropic = getClient();
 
@@ -140,6 +144,7 @@ JSON:
 }
 
 export async function deleteTrend(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("trends").delete().eq("id", id);
   if (error) throw error;
@@ -151,6 +156,7 @@ export async function deleteTrend(id: string) {
 // ============================================================
 
 export async function getActiveProfiles(): Promise<ReferenceProfile[]> {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("reference_profiles")
@@ -162,6 +168,7 @@ export async function getActiveProfiles(): Promise<ReferenceProfile[]> {
 }
 
 export async function getAllProfiles(): Promise<ReferenceProfile[]> {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("reference_profiles")
@@ -176,6 +183,7 @@ export async function addReferenceProfile(
   handle: string,
   displayName: string
 ): Promise<{ id: string } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
   const cleanHandle = handle.replace(/^@/, "").trim();
 
@@ -215,6 +223,7 @@ export async function addReferenceProfile(
 }
 
 export async function removeReferenceProfile(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("reference_profiles")
@@ -226,6 +235,7 @@ export async function removeReferenceProfile(id: string) {
 }
 
 export async function toggleProfileActive(id: string, active: boolean) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("reference_profiles")
@@ -324,6 +334,7 @@ export interface ScanResult {
  * analyzes cross-profile trends, generates recommendations.
  */
 export async function runRadarScan(): Promise<ScanResult> {
+  await requireStaff();
   const supabase = await createClient();
   const anthropic = getClient();
 
@@ -608,6 +619,7 @@ Gere de 5 a 8 recomendacoes de conteudo. Todas em pt-br. Foque em insights PRATI
 // ============================================================
 
 export async function getLatestScan(): Promise<ScanResult | null> {
+  await requireStaff();
   const supabase = await createClient();
 
   try {
@@ -656,6 +668,7 @@ export interface RecommendationAction {
 export async function acceptRecommendation(
   rec: RecommendationAction
 ): Promise<{ proposal_id: string } | { error: string }> {
+  await requireStaff();
   try {
     const supabase = await createClient();
 
@@ -752,6 +765,7 @@ Baseado em padroes detectados de ${rec.inspired_by}
 export async function rejectRecommendation(
   rec: RecommendationAction
 ): Promise<{ success: true }> {
+  await requireStaff();
   const supabase = await createClient();
 
   await supabase.from("activity_log").insert({
@@ -770,6 +784,7 @@ export async function rejectRecommendation(
  * Used to show status badges on recommendation cards.
  */
 export async function getAcceptedRecommendationTitles(): Promise<Set<string>> {
+  await requireStaff();
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -796,6 +811,7 @@ export interface RadarStats {
 }
 
 export async function getRadarStats(): Promise<RadarStats> {
+  await requireStaff();
   const supabase = await createClient();
 
   const { data: profiles } = await supabase

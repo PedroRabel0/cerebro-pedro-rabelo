@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { findSimilarShareablePlaybooks } from "@/lib/ai/embeddings";
 import { buildContentGenerationSystemPrompt } from "@/lib/ai/prompts";
-import { requireClient } from "@/lib/api-guards";
+import { requireClient, rateLimit } from "@/lib/api-guards";
 import { log } from "@/lib/logger";
 
 const PATH = "/portal";
@@ -83,6 +83,10 @@ export async function askClient(
   try {
     const { user, companyId } = await requireClient();
     if (!question.trim()) return { error: "Faca uma pergunta." };
+    if (!rateLimit(`portal-chat:${user.id}`, 10, 60_000))
+      return {
+        error: "Muitas perguntas em sequencia — aguarde um minuto e tente de novo.",
+      };
 
     const db = await createClient();
 

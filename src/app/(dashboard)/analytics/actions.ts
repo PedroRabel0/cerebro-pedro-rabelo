@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { getClient, logCost } from "@/lib/ai/client";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";
 import type { ContentMetric } from "@/lib/supabase/types";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/analytics";
 
@@ -14,6 +15,7 @@ const PATH = "/analytics";
 const PEDRO_INSTAGRAM_HANDLE = "pedro.bagy";
 
 export async function getMetrics(): Promise<ContentMetric[]> {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("content_metrics")
@@ -35,6 +37,7 @@ export async function createMetric(data: {
   views: number;
   posted_at: string;
 }) {
+  await requireStaff();
   const supabase = await createClient();
 
   const engagementRate =
@@ -61,6 +64,7 @@ export async function createMetric(data: {
 }
 
 export async function deleteMetric(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase
     .from("content_metrics")
@@ -83,6 +87,7 @@ export interface ImportResult {
 }
 
 export async function importInstagramMetrics(): Promise<ImportResult> {
+  await requireStaff();
   const handle = PEDRO_INSTAGRAM_HANDLE;
 
   try {
@@ -201,10 +206,12 @@ export async function importInstagramMetrics(): Promise<ImportResult> {
 }
 
 export async function getInstagramHandle(): Promise<string> {
+  await requireStaff();
   return PEDRO_INSTAGRAM_HANDLE;
 }
 
 export async function getAnalyticsInsights(): Promise<string> {
+  await requireStaff();
   const supabase = await createClient();
 
   // Fetch all metrics

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/api-guards";
 
 export interface MonthlyCostRow {
   month: string;
@@ -11,6 +12,7 @@ export interface MonthlyCostRow {
 }
 
 export async function getMonthlyCosts(): Promise<MonthlyCostRow[]> {
+  await requireAdmin();
   const supabase = await createClient();
 
   // Fetch all logs from the last 6 months
@@ -66,6 +68,7 @@ export interface ProviderCostRow {
 }
 
 export async function getCostsByProvider(): Promise<ProviderCostRow[]> {
+  await requireAdmin();
   const supabase = await createClient();
 
   const now = new Date();
@@ -96,6 +99,7 @@ export async function getCostsByProvider(): Promise<ProviderCostRow[]> {
 }
 
 export async function getCurrentMonthCost(): Promise<number> {
+  await requireAdmin();
   const supabase = await createClient();
 
   const now = new Date();

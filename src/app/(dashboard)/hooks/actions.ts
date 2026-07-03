@@ -5,6 +5,7 @@ import { log } from '@/lib/logger';
 import { createClient } from "@/lib/supabase/server";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { revalidatePath } from "next/cache";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/hooks";
 
@@ -24,6 +25,7 @@ export interface Hook {
 // --- Fetch hooks ---
 
 export async function getHooks(category?: string) {
+  await requireStaff();
   const supabase = await createClient();
   let query = supabase
     .from("hooks")
@@ -43,6 +45,7 @@ export async function getHooks(category?: string) {
 // --- Create hook manually ---
 
 export async function createHook(text: string, category: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("hooks").insert({
     text,
@@ -56,6 +59,7 @@ export async function createHook(text: string, category: string) {
 // --- Delete hook ---
 
 export async function deleteHook(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("hooks").delete().eq("id", id);
   if (error) throw error;
@@ -65,6 +69,7 @@ export async function deleteHook(id: string) {
 // --- Increment usage ---
 
 export async function incrementHookUsage(id: string) {
+  await requireStaff();
   const supabase = await createClient();
   const { data: hook, error: fetchError } = await supabase
     .from("hooks")
@@ -93,6 +98,7 @@ export async function generateHooks(
   category?: string,
   count: number = 10
 ): Promise<{ hooks: Hook[] } | { error: string }> {
+  await requireStaff();
   const anthropic = getClient();
   const supabase = await createClient();
 

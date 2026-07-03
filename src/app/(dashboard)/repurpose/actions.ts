@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
 import { generateImagePrompt } from "@/lib/ai/gemini";
 import { randomUUID } from "crypto";
+import { requireStaff } from "@/lib/api-guards";
 
 const PATH = "/repurpose";
 
@@ -22,6 +23,7 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
 };
 
 export async function getRepurposeableContents() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("generated_contents")
@@ -42,6 +44,7 @@ export async function repurposeContent(
   contentId: string,
   targetTypes: string[]
 ): Promise<{ results: RepurposeResult[] } | { error: string }> {
+  await requireStaff();
   const supabase = await createClient();
 
   if (!targetTypes || targetTypes.length === 0) {

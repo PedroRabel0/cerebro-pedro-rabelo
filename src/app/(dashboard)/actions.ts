@@ -13,6 +13,7 @@ import { analyzeDNA } from "@/lib/ai";
 import { getClient, logCost } from "@/lib/ai/client";
 import { findSimilarPlaybooks } from "@/lib/ai/embeddings";
 import type { CaptureSourceType } from "@/lib/supabase/types";
+import { requireStaff, rateLimit } from "@/lib/api-guards";
 
 // --- Universal Input ---
 
@@ -93,6 +94,7 @@ async function handleInstagramInput(url: string, supabase: Awaited<ReturnType<ty
 }
 
 export async function submitFileInput(formData: FormData) {
+  await requireStaff();
   try {
     const file = formData.get("file") as File;
     if (!file) {
@@ -264,6 +266,7 @@ export async function submitUniversalInput(
   origin: "pedro" | "outros" = "pedro",
   skipInsights: boolean = false
 ) {
+  await requireStaff();
   const supabase = await createClient();
 
   // Detect source type from URL
@@ -626,6 +629,7 @@ export async function submitUniversalInput(
 // --- Dashboard Queries ---
 
 export async function getRecentInputs() {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("captures")
@@ -637,6 +641,7 @@ export async function getRecentInputs() {
 }
 
 export async function getDashboardStats() {
+  await requireStaff();
   const supabase = await createClient();
   const [capturesRes, playbooksRes, storiesRes, contentsRes, pendingRes] =
     await Promise.all([
@@ -705,6 +710,9 @@ async function fetchRelevantPlaybooks(
 }
 
 export async function askBrain(question: string): Promise<string> {
+  const user = await requireStaff();
+  if (!rateLimit(`brain:${user.id}`, 20, 60_000))
+    throw new Error("Muitas mensagens em sequencia — aguarde um minuto.");
   const supabase = await createClient();
 
   const [identity, playbooks, stories, recentRefs, brainRulesRes] = await Promise.all([
@@ -821,6 +829,7 @@ export async function askBrain(question: string): Promise<string> {
 export async function getChats(): Promise<
   { id: string; title: string; updated_at: string }[]
 > {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("brain_chats")
@@ -832,6 +841,7 @@ export async function getChats(): Promise<
 }
 
 export async function createChat(): Promise<{ id: string }> {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("brain_chats")
@@ -847,6 +857,7 @@ export async function getChatMessages(
 ): Promise<
   { id: string; role: string; content: string; created_at: string }[]
 > {
+  await requireStaff();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("brain_messages")
@@ -861,6 +872,9 @@ export async function sendChatMessage(
   chatId: string,
   question: string
 ): Promise<{ response: string }> {
+  const user = await requireStaff();
+  if (!rateLimit(`brain:${user.id}`, 20, 60_000))
+    throw new Error("Muitas mensagens em sequencia — aguarde um minuto.");
   const supabase = await createClient();
 
   // 1. Save user message
@@ -1015,6 +1029,7 @@ export async function sendChatMessage(
 }
 
 export async function deleteChat(chatId: string): Promise<void> {
+  await requireStaff();
   const supabase = await createClient();
   // Delete messages first, then chat
   await supabase.from("brain_messages").delete().eq("chat_id", chatId);
@@ -1025,6 +1040,7 @@ export async function renameChat(
   chatId: string,
   title: string
 ): Promise<void> {
+  await requireStaff();
   const supabase = await createClient();
   await supabase
     .from("brain_chats")
@@ -1035,6 +1051,7 @@ export async function renameChat(
 // --- Activity Feed ---
 
 export async function getActivityFeed() {
+  await requireStaff();
   const supabase = await createClient();
   const { data } = await supabase
     .from("activity_log")

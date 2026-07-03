@@ -1,10 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
+import { isAuthorizedAdmin } from '@/lib/api-guards';
 
 export async function GET(request: Request) {
-  // Check for admin secret
-  const url = new URL(request.url);
-  const secret = url.searchParams.get('secret');
-  if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
+  // Security: Authorization: Bearer $ADMIN_SECRET (header, timing-safe)
+  if (!isAuthorizedAdmin(request)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

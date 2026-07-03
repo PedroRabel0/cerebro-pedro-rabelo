@@ -254,6 +254,7 @@ Baseado nos padrões de DNA destes ${posts.length} posts, gere 3 sugestões de c
 // --- Reference Profiles ---
 
 export async function getProfiles() {
+  await requireAdmin();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("reference_profiles")
@@ -533,6 +534,7 @@ export async function deleteProfile(id: string) {
 // --- Reference Posts ---
 
 export async function getPostsByProfile(profileId: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("reference_posts")
@@ -862,6 +864,7 @@ Com base nisso, o que o Pedro pode aprender e aplicar?`,
 // --- Reference Knowledge ---
 
 export async function getKnowledge() {
+  await requireAdmin();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("reference_knowledge")

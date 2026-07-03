@@ -1,7 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { User } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
+
+/** Comparacao de segredos em tempo constante (evita timing attack). */
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
 
 /**
  * Le o papel do usuario preferindo app_metadata (fonte de verdade, so o
@@ -23,7 +31,28 @@ function roleOf(user: User): string | undefined {
 export function isAuthorizedCron(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  return request.headers.get("authorization") === `Bearer ${secret}`;
+  return safeEqual(
+    request.headers.get("authorization") ?? "",
+    `Bearer ${secret}`
+  );
+}
+
+/**
+ * Auth das rotas administrativas (/api/seed, /api/setup-users,
+ * /api/backfill-embeddings, /api/setup-trend-scans): exige
+ * `Authorization: Bearer $ADMIN_SECRET` no HEADER — nunca query string, que
+ * vaza em logs da Vercel, Referer e historico do navegador. Comparacao
+ * timing-safe. Fail-closed: sem ADMIN_SECRET configurado, nega.
+ *
+ * Uso: curl -H "Authorization: Bearer $ADMIN_SECRET" https://.../api/rota
+ */
+export function isAuthorizedAdmin(request: Request): boolean {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret) return false;
+  return safeEqual(
+    request.headers.get("authorization") ?? "",
+    `Bearer ${secret}`
+  );
 }
 
 /**
