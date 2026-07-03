@@ -1,7 +1,8 @@
 ﻿export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Hobby plan max
 
-import { createClient } from "@/lib/supabase/server";
+// ADMIN client (service_role): sem sessao aqui, ou operacao que exige bypass de RLS
+import { createAdminClient as createClient } from "@/lib/supabase/server";
 import { scrapeInstagramProfile } from "@/lib/ai/apify";
 import { analyzeDNA } from "@/lib/ai";
 import { isAuthorizedCron } from "@/lib/api-guards";

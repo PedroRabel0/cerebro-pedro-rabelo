@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+// ADMIN client (service_role): sem sessao aqui, ou operacao que exige bypass de RLS
+import { createAdminClient as createClient } from "@/lib/supabase/server";
 import { log } from "@/lib/logger";
 
 // calendar (completo): ler/escrever eventos E listar agendas (inclui as

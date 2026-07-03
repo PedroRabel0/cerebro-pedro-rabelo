@@ -1,4 +1,5 @@
-﻿import { createClient } from "./server";
+﻿// ADMIN client (service_role): sem sessao aqui, ou operacao que exige bypass de RLS
+import { createAdminClient as createClient } from "./server";
 
 import { log } from '@/lib/logger';
 /**

@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+// ADMIN client (service_role): sem sessao aqui, ou operacao que exige bypass de RLS
+import { createAdminClient as createClient } from "@/lib/supabase/server";
 import { updatePlaybookEmbedding } from "@/lib/ai/embeddings";
 import { NextResponse } from "next/server";
 import { isAuthorizedAdmin } from "@/lib/api-guards";

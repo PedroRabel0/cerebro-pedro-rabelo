@@ -2,7 +2,7 @@
 
 
 import { log } from '@/lib/logger';
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
 import { generateImagePrompt } from "@/lib/ai/gemini";
@@ -1354,7 +1354,7 @@ export async function uploadImageToContent(
   formData: FormData
 ): Promise<{ imageUrl: string } | { error: string }> {
   await requireStaff();
-  const supabase = await createClient();
+  const supabase = await createAdminClient() /* storage/auth.admin exigem service_role */;
 
   try {
     const files: File[] = [];

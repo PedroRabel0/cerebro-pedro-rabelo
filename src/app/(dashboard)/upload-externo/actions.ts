@@ -1,13 +1,13 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { log } from "@/lib/logger";
 import { requireStaff } from "@/lib/api-guards";
 
 export async function uploadExternalContent(formData: FormData) {
   await requireStaff();
-  const supabase = await createClient();
+  const supabase = await createAdminClient() /* storage/auth.admin exigem service_role */;
 
   const title = (formData.get("title") as string) || "Post externo";
   const caption = (formData.get("caption") as string) || "";
@@ -150,7 +150,7 @@ export async function uploadSingleSlide(
   formData: FormData
 ): Promise<{ url: string } | { error: string }> {
   await requireStaff();
-  const supabase = await createClient();
+  const supabase = await createAdminClient() /* storage/auth.admin exigem service_role */;
   const file = formData.get("slide") as File | null;
   if (!file || file.size === 0) return { error: "Arquivo vazio." };
 

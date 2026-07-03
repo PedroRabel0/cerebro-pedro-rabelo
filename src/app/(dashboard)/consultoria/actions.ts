@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { findSimilarPlaybooks, updatePlaybookEmbedding } from "@/lib/ai/embeddings";
@@ -779,7 +779,7 @@ export async function uploadDocument(
 
 export async function getDocumentUrl(docId: string): Promise<{ url: string } | { error: string }> {
   await requireStaff();
-  const supabase = await createClient();
+  const supabase = await createAdminClient() /* storage/auth.admin exigem service_role */;
   const { data: doc } = await supabase.from("consulting_documents").select("storage_path").eq("id", docId).single();
   if (!doc) return { error: "Documento nao encontrado." };
   const { data, error } = await supabase.storage.from(DOCS_BUCKET).createSignedUrl(doc.storage_path, 3600);
@@ -789,7 +789,7 @@ export async function getDocumentUrl(docId: string): Promise<{ url: string } | {
 
 export async function deleteDocument(id: string, companyId: string): Promise<{ ok: true } | { error: string }> {
   await requireStaff();
-  const supabase = await createClient();
+  const supabase = await createAdminClient() /* storage/auth.admin exigem service_role */;
   const { data: doc } = await supabase.from("consulting_documents").select("storage_path").eq("id", id).single();
   if (doc?.storage_path) {
     await supabase.storage.from(DOCS_BUCKET).remove([doc.storage_path]);
@@ -1498,7 +1498,7 @@ export async function createClientUser(
   if (!input.password || input.password.length < 6)
     return { error: "A senha precisa ter ao menos 6 caracteres." };
 
-  const db = await createClient();
+  const db = await createAdminClient() /* storage/auth.admin exigem service_role */;
   const { data: created, error } = await db.auth.admin.createUser({
     email: input.email.trim(),
     password: input.password,
@@ -1534,7 +1534,7 @@ export async function deleteClientUser(
   userId: string
 ): Promise<{ ok: true } | { error: string }> {
   await requireStaff();
-  const db = await createClient();
+  const db = await createAdminClient() /* storage/auth.admin exigem service_role */;
 
   const { error } = await db.auth.admin.deleteUser(userId);
   if (error && !/not.*found/i.test(error.message)) {
@@ -1559,7 +1559,7 @@ export async function resetClientPassword(
   await requireStaff();
   if (!newPassword || newPassword.length < 6)
     return { error: "A senha precisa ter ao menos 6 caracteres." };
-  const db = await createClient();
+  const db = await createAdminClient() /* storage/auth.admin exigem service_role */;
   const { error } = await db.auth.admin.updateUserById(userId, {
     password: newPassword,
   });

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
-import { createClient } from '@/lib/supabase/server';
+// ADMIN client (service_role): sem sessao aqui, ou operacao que exige bypass de RLS
+import { createAdminClient as createClient } from '@/lib/supabase/server';
 import { logApiCost } from '@/lib/ai/client';
 import { log } from '@/lib/logger';
 
