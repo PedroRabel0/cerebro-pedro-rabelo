@@ -727,11 +727,11 @@ Regras: mensagem pronta pra copiar e colar; no maximo 3-4 linhas; comeca com um 
   try {
     const client = getClient();
     const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 500,
       messages: [{ role: "user", content: prompt }],
     });
-    logCost("claude-sonnet-4-6", response.usage.input_tokens, response.usage.output_tokens);
+    logCost("claude-haiku-4-5-20251001", response.usage.input_tokens, response.usage.output_tokens);
     const message = (response.content[0].type === "text" ? response.content[0].text : "").trim();
 
     await supabase.from("consulting_tasks").update({ message_draft: message }).eq("id", taskId);
@@ -952,11 +952,11 @@ Responda SOMENTE com a pauta em markdown: um titulo curto e 4-7 topicos com bull
   try {
     const client = getClient();
     const r = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 1200,
       messages: [{ role: "user", content: prompt }],
     });
-    logCost("claude-sonnet-4-6", r.usage.input_tokens, r.usage.output_tokens);
+    logCost("claude-haiku-4-5-20251001", r.usage.input_tokens, r.usage.output_tokens);
     const agenda = (r.content[0].type === "text" ? r.content[0].text : "").trim();
     if (!agenda) return { error: "Nao consegui gerar a pauta. Tente novamente." };
     return { agenda };
@@ -1236,11 +1236,11 @@ Regras: calcule datas relativas a partir de hoje (ex: "terca que vem"). Para con
   try {
     const client = getClient();
     const r = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 500,
       messages: [{ role: "user", content: prompt }],
     });
-    logCost("claude-sonnet-4-6", r.usage.input_tokens, r.usage.output_tokens);
+    logCost("claude-haiku-4-5-20251001", r.usage.input_tokens, r.usage.output_tokens);
     const text = r.content[0].type === "text" ? r.content[0].text : "";
     parsed = parseJSON(text);
   } catch (err) {

@@ -574,12 +574,12 @@ Responda APENAS com um JSON: {"topics": ["tema 1", "tema 2", ...]}`,
       ],
     });
 
-    // Log cost
+    // Log cost — preco real do Haiku 4.5: $1/$5 por MTok
     const { logApiCost } = await import("@/lib/ai/client");
     const cost =
-      (response.usage.input_tokens / 1_000_000) * 0.8 +
-      (response.usage.output_tokens / 1_000_000) * 4.0;
-    logApiCost("anthropic", "claude-haiku-4-20250414", cost, {
+      (response.usage.input_tokens / 1_000_000) * 1.0 +
+      (response.usage.output_tokens / 1_000_000) * 5.0;
+    logApiCost("anthropic", "claude-haiku-4-5-20251001", cost, {
       input_tokens: response.usage.input_tokens,
       output_tokens: response.usage.output_tokens,
     });

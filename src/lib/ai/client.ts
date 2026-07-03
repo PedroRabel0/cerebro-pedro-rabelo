@@ -1,4 +1,5 @@
 ﻿import Anthropic from '@anthropic-ai/sdk';
+import { after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 import { log } from '@/lib/logger';
@@ -15,7 +16,12 @@ export function getClient(): Anthropic {
 
 /**
  * Generic cost logger for any API provider.
- * Fire-and-forget: persists to Supabase silently.
+ * Usa after() do Next para garantir a execucao POS-resposta: o
+ * fire-and-forget antigo morria em voo quando a instancia serverless era
+ * congelada ao retornar — justamente nas chamadas caras que terminam perto
+ * do fim da funcao. Tambem checa o { error } do insert (o client Supabase
+ * NAO lanca), senao um problema de RLS/schema apagaria o rastreio de custo
+ * de TODOS os provedores em silencio.
  */
 export function logApiCost(
   provider: string,
@@ -25,20 +31,29 @@ export function logApiCost(
 ) {
   log.info(`[API Cost] ${provider}/${model} | $${cost_usd.toFixed(4)}`);
 
-  createClient()
-    .then((supabase) =>
-      supabase.from('api_cost_log').insert({
+  const persist = async () => {
+    try {
+      const supabase = await createClient();
+      const { error } = await supabase.from('api_cost_log').insert({
         provider,
         model,
         input_tokens: details?.input_tokens ?? 0,
         output_tokens: details?.output_tokens ?? 0,
         cost_usd: parseFloat(cost_usd.toFixed(6)),
         created_at: new Date().toISOString(),
-      })
-    )
-    .catch(() => {
-      // Silently ignore — table/column may not exist yet
-    });
+      });
+      if (error) log.error('[API Cost] insert failed:' + ' ' + String(error.message));
+    } catch (err) {
+      log.error('[API Cost] persist error:' + ' ' + String(err));
+    }
+  };
+
+  try {
+    after(persist);
+  } catch {
+    // Fora de request scope (ex.: teste) — melhor tentar do que perder
+    void persist();
+  }
 }
 
 /**
@@ -47,7 +62,8 @@ export function logApiCost(
 export function logCost(model: string, inputTokens: number, outputTokens: number) {
   const costs: Record<string, { input: number; output: number }> = {
     'claude-sonnet-4-6': { input: 3.0, output: 15.0 },
-    'claude-haiku-4-5-20251001': { input: 0.8, output: 4.0 },
+    // Preco real do Haiku 4.5: $1/$5 por MTok (o $0.8/$4 antigo subestimava)
+    'claude-haiku-4-5-20251001': { input: 1.0, output: 5.0 },
   };
   const rate = costs[model] || { input: 3.0, output: 15.0 };
   const cost =
