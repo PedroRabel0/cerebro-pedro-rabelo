@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useEffect, useTransition } from "react";
 import type { ContentType } from "@/lib/supabase/types";
-import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent, refineContent, addStoryToContent } from "./actions";
-import type { StorySuggestion } from "./actions";
+import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent, refineContent, addStoryToContent, suggestCompanyCases } from "./actions";
+import type { StorySuggestion, CaseSuggestion } from "./actions";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
 import { parseCarouselSlides } from "./carousel";
@@ -24,6 +24,7 @@ import {
   Send,
   BookMarked,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 
 // --------------- constants ---------------
@@ -874,10 +875,10 @@ function CaseEmpresaFields() {
     <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-xs text-text-secondary">
       <p className="font-semibold text-accent">Sem campos extras</p>
       <p className="mt-1 leading-relaxed">
-        Nada a preencher: o case e garimpado automaticamente do que voce
-        alimentou no Conhecimento. A IA gera a ANALISE do Pedro em carrossel —
-        nenhuma imagem e gerada: no design, cada slide que pede foto tem um
-        slot clicavel pra voce colocar a foto real.
+        Nada a preencher: voce ja escolheu a empresa na etapa anterior. A IA
+        gera a ANALISE do Pedro em carrossel — nenhuma imagem e gerada: no
+        design, cada slide que pede foto tem um slot clicavel pra voce colocar
+        a foto real da empresa.
       </p>
     </div>
   );
@@ -1587,8 +1588,44 @@ export default function GenerationWizard({
   const [isPending, startTransition] = useTransition();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [customTopic, setCustomTopic] = useState(false);
+  // Sugestoes de cases de empresas (case_empresa): a IA propoe, o usuario clica
+  const [caseSuggestions, setCaseSuggestions] = useState<CaseSuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState("");
+  const [seenSuggestions, setSeenSuggestions] = useState<string[]>([]);
 
   const stepIdx = STEPS.indexOf(step);
+
+  const caseSelected = state.selectedTypes.includes("case_empresa");
+
+  async function fetchCaseSuggestions(shuffle = false) {
+    setLoadingSuggestions(true);
+    setSuggestionsError("");
+    try {
+      const res = await suggestCompanyCases(shuffle ? seenSuggestions : []);
+      if ("error" in res) {
+        setSuggestionsError(res.error);
+      } else {
+        setCaseSuggestions(res.sugestoes);
+        setSeenSuggestions((prev) => [
+          ...prev,
+          ...res.sugestoes.map((s) => s.empresa),
+        ]);
+      }
+    } catch {
+      setSuggestionsError("Nao consegui buscar sugestoes agora. Tente de novo.");
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }
+
+  // Ao entrar no passo de assunto com case selecionado, busca sugestoes
+  useEffect(() => {
+    if (step === "source" && caseSelected && caseSuggestions.length === 0 && !loadingSuggestions) {
+      fetchCaseSuggestions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, caseSelected]);
 
   function updateState<K extends keyof WizardState>(key: K, val: WizardState[K]) {
     setState((prev) => ({ ...prev, [key]: val }));
@@ -1633,12 +1670,7 @@ export default function GenerationWizard({
   const canNext = useMemo(() => {
     switch (step) {
       case "source":
-        // case_empresa dispensa tema: a triagem do case e automatica
-        return (
-          state.topic.trim().length > 0 ||
-          (state.selectedTypes.length > 0 &&
-            state.selectedTypes.every((t) => t === "case_empresa"))
-        );
+        return state.topic.trim().length > 0;
       case "types":
         return state.selectedTypes.length > 0;
       case "details":
@@ -1767,15 +1799,76 @@ export default function GenerationWizard({
           />
         </div>
 
-        {/* Temas macro da base de conhecimento (case_empresa: triagem automatica) */}
+        {/* Temas macro da base (case_empresa: sugestoes de empresas pela IA) */}
         {caseOnly ? (
-          <div className="rounded-xl border border-accent/20 bg-accent/5 p-4 text-xs text-text-secondary">
-            <p className="font-semibold text-accent">Triagem automatica do case</p>
-            <p className="mt-1 leading-relaxed">
-              Nada pra escolher aqui: eu garimpo na sua base o material de case
-              mais recente e pertinente (o que voce alimentou no Conhecimento) e
-              gero a analise do Pedro sobre ele. Quer direcionar pra uma empresa
-              especifica? Use o campo &quot;Recorte&quot; abaixo (opcional).
+          <div>
+            <div className="flex items-center justify-between">
+              <FieldLabel>Qual case analisar? (sugestoes da IA)</FieldLabel>
+              <button
+                type="button"
+                onClick={() => fetchCaseSuggestions(true)}
+                disabled={loadingSuggestions}
+                className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 font-mono text-[10px] text-text-muted transition hover:border-accent/40 hover:text-text disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3 ${loadingSuggestions ? "animate-spin" : ""}`} />
+                Outras sugestoes
+              </button>
+            </div>
+
+            {loadingSuggestions && caseSuggestions.length === 0 && (
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-6 text-sm text-text-muted">
+                <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                Garimpando empresas com historias fortes pra voce...
+              </div>
+            )}
+
+            {suggestionsError && (
+              <p className="rounded-xl border border-red/20 bg-red/5 px-3 py-2 text-xs text-red">
+                {suggestionsError}
+              </p>
+            )}
+
+            {caseSuggestions.length > 0 && (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {caseSuggestions.map((s) => {
+                  const isSelected = state.topic === s.empresa;
+                  return (
+                    <button
+                      key={s.empresa}
+                      type="button"
+                      onClick={() => {
+                        updateState("topic", s.empresa);
+                        updateState("recorte", `${s.gancho} (tema: ${s.tema})`);
+                      }}
+                      className={`rounded-xl border-2 p-3.5 text-left transition-all ${
+                        isSelected
+                          ? "border-accent bg-accent/10"
+                          : "border-border bg-card hover:border-accent/40"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-sm font-bold ${isSelected ? "text-accent" : "text-text"}`}>
+                          {s.empresa}
+                        </span>
+                        <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                          {s.tema || s.setor}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-relaxed text-text-secondary">
+                        {s.gancho}
+                      </p>
+                      {s.por_que && (
+                        <p className="mt-1 text-[10px] text-text-muted">{s.por_que}</p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="mt-2 text-[11px] text-text-muted">
+              Clique numa empresa pra selecionar. A analise vai alem de marketing:
+              estrategia, cultura, operacao, produto, crise — o angulo ja vem na sugestao.
             </p>
           </div>
         ) : (

@@ -644,90 +644,89 @@ export interface WizardResult {
   storySuggestions?: StorySuggestion[];
 }
 
+export interface CaseSuggestion {
+  empresa: string;
+  setor: string;
+  tema: string;
+  gancho: string;
+  por_que: string;
+}
+
 /**
- * Triagem automatica do CASE DE EMPRESA: o usuario nao digita nem escolhe
- * nada — ele alimenta o material da empresa no Conhecimento e a gente
- * garimpa aqui o item mais recente/pertinente (playbooks + historias).
- * Um Haiku barato decide qual item e de fato um case de empresa (e nao um
- * framework generico); o "recorte" do wizard funciona como dica opcional.
+ * Sugere CASES DE EMPRESAS para o Pedro analisar — o usuario nao alimenta
+ * nem digita nada: a IA propoe empresas com historias fortes (do e-commerce
+ * a empresa tradicional que virou gigante digital) e ANGULOS que passeiam
+ * por todos os temas de negocio (nao so marketing/vendas), pra audiencia
+ * sentir que o Pedro domina qualquer assunto.
  */
-async function triageCaseFromBase(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  hint: string
-): Promise<{ titulo: string; corpo: string } | null> {
-  const [pbRes, stRes] = await Promise.all([
-    supabase
-      .from("playbooks")
-      .select("id, title, body_markdown, created_at")
-      .order("created_at", { ascending: false })
-      .limit(15),
-    supabase
-      .from("stories")
-      .select("id, title, body_markdown, created_at")
-      .order("created_at", { ascending: false })
-      .limit(15),
-  ]);
+export async function suggestCompanyCases(
+  exclude: string[] = []
+): Promise<{ sugestoes: CaseSuggestion[] } | { error: string }> {
+  await requireStaff();
+  const supabase = await createClient();
 
-  const candidates = [
-    ...(pbRes.data ?? []).map((p) => ({ kind: "playbook", ...p })),
-    ...(stRes.data ?? []).map((s) => ({ kind: "historia", ...s })),
-  ]
-    .filter((c) => (c.body_markdown || "").trim().length > 80)
-    .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
-    .slice(0, 20);
-  if (candidates.length === 0) return null;
+  const { data: identity } = await supabase
+    .from("identity")
+    .select("positioning, tone_descriptors")
+    .limit(1)
+    .maybeSingle();
 
-  const lista = candidates
-    .map(
-      (c, i) =>
-        `${i}. [${c.kind}] ${c.title} — ${(c.body_markdown || "")
-          .slice(0, 200)
-          .replace(/\n/g, " ")}`
-    )
-    .join("\n");
+  const prompt = `Voce sugere CASES DE EMPRESAS para o Pedro Rabelo analisar em carrosseis de Instagram.
+
+Sobre o Pedro: ${identity?.positioning || "mentor de empreendedores e e-commerce"}. Tom: ${identity?.tone_descriptors || "direto, pratico, opinativo"}.
+
+Gere 6 sugestoes DIVERSAS de empresas com historias FORTES e amplamente conhecidas (fatos verificaveis — nada obscuro). Regras:
+- MISTURE perfis: e-commerce/D2C, empresa TRADICIONAL que se transformou em gigante digital, tech brasileira, icone global, varejo fisico, industria.
+- MISTURE os temas de analise ALEM de marketing/vendas: estrategia, cultura e gente, operacao/logistica, produto, pricing, dados/tecnologia, gestao de crise, sucessao/lideranca, marca. NO MAXIMO 2 sugestoes de marketing/vendas.
+- Pelo menos 3 empresas brasileiras.
+- "gancho" = a tese provocativa da analise em 1 frase, na voz do Pedro (opinativo, direto, zero clichê).
+- "por_que" = 1 frase de por que esse case e bom AGORA para a audiencia dele.${
+    exclude.length > 0
+      ? `\n- NAO sugira: ${exclude.join(", ")}.`
+      : ""
+  }
+
+Responda APENAS JSON valido:
+{"sugestoes":[{"empresa":"...","setor":"...","tema":"...","gancho":"...","por_que":"..."}]}`;
 
   try {
     const client = getClient();
     const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 120,
-      messages: [
-        {
-          role: "user",
-          content: `Voce faz triagem numa base de conhecimento. Abaixo, os itens mais recentes (indice, tipo, titulo, inicio do texto).\n\n${lista}\n\nQual item e MATERIAL SOBRE UMA EMPRESA/CASE ESPECIFICO (uma empresa real, o que ela fez, resultados) — e NAO um framework ou conceito generico? Prefira o mais recente entre os que se qualificam.${
-            hint ? ` Dica do usuario sobre qual case: "${hint}".` : ""
-          }\n\nResponda APENAS JSON: {"index": <numero>} ou {"index": null} se nenhum for case de empresa.`,
-        },
-      ],
+      model: "claude-sonnet-4-6",
+      max_tokens: 1400,
+      messages: [{ role: "user", content: prompt }],
     });
     logCost(
-      "claude-haiku-4-5-20251001",
+      "claude-sonnet-4-6",
       response.usage.input_tokens,
       response.usage.output_tokens
     );
     const text =
       response.content[0].type === "text" ? response.content[0].text : "";
-    const parsed = parseJSON<{ index: number | null }>(text);
-    const idx = parsed?.index;
-    if (typeof idx === "number" && candidates[idx]) {
-      const c = candidates[idx];
-      return { titulo: c.title, corpo: (c.body_markdown || "").slice(0, 6000) };
+    const parsed = parseJSON<{ sugestoes: CaseSuggestion[] }>(text);
+    if (
+      !parsed ||
+      !Array.isArray(parsed.sugestoes) ||
+      parsed.sugestoes.length === 0 ||
+      parsed.sugestoes.some(
+        (s) => typeof s?.empresa !== "string" || typeof s?.gancho !== "string"
+      )
+    ) {
+      return { error: "Nao consegui montar as sugestoes. Tente de novo." };
     }
+    return {
+      sugestoes: parsed.sugestoes.slice(0, 6).map((s) => ({
+        empresa: String(s.empresa).trim(),
+        setor: String(s.setor || "").trim(),
+        tema: String(s.tema || "").trim(),
+        gancho: String(s.gancho).trim(),
+        por_que: String(s.por_que || "").trim(),
+      })),
+    };
   } catch (err) {
-    log.error("[Wizard] triagem de case: " + String(err));
-    // Fallback: dica do usuario bate com algum titulo?
-    if (hint) {
-      const byHint = candidates.find((c) =>
-        c.title.toLowerCase().includes(hint.toLowerCase())
-      );
-      if (byHint)
-        return {
-          titulo: byHint.title,
-          corpo: (byHint.body_markdown || "").slice(0, 6000),
-        };
-    }
+    log.error("[Wizard] suggestCompanyCases: " + String(err));
+    return { error: "Nao consegui buscar sugestoes agora. Tente de novo." };
   }
-  return null;
 }
 
 export async function createWizardContent(
@@ -743,27 +742,8 @@ export async function createWizardContent(
   }
 
   try {
-    // Triagem automatica do case (case_empresa): usuario nao digita nada.
-    let caseMaterial: { titulo: string; corpo: string } | null = null;
-    if (payload.contentTypes.includes("case_empresa")) {
-      caseMaterial = await triageCaseFromBase(
-        supabase,
-        payload.recorte || payload.topic || ""
-      );
-      if (
-        !caseMaterial &&
-        payload.contentTypes.every((t) => t === "case_empresa")
-      ) {
-        return {
-          error:
-            "Nao encontrei material de case de empresa na sua base. Alimente o conteudo da empresa no Conhecimento e gere de novo.",
-        };
-      }
-    }
-
     // Novo fluxo: topic-first — usuário digita o tema, IA busca tudo
-    const topicText =
-      payload.topic || payload.freeTopic || caseMaterial?.titulo || "conteudo";
+    const topicText = payload.topic || payload.freeTopic || "conteudo";
 
     // Busca semântica na base toda: playbooks + stories relevantes
     const [knowledge, identityRes, feedbackRes, wizardRulesRes] =
@@ -1143,7 +1123,9 @@ E entao a LEGENDA do post de Instagram: 3-4 paragrafos curtos que COMPLEMENTAM o
         case "case_empresa":
           typeInstructions = `FORMATO: Case de Empresa — ANALISE DO PEDRO em carrossel de Instagram (6 a 8 slides)
 
-A secao "O CASE SELECIONADO" abaixo (quando presente) e a MATERIA-PRIMA principal — foi garimpada automaticamente da base do Pedro. Isto NAO e um resumo institucional nem um texto neutro de wikipedia: e a LEITURA OPINATIVA do Pedro sobre o case — a opiniao e os frameworks DELE aplicados ao que a empresa fez (use a base de conhecimento abaixo como lente; cite o conceito/framework quando couber).
+O TOPICO e a EMPRESA a analisar e o RECORTE e o ANGULO/tese da analise. Use o que voce SABE sobre essa empresa (fatos amplamente conhecidos e verificaveis da historia dela); numeros exatos incertos viram ordens de grandeza honestas ("multiplicou por ~10", "bilhoes em GMV") — NUNCA invente numero preciso. Isto NAO e um resumo institucional nem um texto neutro de wikipedia: e a LEITURA OPINATIVA do Pedro — a opiniao e os frameworks DELE aplicados ao que a empresa fez (use a base de conhecimento abaixo como lente; cite o conceito quando couber).
+
+IMPORTANTE — AMPLITUDE DE TEMA: a analise NAO precisa ser de marketing/vendas. Siga o angulo do RECORTE: pode ser estrategia, cultura e gente, operacao/logistica, produto, pricing, dados/tecnologia, gestao de crise, sucessao, marca. O leitor deve sentir que o Pedro domina QUALQUER assunto de negocios.
 
 ESTRUTURA OBRIGATORIA:
 
@@ -1166,11 +1148,7 @@ REGRAS DAS FOTOS (IMPORTANTE):
 
 FORMATO DE RESPOSTA:
 Cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases diretas (vai ser lido em imagem). Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
-E entao a LEGENDA do post: COMPLEMENTA os slides (nao repete), hook na primeira linha, 3-5 paragrafos curtos, CTA e 5-8 hashtags no final.${
-            caseMaterial
-              ? `\n\n## O CASE SELECIONADO (triagem automatica da base do Pedro)\nTitulo: ${caseMaterial.titulo}\n\n${caseMaterial.corpo}`
-              : ""
-          }`;
+E entao a LEGENDA do post: COMPLEMENTA os slides (nao repete), hook na primeira linha, 3-5 paragrafos curtos, CTA e 5-8 hashtags no final.`;
           break;
       }
 
