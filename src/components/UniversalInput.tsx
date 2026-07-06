@@ -1,5 +1,6 @@
 "use client";
 
+import { extractPdfText, isPdf } from "@/lib/pdf-client";
 import { useState, useRef, useEffect } from "react";
 import { submitFileInput, prepareUniversalInput, processCaptureNow } from "@/app/(dashboard)/actions";
 import VoiceButton from "@/components/VoiceButton";
@@ -334,7 +335,27 @@ export default function UniversalInput() {
 
     try {
       let res;
-      if (selectedFile) {
+      if (selectedFile && isPdf(selectedFile)) {
+        // PDF: extrai o texto NO NAVEGADOR via pdf.js — o extrator do
+        // servidor nao le PDFs modernos (streams FlateDecode) e mandava
+        // lixo binario pra IA. De quebra, escapa do limite de 10MB.
+        const pdfText = await extractPdfText(selectedFile).catch(() => "");
+        if (pdfText.trim().length < 50) {
+          try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
+          processingRef.current = false;
+          setErrorMessage(
+            `Nao consegui extrair texto de "${selectedFile.name}" — provavelmente e um PDF escaneado (so imagens). Copie o texto do PDF e cole no campo de texto.`
+          );
+          setState("error");
+          return;
+        }
+        setCurrentStep(1);
+        res = await prepareUniversalInput(
+          `[ARQUIVO: ${selectedFile.name}]\n\n${pdfText}`.slice(0, 60000),
+          contentOrigin,
+          skipInsights
+        );
+      } else if (selectedFile) {
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("origin", contentOrigin);

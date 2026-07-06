@@ -39,8 +39,34 @@ export async function pdfToImageFiles(file: File): Promise<File[]> {
   return files;
 }
 
-function isPdf(f: File): boolean {
+export function isPdf(f: File): boolean {
   return f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+}
+
+/**
+ * Extrai o TEXTO de um PDF no navegador via pdf.js — funciona com PDFs
+ * modernos (streams comprimidos/FlateDecode), que o extrator caseiro do
+ * servidor nao consegue ler. Retorna "" para PDFs so de imagem (scan).
+ */
+export async function extractPdfText(file: File): Promise<string> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data }).promise;
+  const parts: string[] = [];
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((item) => ("str" in item ? item.str : ""))
+      .join(" ")
+      .replace(/\s{3,}/g, "\n")
+      .trim();
+    if (pageText) parts.push(pageText);
+  }
+  return parts.join("\n\n").trim();
 }
 
 function isImage(f: File): boolean {
