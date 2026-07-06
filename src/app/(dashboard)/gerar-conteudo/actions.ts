@@ -5,6 +5,7 @@ import { log } from '@/lib/logger';
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
+import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import { generateImagePrompt } from "@/lib/ai/gemini";
 import { generateImage } from "@/lib/ai/image-gen";
 import { uploadImageToStorage } from "@/lib/supabase/storage";
@@ -643,6 +644,92 @@ export interface WizardResult {
   storySuggestions?: StorySuggestion[];
 }
 
+/**
+ * Triagem automatica do CASE DE EMPRESA: o usuario nao digita nem escolhe
+ * nada — ele alimenta o material da empresa no Conhecimento e a gente
+ * garimpa aqui o item mais recente/pertinente (playbooks + historias).
+ * Um Haiku barato decide qual item e de fato um case de empresa (e nao um
+ * framework generico); o "recorte" do wizard funciona como dica opcional.
+ */
+async function triageCaseFromBase(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  hint: string
+): Promise<{ titulo: string; corpo: string } | null> {
+  const [pbRes, stRes] = await Promise.all([
+    supabase
+      .from("playbooks")
+      .select("id, title, body_markdown, created_at")
+      .order("created_at", { ascending: false })
+      .limit(15),
+    supabase
+      .from("stories")
+      .select("id, title, body_markdown, created_at")
+      .order("created_at", { ascending: false })
+      .limit(15),
+  ]);
+
+  const candidates = [
+    ...(pbRes.data ?? []).map((p) => ({ kind: "playbook", ...p })),
+    ...(stRes.data ?? []).map((s) => ({ kind: "historia", ...s })),
+  ]
+    .filter((c) => (c.body_markdown || "").trim().length > 80)
+    .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+    .slice(0, 20);
+  if (candidates.length === 0) return null;
+
+  const lista = candidates
+    .map(
+      (c, i) =>
+        `${i}. [${c.kind}] ${c.title} — ${(c.body_markdown || "")
+          .slice(0, 200)
+          .replace(/\n/g, " ")}`
+    )
+    .join("\n");
+
+  try {
+    const client = getClient();
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 120,
+      messages: [
+        {
+          role: "user",
+          content: `Voce faz triagem numa base de conhecimento. Abaixo, os itens mais recentes (indice, tipo, titulo, inicio do texto).\n\n${lista}\n\nQual item e MATERIAL SOBRE UMA EMPRESA/CASE ESPECIFICO (uma empresa real, o que ela fez, resultados) — e NAO um framework ou conceito generico? Prefira o mais recente entre os que se qualificam.${
+            hint ? ` Dica do usuario sobre qual case: "${hint}".` : ""
+          }\n\nResponda APENAS JSON: {"index": <numero>} ou {"index": null} se nenhum for case de empresa.`,
+        },
+      ],
+    });
+    logCost(
+      "claude-haiku-4-5-20251001",
+      response.usage.input_tokens,
+      response.usage.output_tokens
+    );
+    const text =
+      response.content[0].type === "text" ? response.content[0].text : "";
+    const parsed = parseJSON<{ index: number | null }>(text);
+    const idx = parsed?.index;
+    if (typeof idx === "number" && candidates[idx]) {
+      const c = candidates[idx];
+      return { titulo: c.title, corpo: (c.body_markdown || "").slice(0, 6000) };
+    }
+  } catch (err) {
+    log.error("[Wizard] triagem de case: " + String(err));
+    // Fallback: dica do usuario bate com algum titulo?
+    if (hint) {
+      const byHint = candidates.find((c) =>
+        c.title.toLowerCase().includes(hint.toLowerCase())
+      );
+      if (byHint)
+        return {
+          titulo: byHint.title,
+          corpo: (byHint.body_markdown || "").slice(0, 6000),
+        };
+    }
+  }
+  return null;
+}
+
 export async function createWizardContent(
   payload: WizardPayload
 ): Promise<
@@ -656,8 +743,27 @@ export async function createWizardContent(
   }
 
   try {
+    // Triagem automatica do case (case_empresa): usuario nao digita nada.
+    let caseMaterial: { titulo: string; corpo: string } | null = null;
+    if (payload.contentTypes.includes("case_empresa")) {
+      caseMaterial = await triageCaseFromBase(
+        supabase,
+        payload.recorte || payload.topic || ""
+      );
+      if (
+        !caseMaterial &&
+        payload.contentTypes.every((t) => t === "case_empresa")
+      ) {
+        return {
+          error:
+            "Nao encontrei material de case de empresa na sua base. Alimente o conteudo da empresa no Conhecimento e gere de novo.",
+        };
+      }
+    }
+
     // Novo fluxo: topic-first — usuário digita o tema, IA busca tudo
-    const topicText = payload.topic || payload.freeTopic || "conteudo";
+    const topicText =
+      payload.topic || payload.freeTopic || caseMaterial?.titulo || "conteudo";
 
     // Busca semântica na base toda: playbooks + stories relevantes
     const [knowledge, identityRes, feedbackRes, wizardRulesRes] =
@@ -1037,7 +1143,7 @@ E entao a LEGENDA do post de Instagram: 3-4 paragrafos curtos que COMPLEMENTAM o
         case "case_empresa":
           typeInstructions = `FORMATO: Case de Empresa — ANALISE DO PEDRO em carrossel de Instagram (6 a 8 slides)
 
-O TOPICO informado e o case/empresa a analisar. Isto NAO e um resumo institucional nem um texto neutro de wikipedia: e a LEITURA OPINATIVA do Pedro sobre o case — a opiniao e os frameworks DELE aplicados ao que a empresa fez (use a base de conhecimento abaixo como lente; cite o conceito/framework quando couber).
+A secao "O CASE SELECIONADO" abaixo (quando presente) e a MATERIA-PRIMA principal — foi garimpada automaticamente da base do Pedro. Isto NAO e um resumo institucional nem um texto neutro de wikipedia: e a LEITURA OPINATIVA do Pedro sobre o case — a opiniao e os frameworks DELE aplicados ao que a empresa fez (use a base de conhecimento abaixo como lente; cite o conceito/framework quando couber).
 
 ESTRUTURA OBRIGATORIA:
 
@@ -1060,7 +1166,11 @@ REGRAS DAS FOTOS (IMPORTANTE):
 
 FORMATO DE RESPOSTA:
 Cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases diretas (vai ser lido em imagem). Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
-E entao a LEGENDA do post: COMPLEMENTA os slides (nao repete), hook na primeira linha, 3-5 paragrafos curtos, CTA e 5-8 hashtags no final.`;
+E entao a LEGENDA do post: COMPLEMENTA os slides (nao repete), hook na primeira linha, 3-5 paragrafos curtos, CTA e 5-8 hashtags no final.${
+            caseMaterial
+              ? `\n\n## O CASE SELECIONADO (triagem automatica da base do Pedro)\nTitulo: ${caseMaterial.titulo}\n\n${caseMaterial.corpo}`
+              : ""
+          }`;
           break;
       }
 

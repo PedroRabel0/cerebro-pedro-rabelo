@@ -29,11 +29,11 @@ import {
 // --------------- constants ---------------
 
 type WizardStep = "source" | "types" | "details" | "result";
-const STEPS: WizardStep[] = ["source", "types", "details", "result"];
+const STEPS: WizardStep[] = ["types", "source", "details", "result"];
 const STEP_LABELS: Record<WizardStep, string> = {
-  source: "Fonte & Topico",
-  types: "Tipos de Conteudo",
-  details: "Formato & Detalhes",
+  types: "Formato",
+  source: "Fonte & Assunto",
+  details: "Detalhes",
   result: "Resultado",
 };
 
@@ -874,10 +874,10 @@ function CaseEmpresaFields() {
     <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-xs text-text-secondary">
       <p className="font-semibold text-accent">Sem campos extras</p>
       <p className="mt-1 leading-relaxed">
-        Escreva no <b>tema</b> a empresa e o case (ex.: &quot;Loja X dobrou o
-        faturamento sem aumentar trafego&quot;). A IA gera a ANALISE do Pedro em
-        carrossel — nenhuma imagem e gerada: as fotos reais entram no design,
-        em slots que indicam qual foto colocar em cada slide.
+        Nada a preencher: o case e garimpado automaticamente do que voce
+        alimentou no Conhecimento. A IA gera a ANALISE do Pedro em carrossel —
+        nenhuma imagem e gerada: no design, cada slide que pede foto tem um
+        slot clicavel pra voce colocar a foto real.
       </p>
     </div>
   );
@@ -1577,7 +1577,7 @@ export default function GenerationWizard({
   stories: StoryOption[];
   themes: ThemeOption[];
 }) {
-  const [step, setStep] = useState<WizardStep>("source");
+  const [step, setStep] = useState<WizardStep>("types");
   const [state, setState] = useState<WizardState>(initialState);
   const [generating, setGenerating] = useState(false);
   const [regeneratingType, setRegeneratingType] = useState<string | null>(null);
@@ -1626,14 +1626,19 @@ export default function GenerationWizard({
     });
     // Small delay so user sees the selection before advancing
     if (!state.selectedTypes.includes(t)) {
-      setTimeout(() => setStep("details"), 200);
+      setTimeout(() => setStep("source"), 200);
     }
   }
 
   const canNext = useMemo(() => {
     switch (step) {
       case "source":
-        return state.topic.trim().length > 0;
+        // case_empresa dispensa tema: a triagem do case e automatica
+        return (
+          state.topic.trim().length > 0 ||
+          (state.selectedTypes.length > 0 &&
+            state.selectedTypes.every((t) => t === "case_empresa"))
+        );
       case "types":
         return state.selectedTypes.length > 0;
       case "details":
@@ -1742,12 +1747,15 @@ export default function GenerationWizard({
     setState(initialState);
     setResults([]);
     setError("");
-    setStep("source");
+    setStep("types");
   }
 
   // --------------- render steps ---------------
 
   function renderSource() {
+    const caseOnly =
+      state.selectedTypes.length > 0 &&
+      state.selectedTypes.every((t) => t === "case_empresa");
     return (
       <div className="space-y-5">
         <div>
@@ -1759,7 +1767,18 @@ export default function GenerationWizard({
           />
         </div>
 
-        {/* Temas macro da base de conhecimento */}
+        {/* Temas macro da base de conhecimento (case_empresa: triagem automatica) */}
+        {caseOnly ? (
+          <div className="rounded-xl border border-accent/20 bg-accent/5 p-4 text-xs text-text-secondary">
+            <p className="font-semibold text-accent">Triagem automatica do case</p>
+            <p className="mt-1 leading-relaxed">
+              Nada pra escolher aqui: eu garimpo na sua base o material de case
+              mais recente e pertinente (o que voce alimentou no Conhecimento) e
+              gero a analise do Pedro sobre ele. Quer direcionar pra uma empresa
+              especifica? Use o campo &quot;Recorte&quot; abaixo (opcional).
+            </p>
+          </div>
+        ) : (
         <div>
           <FieldLabel>Sobre o que quer falar?</FieldLabel>
 
@@ -1833,6 +1852,7 @@ export default function GenerationWizard({
             A IA cruza todos os dados da base sobre o tema escolhido. Mesmo repetindo, o conteudo sera sempre diferente.
           </p>
         </div>
+        )}
 
         <TextField
           label="Recorte especifico (opcional)"

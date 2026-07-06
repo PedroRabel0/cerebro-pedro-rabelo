@@ -27,7 +27,31 @@ export default function SlideDesigner({ slides, hook, cta, title, hashtags, phot
   const [currentSlide, setCurrentSlide] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const [downloadingAll, setDownloadingAll] = useState(false);
+  // Fotos REAIS colocadas pelo usuario nos slots (indice do slide -> objectURL).
+  // Ficam so no navegador (montagem do design); saem no PNG exportado.
+  const [slidePhotos, setSlidePhotos] = useState<Record<number, string>>({});
+  const pendingPhotoIndex = useRef<number | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const slideRef = useRef<HTMLDivElement>(null);
+
+  function pickPhoto(index: number) {
+    pendingPhotoIndex.current = index;
+    photoInputRef.current?.click();
+  }
+
+  function handlePhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const index = pendingPhotoIndex.current;
+    if (file && index !== null && file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setSlidePhotos((prev) => {
+        if (prev[index]) URL.revokeObjectURL(prev[index]);
+        return { ...prev, [index]: url };
+      });
+    }
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    pendingPhotoIndex.current = null;
+  }
 
   // Build full slides array: cover + content slides + CTA slide
   const allSlides = buildSlideData(slides, hook, cta, title, photoHints);
@@ -173,6 +197,8 @@ export default function SlideDesigner({ slides, hook, cta, title, hashtags, phot
               <SlideRenderer
                 slide={allSlides[currentSlide]}
                 index={currentSlide}
+                photoUrl={slidePhotos[currentSlide]}
+                onPickPhoto={() => pickPhoto(currentSlide)}
               />
             </div>
           </div>
@@ -204,11 +230,21 @@ export default function SlideDesigner({ slides, hook, cta, title, hashtags, phot
         <span>{allSlides.length}</span>
       </div>
 
-      {/* Hidden full-size renders for download */}
+      {/* Input unico para as fotos dos slots */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handlePhotoChosen}
+        className="hidden"
+        aria-label="Escolher foto real para o slide"
+      />
+
+      {/* Hidden full-size renders for download (com as fotos, sem interacao) */}
       <div className="fixed -left-[9999px] -top-[9999px]" aria-hidden="true">
         {allSlides.map((slide, i) => (
           <div key={i} id={`slide-render-${i}`}>
-            <SlideRenderer slide={slide} index={i} />
+            <SlideRenderer slide={slide} index={i} photoUrl={slidePhotos[i]} />
           </div>
         ))}
       </div>
@@ -278,9 +314,41 @@ function buildSlideData(
  * Slot demarcado de FOTO REAL: sai no PNG exportado marcando exatamente onde
  * (e qual) foto o Pedro deve encaixar no design final. Nada e gerado por IA.
  */
-function PhotoSlot({ hint, height }: { hint: string; height: number }) {
+function PhotoSlot({
+  hint,
+  height,
+  photoUrl,
+  onPick,
+}: {
+  hint: string;
+  height: number;
+  photoUrl?: string;
+  onPick?: () => void;
+}) {
+  // Foto ja colocada: renderiza a imagem real (sai no PNG exportado).
+  // Clique troca a foto (so no preview interativo).
+  if (photoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={photoUrl}
+        alt={hint}
+        onClick={onPick}
+        style={{
+          width: "100%",
+          height,
+          objectFit: "cover",
+          borderRadius: 24,
+          flexShrink: 0,
+          cursor: onPick ? "pointer" : undefined,
+        }}
+      />
+    );
+  }
+
   return (
     <div
+      onClick={onPick}
       style={{
         width: "100%",
         height,
@@ -293,6 +361,7 @@ function PhotoSlot({ hint, height }: { hint: string; height: number }) {
         alignItems: "center",
         gap: 14,
         flexShrink: 0,
+        cursor: onPick ? "pointer" : undefined,
       }}
     >
       <span style={{ fontSize: 44, lineHeight: 1 }}>📷</span>
@@ -319,19 +388,48 @@ function PhotoSlot({ hint, height }: { hint: string; height: number }) {
       >
         {hint}
       </span>
+      {onPick && (
+        <span
+          style={{
+            color: "#888",
+            fontSize: 20,
+            fontWeight: 600,
+            letterSpacing: "0.04em",
+          }}
+        >
+          Clique para colocar a foto
+        </span>
+      )}
     </div>
   );
 }
 
 // --- Slide Renderer ---
 
-function SlideRenderer({ slide, index }: { slide: SlideData; index: number }) {
-  if (slide.type === "cover") return <CoverSlide slide={slide} />;
-  if (slide.type === "cta") return <CTASlide slide={slide} />;
-  return <ContentSlide slide={slide} />;
+function SlideRenderer({
+  slide,
+  index,
+  photoUrl,
+  onPickPhoto,
+}: {
+  slide: SlideData;
+  index: number;
+  photoUrl?: string;
+  onPickPhoto?: () => void;
+}) {
+  if (slide.type === "cover")
+    return <CoverSlide slide={slide} photoUrl={photoUrl} onPickPhoto={onPickPhoto} />;
+  if (slide.type === "cta")
+    return <CTASlide slide={slide} photoUrl={photoUrl} onPickPhoto={onPickPhoto} />;
+  return <ContentSlide slide={slide} photoUrl={photoUrl} onPickPhoto={onPickPhoto} />;
 }
 
-function CoverSlide({ slide }: { slide: SlideData }) {
+interface SlidePhotoProps {
+  photoUrl?: string;
+  onPickPhoto?: () => void;
+}
+
+function CoverSlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & SlidePhotoProps) {
   return (
     <div
       style={{
@@ -362,7 +460,7 @@ function CoverSlide({ slide }: { slide: SlideData }) {
       {/* Slot de foto real (case_empresa): a capa leva a foto da empresa */}
       {slide.photoHint && (
         <div style={{ width: "100%", maxWidth: 900, marginBottom: 44 }}>
-          <PhotoSlot hint={slide.photoHint} height={380} />
+          <PhotoSlot hint={slide.photoHint} height={380} photoUrl={photoUrl} onPick={onPickPhoto} />
         </div>
       )}
 
@@ -430,7 +528,7 @@ function CoverSlide({ slide }: { slide: SlideData }) {
   );
 }
 
-function ContentSlide({ slide }: { slide: SlideData }) {
+function ContentSlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & SlidePhotoProps) {
   const bodyFontSize = (slide.body?.length || 0) > 300 ? 32 : (slide.body?.length || 0) > 150 ? 36 : 40;
 
   return (
@@ -494,7 +592,7 @@ function ContentSlide({ slide }: { slide: SlideData }) {
       {/* Slot de foto real (case_empresa) */}
       {slide.photoHint && (
         <div style={{ marginBottom: 30 }}>
-          <PhotoSlot hint={slide.photoHint} height={300} />
+          <PhotoSlot hint={slide.photoHint} height={300} photoUrl={photoUrl} onPick={onPickPhoto} />
         </div>
       )}
 
@@ -533,7 +631,7 @@ function ContentSlide({ slide }: { slide: SlideData }) {
   );
 }
 
-function CTASlide({ slide }: { slide: SlideData }) {
+function CTASlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & SlidePhotoProps) {
   return (
     <div
       style={{
@@ -566,7 +664,7 @@ function CTASlide({ slide }: { slide: SlideData }) {
       {/* Slot de foto real (case_empresa) */}
       {slide.photoHint && (
         <div style={{ width: "100%", maxWidth: 800, marginBottom: 40, position: "relative" }}>
-          <PhotoSlot hint={slide.photoHint} height={300} />
+          <PhotoSlot hint={slide.photoHint} height={300} photoUrl={photoUrl} onPick={onPickPhoto} />
         </div>
       )}
 
