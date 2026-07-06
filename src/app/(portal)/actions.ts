@@ -34,8 +34,9 @@ export async function getClientCompany(): Promise<
     if (error || !data) return { error: "Empresa nao encontrada." };
     return { id: companyId, name: data.name as string };
   } catch (err) {
-    const m = err instanceof Error ? err.message : "Erro desconhecido";
-    return { error: m };
+    // Detalhe tecnico so no log — o cliente ve mensagem amigavel em PT-BR
+    log.error("[Portal] getClientCompany: " + String(err));
+    return { error: "Nao foi possivel carregar seus dados. Tente de novo em instantes." };
   }
 }
 
@@ -203,7 +204,12 @@ Retorne APENAS um JSON valido no formato:
     revalidatePath(PATH);
     return { answer: parsed!.answer, escalated: false };
   } catch (err) {
-    const m = err instanceof Error ? err.message : "Erro desconhecido";
-    return { error: `Falha ao consultar o Pedro IA: ${m}` };
+    // Nunca vazar erro tecnico (ex.: "overloaded_error", "429 rate_limit")
+    // pro cliente pagante — detalhe vai pro log, cliente ve PT-BR amigavel.
+    log.error("[Portal] askClient: " + String(err));
+    return {
+      error:
+        "Nao consegui responder agora — tente de novo em alguns instantes. Se continuar, a equipe do Pedro ja foi avisada.",
+    };
   }
 }

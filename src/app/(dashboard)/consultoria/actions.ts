@@ -89,6 +89,22 @@ export interface ConsultoriaOverview {
   cooling_clients: number;
 }
 
+
+/**
+ * Converte um erro tecnico (Postgres/Supabase) em mensagem amigavel PT-BR.
+ * O usuario via coisas como "duplicate key value violates unique constraint"
+ * ou "new row violates row-level security policy" direto na UI; agora o
+ * detalhe vai pro log e a tela mostra o que fazer.
+ */
+function erroAmigavel(error: unknown, acao: string): { error: string } {
+  const detalhe =
+    error instanceof Error
+      ? error.message
+      : (error as { message?: string })?.message || JSON.stringify(error);
+  log.error(`[Consultoria] Falha ao ${acao}: ${detalhe}`);
+  return { error: `Nao foi possivel ${acao}. Tente novamente.` };
+}
+
 export async function getConsultoriaData(): Promise<{
   companies: CompanyWithCounts[];
   overview: ConsultoriaOverview;
@@ -343,7 +359,7 @@ export async function createCompany(input: {
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "criar a empresa");
   revalidatePath(PATH);
   return { id: data.id };
 }
@@ -358,7 +374,7 @@ export async function updateCompany(
     .from("consulting_companies")
     .update({ ...fields, updated_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "salvar a empresa");
   revalidatePath(PATH);
   revalidatePath(`${PATH}/${id}`);
   return { ok: true };
@@ -375,7 +391,7 @@ export async function touchCompany(id: string): Promise<{ ok: true } | { error: 
     .from("consulting_companies")
     .update({ last_contact_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "registrar o contato com a empresa");
   revalidatePath(PATH);
   revalidatePath(`${PATH}/${id}`);
   return { ok: true };
@@ -385,7 +401,7 @@ export async function deleteCompany(id: string): Promise<{ ok: true } | { error:
   await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_companies").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "excluir a empresa");
   revalidatePath(PATH);
   return { ok: true };
 }
@@ -416,7 +432,7 @@ export async function createContact(
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "salvar o contato");
   revalidatePath(`${PATH}/${companyId}`);
   return { id: data.id };
 }
@@ -425,7 +441,7 @@ export async function deleteContact(id: string, companyId: string): Promise<{ ok
   await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_contacts").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "excluir o contato");
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }
@@ -479,7 +495,7 @@ export async function createMeeting(
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "salvar a reuniao");
   await advanceLastContact(supabase, companyId, heldAt);
   revalidatePath(PATH);
   revalidatePath(`${PATH}/${companyId}`);
@@ -490,7 +506,7 @@ export async function deleteMeeting(id: string, companyId: string): Promise<{ ok
   await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_meetings").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "excluir a reuniao");
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }
@@ -624,7 +640,7 @@ ${meeting.transcript.slice(0, 14000)}`;
 
     if (rows.length > 0) {
       const { error } = await supabase.from("consulting_tasks").insert(rows);
-      if (error) return { error: error.message };
+      if (error) return erroAmigavel(error, "processar a transcricao da reuniao");
     }
 
     // Processar uma reuniao implica que ela aconteceu -> conta como contato.
@@ -665,7 +681,7 @@ export async function createTask(
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "criar a tarefa");
   revalidatePath(`${PATH}/${companyId}`);
   return { id: data.id };
 }
@@ -681,7 +697,7 @@ export async function updateTask(
     .from("consulting_tasks")
     .update({ ...fields, updated_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "atualizar a tarefa");
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }
@@ -690,7 +706,7 @@ export async function deleteTask(id: string, companyId: string): Promise<{ ok: t
   await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_tasks").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "excluir a tarefa");
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }
@@ -771,7 +787,7 @@ export async function uploadDocument(
     .insert({ company_id: companyId, name: file.name, storage_path: path, kind })
     .select("id")
     .single();
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "enviar o documento");
 
   revalidatePath(`${PATH}/${companyId}`);
   return { id: data.id };
@@ -795,7 +811,7 @@ export async function deleteDocument(id: string, companyId: string): Promise<{ o
     await supabase.storage.from(DOCS_BUCKET).remove([doc.storage_path]);
   }
   const { error } = await supabase.from("consulting_documents").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "excluir o documento");
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }
@@ -822,7 +838,7 @@ export async function createStep(
     .insert({ company_id: companyId, title: input.title.trim(), target_date: input.target_date || null, ordem: count ?? 0 })
     .select("id")
     .single();
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "criar a etapa");
   revalidatePath(`${PATH}/${companyId}`);
   return { id: data.id };
 }
@@ -834,7 +850,7 @@ export async function toggleStep(id: string, companyId: string, done: boolean): 
     .from("consulting_steps")
     .update({ status: done ? "feita" : "pendente" })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "atualizar a etapa");
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }
@@ -843,7 +859,7 @@ export async function deleteStep(id: string, companyId: string): Promise<{ ok: t
   await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_steps").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "excluir a etapa");
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }
@@ -870,7 +886,7 @@ export async function createWin(
     })
     .select("id")
     .single();
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "registrar a vitoria");
   revalidatePath(`${PATH}/${companyId}`);
   return { id: data.id };
 }
@@ -879,7 +895,7 @@ export async function deleteWin(id: string, companyId: string): Promise<{ ok: tr
   await requireStaff();
   const supabase = await createClient();
   const { error } = await supabase.from("consulting_wins").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "excluir a vitoria");
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }
@@ -1091,7 +1107,7 @@ export async function importMeetingFromCalendar(
     title: title || "Reuniao da agenda",
     held_at: when,
   });
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "importar a reuniao da agenda");
   await advanceLastContact(supabase, companyId, when);
   revalidatePath(PATH);
   revalidatePath(`${PATH}/${companyId}`);
@@ -1171,7 +1187,7 @@ export async function scheduleMeeting(
     google_event_id: res.eventId,
     google_calendar_id: input.calendarId || "primary",
   });
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "agendar a reuniao");
 
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
@@ -1455,7 +1471,7 @@ export async function answerPendingQuestion(
     })
     .select("id, title")
     .single();
-  if (pbError) return { error: pbError.message };
+  if (pbError) return erroAmigavel(pbError, "enviar a resposta ao cliente");
 
   // Embedding em background (nao bloqueia a resposta)
   updatePlaybookEmbedding(newPlaybook.id, newPlaybook.title, principio).catch(() => {});
@@ -1507,10 +1523,10 @@ export async function createClientUser(
     app_metadata: { role: "cliente", company_id: companyId },
   });
   if (error) {
-    const msg = /already|registered|exists/i.test(error.message)
-      ? "Ja existe um usuario com este e-mail."
-      : error.message;
-    return { error: msg };
+    if (/already|registered|exists/i.test(error.message)) {
+      return { error: "Ja existe um usuario com este e-mail." };
+    }
+    return erroAmigavel(error, "criar o acesso do cliente");
   }
 
   const { error: linkErr } = await db.from("consulting_client_users").insert({
@@ -1519,7 +1535,7 @@ export async function createClientUser(
     name: input.name.trim(),
     email: input.email.trim(),
   });
-  if (linkErr) return { error: linkErr.message };
+  if (linkErr) return erroAmigavel(linkErr, "vincular o acesso do cliente a empresa");
 
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
@@ -1538,7 +1554,7 @@ export async function deleteClientUser(
 
   const { error } = await db.auth.admin.deleteUser(userId);
   if (error && !/not.*found/i.test(error.message)) {
-    return { error: error.message };
+    return erroAmigavel(error, "remover o acesso do cliente");
   }
 
   await db.from("consulting_client_users").delete().eq("user_id", userId);
@@ -1563,7 +1579,7 @@ export async function resetClientPassword(
   const { error } = await db.auth.admin.updateUserById(userId, {
     password: newPassword,
   });
-  if (error) return { error: error.message };
+  if (error) return erroAmigavel(error, "redefinir a senha do cliente");
   revalidatePath(`${PATH}/${companyId}`);
   return { ok: true };
 }

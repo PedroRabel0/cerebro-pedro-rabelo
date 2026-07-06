@@ -8,7 +8,6 @@ import {
   getChats,
   createChat,
   getChatMessages,
-  sendChatMessage,
   deleteChat,
 } from "@/app/(dashboard)/actions";
 
@@ -44,7 +43,10 @@ export default function BrainChat() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  // loading = esperando o PRIMEIRO token (mostra "Pensando...");
+  // streaming = resposta chegando token a token (bloqueia novo envio)
   const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   // Drawer mobile SEPARADO do painel desktop: com um state so (default true),
   // toda visita no celular abria com o drawer cobrindo o chat inteiro.
@@ -116,7 +118,7 @@ export default function BrainChat() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const question = input.trim();
-    if (!question || loading) return;
+    if (!question || loading || streaming) return;
 
     let chatId = activeChatId;
     if (!chatId) {
@@ -137,21 +139,59 @@ export default function BrainChat() {
     }]);
 
     try {
-      const { response } = await sendChatMessage(chatId, question);
-      setMessages((prev) => [...prev, {
-        id: `temp-${Date.now()}-brain`, role: "brain", content: response, created_at: new Date().toISOString(),
-      }]);
+      // Streaming: a resposta chega token a token via /api/brain-chat —
+      // sem 10-30s de spinner, e um corte no meio preserva o parcial.
+      const res = await fetch("/api/brain-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId, question }),
+      });
+
+      if (!res.ok || !res.body) {
+        // 429 (rate limit) traz mensagem PT-BR do servidor
+        const serverMsg = res.status === 429 ? await res.text() : "";
+        throw new Error(serverMsg || "Desculpa, tive um problema. Tenta de novo.");
+      }
+
+      const brainId = `temp-${Date.now()}-brain`;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let first = true;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        if (!chunk) continue;
+        if (first) {
+          first = false;
+          setLoading(false);   // some o "Pensando..." — a resposta comecou
+          setStreaming(true);
+          setMessages((prev) => [...prev, {
+            id: brainId, role: "brain", content: chunk, created_at: new Date().toISOString(),
+          }]);
+        } else {
+          setMessages((prev) => prev.map((m) =>
+            m.id === brainId ? { ...m, content: m.content + chunk } : m
+          ));
+        }
+      }
+
       setChats((prev) => prev.map((c) =>
         c.id === chatId
           ? { ...c, title: c.title === "Nova conversa" ? question.slice(0, 50) : c.title, updated_at: new Date().toISOString() }
           : c
       ));
-    } catch {
+    } catch (err) {
       setMessages((prev) => [...prev, {
-        id: `temp-${Date.now()}-err`, role: "brain", content: "Desculpa, tive um problema. Tenta de novo.", created_at: new Date().toISOString(),
+        id: `temp-${Date.now()}-err`,
+        role: "brain",
+        content: err instanceof Error && err.message ? err.message : "Desculpa, tive um problema. Tenta de novo.",
+        created_at: new Date().toISOString(),
       }]);
     } finally {
       setLoading(false);
+      setStreaming(false);
     }
   }
 
@@ -419,18 +459,18 @@ export default function BrainChat() {
                   onKeyDown={handleKeyDown}
                   placeholder={activeChatId ? "Pergunte ao Cerebro..." : "Crie uma conversa para comecar..."}
                   aria-label="Mensagem para o Cerebro"
-                  disabled={loading}
+                  disabled={loading || streaming}
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm text-text placeholder:text-text-muted/50 focus:outline-none focus-visible:outline-none disabled:opacity-50"
                   style={{ maxHeight: "150px" }}
                 />
                 <VoiceButton
                   onTranscript={(text) => setInput((prev) => prev ? prev + " " + text : text)}
-                  disabled={loading || !activeChatId}
+                  disabled={loading || streaming || !activeChatId}
                 />
                 <button
                   type="submit"
-                  disabled={loading || !input.trim()}
+                  disabled={loading || streaming || !input.trim()}
                   aria-label="Enviar mensagem"
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent text-white transition-all hover:bg-accent-hover disabled:opacity-30 disabled:bg-surface disabled:text-text-muted"
                 >

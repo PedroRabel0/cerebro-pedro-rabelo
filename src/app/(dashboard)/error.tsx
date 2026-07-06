@@ -18,7 +18,19 @@ export default function DashboardError({
 
         <h2 className="text-xl font-semibold text-text">Algo deu errado</h2>
 
-        <p className="text-sm text-text-muted">{error.message}</p>
+        {/* Em producao o Next redige error.message ("An error occurred in the
+            Server Components render...") — texto tecnico em ingles que nao
+            ajuda ninguem. Mensagem fixa em PT-BR + digest como codigo de
+            suporte (pesquisavel na tabela error_log). */}
+        <p className="text-sm text-text-muted">
+          Nao foi possivel carregar esta tela. Tente novamente — se o problema
+          continuar, me avisa com o codigo abaixo.
+        </p>
+        {error.digest && (
+          <p className="font-mono text-[11px] text-text-muted/60">
+            Codigo de suporte: {error.digest}
+          </p>
+        )}
 
         <button
           onClick={reset}

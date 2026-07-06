@@ -5,6 +5,24 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Brain } from "lucide-react";
 
+/**
+ * Traduz os erros do Supabase Auth (que chegam em inglês) para mensagens
+ * amigáveis em PT-BR — a porta de entrada é usada também por clientes da
+ * consultoria.
+ */
+function loginErrorPtBr(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("invalid login credentials"))
+    return "E-mail ou senha incorretos.";
+  if (m.includes("email not confirmed"))
+    return "Este e-mail ainda não foi confirmado. Fale com a equipe do Pedro.";
+  if (m.includes("rate limit") || m.includes("too many"))
+    return "Muitas tentativas seguidas. Aguarde um minuto e tente de novo.";
+  if (m.includes("network") || m.includes("fetch"))
+    return "Falha de conexão. Verifique sua internet e tente novamente.";
+  return "Não foi possível entrar. Confira os dados e tente novamente.";
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,7 +44,7 @@ export default function LoginPage() {
       password,
     });
     if (error) {
-      setError(error.message);
+      setError(loginErrorPtBr(error.message));
     } else {
       const {
         data: { user },
