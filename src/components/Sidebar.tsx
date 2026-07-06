@@ -25,7 +25,6 @@ import {
   NotebookPen,
   Upload,
   Briefcase,
-  Building2,
 } from "lucide-react";
 import { useUserRole, type UserRole } from "@/lib/hooks/useUserRole";
 
@@ -48,7 +47,6 @@ const navSections: NavSection[] = [
       { href: "/", label: "Cérebro", Icon: Brain },
       { href: "/base-de-conhecimento", label: "Conhecimento", Icon: BookOpen },
       { href: "/gerar-conteudo", label: "Geração", Icon: Sparkles },
-      { href: "/cases", label: "Cases", Icon: Building2 },
     ],
   },
   {

@@ -50,6 +50,7 @@ const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: "instagram_frase", label: "Instagram Frase" },
   { value: "instagram_carousel_educativo", label: "Instagram Educativo" },
   { value: "instagram_static", label: "Instagram Estatico" },
+  { value: "case_empresa", label: "Case de Empresa (Analise do Pedro)" },
   { value: "youtube_long", label: "YouTube Longo" },
   { value: "youtube_short", label: "YouTube Short" },
   { value: "linkedin_post", label: "LinkedIn Post" },
@@ -66,6 +67,7 @@ const CONTENT_GROUPS: { platform: string; types: { value: ContentType; label: st
       { value: "instagram_frase", label: "Frase" },
       { value: "instagram_carousel_educativo", label: "Educativo" },
       { value: "instagram_static", label: "Estático" },
+      { value: "case_empresa", label: "Case de Empresa" },
     ],
   },
   {
@@ -867,6 +869,20 @@ function InstagramEstaticoFields({
   );
 }
 
+function CaseEmpresaFields() {
+  return (
+    <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-xs text-text-secondary">
+      <p className="font-semibold text-accent">Sem campos extras</p>
+      <p className="mt-1 leading-relaxed">
+        Escreva no <b>tema</b> a empresa e o case (ex.: &quot;Loja X dobrou o
+        faturamento sem aumentar trafego&quot;). A IA gera a ANALISE do Pedro em
+        carrossel — nenhuma imagem e gerada: as fotos reais entram no design,
+        em slots que indicam qual foto colocar em cada slide.
+      </p>
+    </div>
+  );
+}
+
 function TypeDetailFields({
   type,
   details,
@@ -897,6 +913,8 @@ function TypeDetailFields({
       return <YoutubeShortFields details={details} update={update} />;
     case "instagram_static":
       return <InstagramEstaticoFields details={details} update={update} />;
+    case "case_empresa":
+      return <CaseEmpresaFields />;
     default:
       return null;
   }
@@ -943,12 +961,14 @@ function SourceMapDisplay({ sourceMap }: { sourceMap: Record<string, unknown> | 
 function CarouselDesignPreview({
   content,
   wizardState,
+  contentType = "instagram_carousel",
 }: {
   content: string;
   wizardState: WizardState;
+  contentType?: ContentType;
 }) {
   const parsed = parseCarouselSlides(content);
-  const details = wizardState.typeDetails["instagram_carousel"] || {};
+  const details = wizardState.typeDetails[contentType] || {};
   const title =
     wizardState.topic ||
     wizardState.recorte ||
@@ -961,6 +981,7 @@ function CarouselDesignPreview({
       cta={details.cta || parsed.cta}
       title={title}
       hashtags={[]}
+      photoHints={parsed.photoHints}
     />
   );
 }
@@ -1402,10 +1423,15 @@ function ResultCard({
         </div>
       </div>
 
-      {/* SlideDesigner for carousels */}
-      {result.contentType === "instagram_carousel" && (
+      {/* SlideDesigner for carousels (case_empresa: com slots de foto real) */}
+      {(result.contentType === "instagram_carousel" ||
+        result.contentType === "case_empresa") && (
         <div className="mt-4">
-          <CarouselDesignPreview content={text} wizardState={wizardState} />
+          <CarouselDesignPreview
+            content={text}
+            wizardState={wizardState}
+            contentType={result.contentType}
+          />
         </div>
       )}
 
@@ -1486,28 +1512,31 @@ function ResultCard({
           Regenerar
         </button>
 
-        <button
-          onClick={async () => {
-            setGeneratingImage(true);
-            setImageError(null);
-            const res = await generateImageForContent(result.id, text, result.contentType);
-            if ("error" in res) {
-              setImageError(res.error);
-            } else {
-              setGeneratedImageUrl(res.imageUrl);
-            }
-            setGeneratingImage(false);
-          }}
-          disabled={generatingImage}
-          className="flex items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 px-3 py-1.5 font-mono text-xs text-accent transition hover:bg-accent/20 disabled:opacity-50"
-        >
-          {generatingImage ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <ImageIcon className="h-3 w-3" />
-          )}
-          {generatingImage ? "Gerando..." : "Gerar Imagem"}
-        </button>
+        {/* case_empresa usa FOTOS REAIS (slots no design) — sem imagem de IA */}
+        {result.contentType !== "case_empresa" && (
+          <button
+            onClick={async () => {
+              setGeneratingImage(true);
+              setImageError(null);
+              const res = await generateImageForContent(result.id, text, result.contentType);
+              if ("error" in res) {
+                setImageError(res.error);
+              } else {
+                setGeneratedImageUrl(res.imageUrl);
+              }
+              setGeneratingImage(false);
+            }}
+            disabled={generatingImage}
+            className="flex items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 px-3 py-1.5 font-mono text-xs text-accent transition hover:bg-accent/20 disabled:opacity-50"
+          >
+            {generatingImage ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <ImageIcon className="h-3 w-3" />
+            )}
+            {generatingImage ? "Gerando..." : "Gerar Imagem"}
+          </button>
+        )}
 
         <div className="ml-auto flex flex-wrap gap-1">
           <button

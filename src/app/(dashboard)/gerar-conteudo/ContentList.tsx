@@ -574,7 +574,9 @@ export default function ContentList({
           const imageUrls = parseImageUrls(freshImages[c.id] || c.image_url);
           const hasImage = imageUrls.length > 0;
           const isCopied = copiedId === c.id;
-          const isCarousel = c.content_type === "instagram_carousel";
+          const isCarousel =
+            c.content_type === "instagram_carousel" ||
+            c.content_type === "case_empresa";
           const displayText = refinedTexts[c.id] || c.content_text;
           const displayPrompt = refinedPrompts[c.id] || c.image_prompt;
 
@@ -919,6 +921,7 @@ export default function ContentList({
                             slides={parsed.slides}
                             hook={parsed.hook}
                             cta={parsed.cta}
+                            photoHints={parsed.photoHints}
                             title={
                               c.free_text_input ||
                               c.playbook?.title ||

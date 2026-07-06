@@ -9,6 +9,7 @@ const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: "instagram_reel", label: "Instagram Reel" },
   { value: "instagram_carousel", label: "Instagram Carousel" },
   { value: "instagram_static", label: "Instagram Static" },
+  { value: "case_empresa", label: "Case de Empresa" },
   { value: "youtube_long", label: "YouTube Long" },
   { value: "youtube_short", label: "YouTube Short" },
   { value: "linkedin_post", label: "LinkedIn Post" },
@@ -30,6 +31,8 @@ export function contentTypeBadgeColor(ct: string): string {
     case "x_thread":
     case "x_tweet":
       return "bg-border-light text-text";
+    case "case_empresa":
+      return "bg-accent/15 text-accent";
     default:
       return "bg-text-muted text-text";
   }

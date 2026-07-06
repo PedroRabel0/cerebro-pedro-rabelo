@@ -288,6 +288,7 @@ export type ContentType =
   | "instagram_carousel_educativo"
   | "instagram_frase"
   | "instagram_static"
+  | "case_empresa"
   | "youtube_long"
   | "youtube_short"
   | "linkedin_post"

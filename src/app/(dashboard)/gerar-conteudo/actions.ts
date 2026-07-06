@@ -1034,6 +1034,34 @@ INSTRUCOES DO FORMATO:
 Depois de TODOS os slides, escreva uma linha exatamente assim: ---LEGENDA---
 E entao a LEGENDA do post de Instagram: 3-4 paragrafos curtos que COMPLEMENTAM o carrossel (NAO repita o conteudo dos slides; contextualize, provoque ou conte um bastidor pessoal) e termine com um CTA. Essa legenda e o texto que vai na descricao do post.`;
           break;
+        case "case_empresa":
+          typeInstructions = `FORMATO: Case de Empresa — ANALISE DO PEDRO em carrossel de Instagram (6 a 8 slides)
+
+O TOPICO informado e o case/empresa a analisar. Isto NAO e um resumo institucional nem um texto neutro de wikipedia: e a LEITURA OPINATIVA do Pedro sobre o case — a opiniao e os frameworks DELE aplicados ao que a empresa fez (use a base de conhecimento abaixo como lente; cite o conceito/framework quando couber).
+
+ESTRUTURA OBRIGATORIA:
+
+**SLIDE 1 — CAPA:**
+- Gancho forte na voz do Pedro sobre o case, maximo 10 palavras de impacto.
+- A capa leva FOTO REAL da empresa: inclua ao final do slide uma linha no formato [FOTO: qual foto usar — fachada, produto, print de resultado, foto do fundador...]
+
+**SLIDES 2 a N-1 — A ANALISE:**
+- 1 slide de CONTEXTO: o que a empresa fez, direto e factual (2-3 frases). Geralmente leva foto real: inclua [FOTO: ...] quando fizer sentido (print de numero, foto do produto/operacao).
+- 2 a 4 slides de INSIGHT: por que funcionou (ou falhou) NA VISAO DO PEDRO. Conecte com os frameworks/playbooks da base. Opiniao forte, tom de quem ja operou. Slides de insight normalmente NAO levam foto — nao inclua a linha [FOTO: ...] neles.
+- 1 slide "O QUE EU FARIA": o que o Pedro replicaria ou faria diferente nesse case.
+
+**ULTIMO SLIDE — LICAO + CTA:**
+- A licao acionavel para o seguidor aplicar no proprio negocio + CTA especifico (salvar/comentar/compartilhar com motivo concreto).
+
+REGRAS DAS FOTOS (IMPORTANTE):
+- Nenhuma imagem e gerada por IA. Os marcadores [FOTO: ...] viram SLOTS no design para as fotos reais.
+- Use o marcador SO onde uma foto real da empresa agrega (capa e OBRIGATORIA; contexto/resultados geralmente sim; insight/opiniao nao).
+- O marcador e SEMPRE a ultima linha do slide, exatamente no formato: [FOTO: descricao curta de qual foto colocar]
+
+FORMATO DE RESPOSTA:
+Cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases diretas (vai ser lido em imagem). Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
+E entao a LEGENDA do post: COMPLEMENTA os slides (nao repete), hook na primeira linha, 3-5 paragrafos curtos, CTA e 5-8 hashtags no final.`;
+          break;
       }
 
       // Build source-specific instructions
@@ -1245,7 +1273,12 @@ REGRAS:
 
       // Generate image prompt inline (skip for carousel_educativo — it embeds its own design prompt)
       let imagePrompt: string | null = null;
-      if (contentType !== "instagram_carousel_educativo") {
+      // case_empresa tambem fica FORA do gerador de prompt de imagem:
+      // as fotos sao REAIS (slots no design), nada e gerado por IA.
+      if (
+        contentType !== "instagram_carousel_educativo" &&
+        contentType !== "case_empresa"
+      ) {
         try {
           const promptResult = await generateImagePrompt(result.content_text, contentType);
           if (!("error" in promptResult)) {

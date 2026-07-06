@@ -9,6 +9,13 @@ interface SlideDesignerProps {
   cta: string;
   title: string;
   hashtags: string[];
+  /**
+   * Hints de FOTO REAL por posicao, alinhados com [capa, ...slides, cta]
+   * (vindos do parseCarouselSlides — tipo "case_empresa"). Onde houver hint,
+   * o slide renderiza um SLOT demarcado para o Pedro encaixar a foto real
+   * dele no design. null/ausente = slide so de texto (comportamento atual).
+   */
+  photoHints?: (string | null)[];
 }
 
 /**
@@ -16,14 +23,14 @@ interface SlideDesignerProps {
  * Renders slides with Pedro's brand identity (black + red).
  * Supports PNG download via canvas.
  */
-export default function SlideDesigner({ slides, hook, cta, title, hashtags }: SlideDesignerProps) {
+export default function SlideDesigner({ slides, hook, cta, title, hashtags, photoHints }: SlideDesignerProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const [downloadingAll, setDownloadingAll] = useState(false);
   const slideRef = useRef<HTMLDivElement>(null);
 
   // Build full slides array: cover + content slides + CTA slide
-  const allSlides = buildSlideData(slides, hook, cta, title);
+  const allSlides = buildSlideData(slides, hook, cta, title, photoHints);
 
   const goNext = () => setCurrentSlide((p) => Math.min(p + 1, allSlides.length - 1));
   const goPrev = () => setCurrentSlide((p) => Math.max(p - 1, 0));
@@ -218,21 +225,26 @@ interface SlideData {
   number?: number;
   total?: number;
   subtitle?: string;
+  /** Hint de foto real — renderiza o slot demarcado no slide */
+  photoHint?: string | null;
 }
 
 function buildSlideData(
   slides: string[],
   hook: string,
   cta: string,
-  title: string
+  title: string,
+  photoHints?: (string | null)[]
 ): SlideData[] {
   const result: SlideData[] = [];
+  const hints = photoHints ?? [];
 
   // Cover slide
   result.push({
     type: "cover",
     heading: hook || title,
     subtitle: "Deslize para aprender →",
+    photoHint: hints[0] ?? null,
   });
 
   // Content slides
@@ -247,6 +259,7 @@ function buildSlideData(
       body: hasHeading ? text.slice(parts[0].length + 1).trim() : text,
       number: i + 1,
       total: slides.length,
+      photoHint: hints[i + 1] ?? null,
     });
   });
 
@@ -255,9 +268,59 @@ function buildSlideData(
     type: "cta",
     heading: cta || "Salve este post e compartilhe com um empreendedor.",
     subtitle: "@pedrorabelo",
+    photoHint: hints[slides.length + 1] ?? null,
   });
 
   return result;
+}
+
+/**
+ * Slot demarcado de FOTO REAL: sai no PNG exportado marcando exatamente onde
+ * (e qual) foto o Pedro deve encaixar no design final. Nada e gerado por IA.
+ */
+function PhotoSlot({ hint, height }: { hint: string; height: number }) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height,
+        border: "3px dashed #E31B23",
+        borderRadius: 24,
+        background: "rgba(227,27,35,0.06)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 14,
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ fontSize: 44, lineHeight: 1 }}>📷</span>
+      <span
+        style={{
+          color: "#E31B23",
+          fontSize: 22,
+          fontWeight: 800,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        }}
+      >
+        Foto real aqui
+      </span>
+      <span
+        style={{
+          color: "#d4d4d4",
+          fontSize: 24,
+          fontWeight: 500,
+          textAlign: "center",
+          maxWidth: 700,
+          lineHeight: 1.4,
+        }}
+      >
+        {hint}
+      </span>
+    </div>
+  );
 }
 
 // --- Slide Renderer ---
@@ -296,11 +359,18 @@ function CoverSlide({ slide }: { slide: SlideData }) {
         }}
       />
 
+      {/* Slot de foto real (case_empresa): a capa leva a foto da empresa */}
+      {slide.photoHint && (
+        <div style={{ width: "100%", maxWidth: 900, marginBottom: 44 }}>
+          <PhotoSlot hint={slide.photoHint} height={380} />
+        </div>
+      )}
+
       {/* Main heading */}
       <h1
         style={{
           color: "#ffffff",
-          fontSize: 64,
+          fontSize: slide.photoHint ? 54 : 64,
           fontWeight: 800,
           lineHeight: 1.15,
           textAlign: "center",
@@ -421,11 +491,18 @@ function ContentSlide({ slide }: { slide: SlideData }) {
         </h2>
       )}
 
+      {/* Slot de foto real (case_empresa) */}
+      {slide.photoHint && (
+        <div style={{ marginBottom: 30 }}>
+          <PhotoSlot hint={slide.photoHint} height={300} />
+        </div>
+      )}
+
       {/* Body */}
       <p
         style={{
           color: "#d4d4d4",
-          fontSize: bodyFontSize,
+          fontSize: slide.photoHint ? Math.min(bodyFontSize, 32) : bodyFontSize,
           fontWeight: 400,
           lineHeight: 1.6,
           flex: 1,
@@ -486,11 +563,18 @@ function CTASlide({ slide }: { slide: SlideData }) {
         }}
       />
 
+      {/* Slot de foto real (case_empresa) */}
+      {slide.photoHint && (
+        <div style={{ width: "100%", maxWidth: 800, marginBottom: 40, position: "relative" }}>
+          <PhotoSlot hint={slide.photoHint} height={300} />
+        </div>
+      )}
+
       {/* CTA text */}
       <h2
         style={{
           color: "#ffffff",
-          fontSize: 52,
+          fontSize: slide.photoHint ? 44 : 52,
           fontWeight: 800,
           lineHeight: 1.3,
           textAlign: "center",

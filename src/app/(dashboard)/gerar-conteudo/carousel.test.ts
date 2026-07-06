@@ -59,3 +59,45 @@ describe("parseCarouselSlides", () => {
     expect(r.cta).toBe("Fim");
   });
 });
+
+describe("parseCarouselSlides — fotos reais ([FOTO: ...], tipo case_empresa)", () => {
+  it("extrai os hints e limpa o texto dos slides", () => {
+    const r = parseCarouselSlides(
+      `SLIDE 1:
+A loja que dobrou o faturamento sem gastar mais em trafego
+[FOTO: fachada da loja]
+
+SLIDE 2:
+O contexto
+Loja de moda, 2 anos de operacao, faturamento travado.
+[FOTO: print do faturamento antes]
+
+SLIDE 3:
+O insight
+Eles pararam de comprar trafego e arrumaram a esteira de LTV primeiro.
+
+SLIDE 4:
+Salva esse case. E me diz: qual etapa da SUA esteira esta vazando?
+
+---LEGENDA---
+Case real que eu analisei essa semana. #ecommerce`
+    );
+    // hints alinhados com [capa, ...slides, cta]
+    expect(r.photoHints).toEqual([
+      "fachada da loja",
+      "print do faturamento antes",
+      null,
+      null,
+    ]);
+    // texto limpo, sem o marcador
+    expect(r.hook).not.toContain("[FOTO");
+    expect(r.slides[0]).not.toContain("[FOTO");
+    expect(r.hook).toContain("dobrou o faturamento");
+    expect(r.slides[0]).toContain("faturamento travado");
+  });
+
+  it("formatos sem marcador retornam hints todos null (retrocompatibilidade)", () => {
+    const r = parseCarouselSlides(`Capa\n\nMeio\n\nFim`);
+    expect(r.photoHints).toEqual([null, null, null]);
+  });
+});
