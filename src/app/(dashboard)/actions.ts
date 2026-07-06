@@ -252,7 +252,7 @@ export async function submitFileInput(formData: FormData) {
     // Delegate to normal processing
     const origin = (formData.get("origin") as string) || "pedro";
     const skipInsights = formData.get("skipInsights") === "true";
-    return submitUniversalInput(enrichedInput.slice(0, 60000), origin as "pedro" | "outros", skipInsights);
+    return prepareUniversalInput(enrichedInput.slice(0, 60000), origin as "pedro" | "outros", skipInsights);
 
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
@@ -261,7 +261,11 @@ export async function submitFileInput(formData: FormData) {
   }
 }
 
-export async function submitUniversalInput(
+/**
+ * FASE 1 do Alimentar: adquire o conteudo (texto/YouTube/Instagram), salva a
+ * captura e retorna rapido. A IA roda na FASE 2 (processCaptureNow).
+ */
+export async function prepareUniversalInput(
   input: string,
   origin: "pedro" | "outros" = "pedro",
   skipInsights: boolean = false
@@ -424,6 +428,64 @@ export async function submitUniversalInput(
       instagramData,
       origin,
     };
+  }
+
+  // FASE 1 termina aqui: conteudo (ja enriquecido por YouTube/Instagram)
+  // salvo na captura. O pipeline de IA roda na FASE 2 (processCaptureNow),
+  // em chamada separada — inline, conteudos grandes estouravam os 60s da
+  // Vercel e a action morria sem resposta ("unexpected response").
+  if (aiInput !== input) {
+    await supabase
+      .from("captures")
+      .update({ raw_content: aiInput.replace(/\0/g, "").slice(0, 100000) })
+      .eq("id", capture.id);
+  }
+  revalidatePath("/");
+  return {
+    captureId: capture.id,
+    status: "ready" as const,
+    instagramData,
+    origin,
+  };
+}
+
+/**
+ * FASE 2 do Alimentar: roda o pipeline de IA sobre uma captura ja salva e
+ * grava as propostas. Chamada separada da FASE 1 de proposito — e retryavel:
+ * se estourar o teto de 60s, nada se perde (o conteudo esta na captura) e a
+ * UI oferece reprocessar sem reenviar o arquivo.
+ */
+export async function processCaptureNow(captureId: string) {
+  await requireStaff();
+  const supabase = await createClient();
+
+  const { data: captureRow } = await supabase
+    .from("captures")
+    .select("id, raw_content, context, source_type, source_url")
+    .eq("id", captureId)
+    .maybeSingle();
+  if (!captureRow) {
+    return {
+      captureId,
+      status: "saved_without_ai" as const,
+      instagramData: null,
+      error: "Captura nao encontrada.",
+    };
+  }
+
+  const capture = { id: captureRow.id as string };
+  const aiInput: string = captureRow.raw_content || "";
+  const sourceType = (captureRow.source_type || "manual") as CaptureSourceType;
+  const origin: "pedro" | "outros" = (captureRow.context || "").includes(
+    "origem:outros"
+  )
+    ? "outros"
+    : "pedro";
+  const sourceUrl: string | null = captureRow.source_url ?? null;
+  const instagramData = null;
+
+  if (!aiInput.trim()) {
+    return { captureId, status: "saved_without_ai" as const, instagramData };
   }
 
   // 5. AI Processing — Pipeline KB v2 (extração + reconciliação + linkagem)
@@ -609,8 +671,8 @@ export async function submitUniversalInput(
         detected_type: pipelineResult.detected_type,
         title: pipelineResult.title,
         summary: pipelineResult.summary,
-        source_url: isUrl ? input.trim() : null,
-        raw_content: input,
+        source_url: sourceUrl,
+        raw_content: aiInput,
         proposals: legacyProposals,
         extracted_themes: pipelineResult.extracted_themes,
         speaker_verified: pipelineResult.speaker_verified,
@@ -624,6 +686,22 @@ export async function submitUniversalInput(
     return { captureId: capture.id, status: "saved_without_ai" as const, instagramData };
   }
 }
+
+/**
+ * Compat: fases 1 + 2 inline (comportamento antigo). A UI do Alimentar usa
+ * as fases separadas para conteudos grandes nao estourarem os 60s.
+ */
+export async function submitUniversalInput(
+  input: string,
+  origin: "pedro" | "outros" = "pedro",
+  skipInsights: boolean = false
+) {
+  const prep = await prepareUniversalInput(input, origin, skipInsights);
+  if (prep.status !== "ready") return prep;
+  const processed = await processCaptureNow(prep.captureId);
+  return { ...processed, instagramData: prep.instagramData ?? null, origin };
+}
+
 
 
 // --- Dashboard Queries ---

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { submitUniversalInput, submitFileInput } from "@/app/(dashboard)/actions";
+import { submitFileInput, prepareUniversalInput, processCaptureNow } from "@/app/(dashboard)/actions";
 import VoiceButton from "@/components/VoiceButton";
 import {
   Send,
@@ -249,6 +249,9 @@ export default function UniversalInput() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const processingRef = useRef(false);
+  // Captura salva cuja FASE 2 (IA) falhou/estourou o tempo — permite
+  // reprocessar sem reenviar o arquivo.
+  const [pendingCaptureId, setPendingCaptureId] = useState<string | null>(null);
 
   // On mount: check if we were processing before navigating away
   useEffect(() => {
@@ -340,7 +343,7 @@ export default function UniversalInput() {
         res = await submitFileInput(formData);
       } else {
         setCurrentStep(1);
-        res = await submitUniversalInput(input.trim(), contentOrigin, skipInsights);
+        res = await prepareUniversalInput(input.trim(), contentOrigin, skipInsights);
       }
 
       // Clear processing state
@@ -353,6 +356,31 @@ export default function UniversalInput() {
         setErrorMessage(resAny.error as string);
         setState("error");
         return;
+      }
+
+      // FASE 2: pipeline de IA em chamada separada. Se estourar o teto de
+      // 60s, o conteudo JA esta salvo — o retry reprocessa sem reenviar.
+      if (resAny.status === "ready" && typeof resAny.captureId === "string") {
+        const capId = resAny.captureId as string;
+        setPendingCaptureId(capId);
+        let processed: Record<string, unknown>;
+        try {
+          processed = (await processCaptureNow(capId)) as Record<string, unknown>;
+        } catch {
+          throw new Error(
+            "Seu conteudo FOI salvo, mas o processamento da IA passou do tempo. Clique em Tentar novamente para reprocessar (sem reenviar o arquivo)."
+          );
+        }
+        if (processed.error && typeof processed.error === "string") {
+          setErrorMessage(processed.error as string);
+          setState("error");
+          return;
+        }
+        res = {
+          ...processed,
+          instagramData: resAny.instagramData ?? null,
+        } as typeof res;
+        setPendingCaptureId(null);
       }
 
       setSteps((prev) => prev.map((s) => ({ ...s, status: "done" as const })));
@@ -377,7 +405,39 @@ export default function UniversalInput() {
     }
   }
 
+  async function retryProcessing() {
+    if (!pendingCaptureId) return;
+    setErrorMessage(null);
+    setState("processing");
+    setSteps([{ label: "Reprocessando com Claude AI", status: "active" as const }]);
+    setCurrentStep(0);
+    processingRef.current = true;
+    try {
+      const processed = (await processCaptureNow(pendingCaptureId)) as Record<string, unknown>;
+      if (processed.error && typeof processed.error === "string") {
+        setErrorMessage(processed.error as string);
+        setState("error");
+        return;
+      }
+      setSteps((prev) => prev.map((s) => ({ ...s, status: "done" as const })));
+      setResult(processed as unknown as ProcessResult);
+      setState("done");
+      setPendingCaptureId(null);
+      setInput("");
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch {
+      setErrorMessage(
+        "Ainda passou do tempo. O conteudo continua salvo — tente reprocessar de novo em instantes."
+      );
+      setState("error");
+    } finally {
+      processingRef.current = false;
+    }
+  }
+
   function handleReset() {
+    setPendingCaptureId(null);
     setState("idle");
     setResult(null);
     setSteps([]);
@@ -722,10 +782,13 @@ export default function UniversalInput() {
             </div>
           </div>
           <button
-            onClick={() => { handleReset(); setErrorMessage(null); }}
+            onClick={() => {
+              if (pendingCaptureId) retryProcessing();
+              else { handleReset(); setErrorMessage(null); }
+            }}
             className="mt-3 rounded-lg bg-card px-3 py-1.5 font-mono text-[11px] text-text-muted transition hover:text-text"
           >
-            Tentar novamente
+            {pendingCaptureId ? "Reprocessar (sem reenviar)" : "Tentar novamente"}
           </button>
         </div>
       )}
