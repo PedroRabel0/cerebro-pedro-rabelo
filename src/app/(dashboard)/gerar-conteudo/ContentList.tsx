@@ -14,6 +14,7 @@ import {
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
+import CaseSlideDesigner from "@/components/CaseSlideDesigner";
 import { parseCarouselSlides } from "./carousel";
 import { useConfirm } from "@/components/ConfirmProvider";
 import {
@@ -916,18 +917,25 @@ export default function ContentList({
                     <div className="rounded-xl border border-border bg-surface/30 p-4">
                       {(() => {
                         const parsed = parseCarouselSlides(c.content_text);
-                        return (
+                        const designTitle =
+                          c.free_text_input || c.playbook?.title || "Carousel";
+                        return c.content_type === "case_empresa" ? (
+                          <CaseSlideDesigner
+                            slides={parsed.slides}
+                            hook={parsed.hook}
+                            cta={parsed.cta}
+                            title={designTitle}
+                            photoHints={parsed.photoHints}
+                            slideRoles={parsed.slideRoles}
+                            companyBrand={parsed.companyBrand}
+                          />
+                        ) : (
                           <SlideDesigner
                             slides={parsed.slides}
                             hook={parsed.hook}
                             cta={parsed.cta}
                             photoHints={parsed.photoHints}
-                            companyBrand={parsed.companyBrand}
-                            title={
-                              c.free_text_input ||
-                              c.playbook?.title ||
-                              "Carousel"
-                            }
+                            title={designTitle}
                             hashtags={[]}
                           />
                         );

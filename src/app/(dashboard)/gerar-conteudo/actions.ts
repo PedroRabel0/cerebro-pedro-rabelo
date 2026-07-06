@@ -1141,6 +1141,14 @@ ESTRUTURA OBRIGATORIA:
 **ULTIMO SLIDE — LICAO + CTA:**
 - A licao acionavel para o seguidor aplicar no proprio negocio + CTA especifico (salvar/comentar/compartilhar com motivo concreto).
 
+PAPEL DE CADA SLIDE (IMPORTANTE — define o layout do design):
+- Em CADA slide do meio, inclua uma linha com o papel dele, exatamente neste formato:
+  [TIPO: contexto] — o slide factual do que a empresa fez
+  [TIPO: insight] — os slides de leitura/tese do Pedro
+  [TIPO: acao] — o slide "o que EU faria no lugar deles" (use em exatamente 1 slide)
+  [TIPO: licao] — se houver slide de licao antes do CTA final
+- Capa (SLIDE 1) e ultimo slide nao precisam do marcador.
+
 REGRAS DAS FOTOS (IMPORTANTE):
 - Nenhuma imagem e gerada por IA. Os marcadores [FOTO: ...] viram SLOTS no design para as fotos reais.
 - Use o marcador SO onde uma foto real da empresa agrega (capa e OBRIGATORIA; contexto/resultados geralmente sim; insight/opiniao nao).

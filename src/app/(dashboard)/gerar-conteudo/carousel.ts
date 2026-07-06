@@ -41,17 +41,33 @@ export interface ParsedCarousel {
    * Usada pra fundir a cara do Pedro com a da empresa no design.
    */
   companyBrand: CompanyBrand | null;
+  /**
+   * Papel de cada slide (marcador [TIPO: contexto|insight|acao|licao]),
+   * alinhado com [capa, ...slides, cta]. O template dossie do case escolhe
+   * o LAYOUT pelo papel. null = sem papel declarado (layout padrao).
+   */
+  slideRoles: (string | null)[];
 }
 
 const FOTO_RE = /\[\s*FOTO:\s*([^\]]+)\]/i;
+const TIPO_RE = /\[\s*TIPO:\s*([a-zA-Z_]+)\s*\]/i;
 
-/** Extrai (e remove do texto) o marcador [FOTO: ...] de um slide. */
-function extractPhoto(text: string): { text: string; hint: string | null } {
-  const m = text.match(FOTO_RE);
-  if (!m) return { text: text.trim(), hint: null };
+/** Extrai (e remove do texto) os marcadores [FOTO: ...] e [TIPO: ...] de um slide. */
+function extractPhoto(text: string): {
+  text: string;
+  hint: string | null;
+  role: string | null;
+} {
+  const mFoto = text.match(FOTO_RE);
+  const mTipo = text.match(TIPO_RE);
+  let clean = text;
+  if (mFoto) clean = clean.replace(FOTO_RE, " ");
+  if (mTipo) clean = clean.replace(TIPO_RE, " ");
+  clean = clean.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   return {
-    text: text.replace(FOTO_RE, " ").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(),
-    hint: m[1].trim(),
+    text: clean,
+    hint: mFoto ? mFoto[1].trim() : null,
+    role: mTipo ? mTipo[1].trim().toLowerCase() : null,
   };
 }
 
@@ -71,6 +87,7 @@ function withPhotos(
     cta: c.text,
     photoHints: [h.hint, ...s.map((x) => x.hint), c.hint],
     companyBrand: brand,
+    slideRoles: [h.role ?? "capa", ...s.map((x) => x.role), c.role ?? "licao"],
   };
 }
 

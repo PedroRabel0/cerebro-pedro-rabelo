@@ -6,6 +6,7 @@ import { createWizardContent, updateContentStatus, generateImageForContent, uplo
 import type { StorySuggestion, CaseSuggestion } from "./actions";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
+import CaseSlideDesigner from "@/components/CaseSlideDesigner";
 import { parseCarouselSlides } from "./carousel";
 import {
   Sparkles,
@@ -976,15 +977,26 @@ function CarouselDesignPreview({
     "Carousel";
 
   return (
-    <SlideDesigner
-      slides={parsed.slides}
-      hook={details.gancho || parsed.hook}
-      cta={details.cta || parsed.cta}
-      title={title}
-      hashtags={[]}
-      photoHints={parsed.photoHints}
-      companyBrand={parsed.companyBrand}
-    />
+    contentType === "case_empresa" ? (
+      <CaseSlideDesigner
+        slides={parsed.slides}
+        hook={details.gancho || parsed.hook}
+        cta={details.cta || parsed.cta}
+        title={title}
+        photoHints={parsed.photoHints}
+        slideRoles={parsed.slideRoles}
+        companyBrand={parsed.companyBrand}
+      />
+    ) : (
+      <SlideDesigner
+        slides={parsed.slides}
+        hook={details.gancho || parsed.hook}
+        cta={details.cta || parsed.cta}
+        title={title}
+        hashtags={[]}
+        photoHints={parsed.photoHints}
+      />
+    )
   );
 }
 
