@@ -983,6 +983,7 @@ function CarouselDesignPreview({
       title={title}
       hashtags={[]}
       photoHints={parsed.photoHints}
+      companyBrand={parsed.companyBrand}
     />
   );
 }

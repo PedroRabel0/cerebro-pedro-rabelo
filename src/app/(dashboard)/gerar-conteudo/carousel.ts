@@ -20,6 +20,12 @@
  * com fallbacks para conteudos antigos/fora do padrao.
  */
 
+export interface CompanyBrand {
+  name: string;
+  color: string;
+  domain: string | null;
+}
+
 export interface ParsedCarousel {
   slides: string[];
   hook: string;
@@ -29,6 +35,12 @@ export interface ParsedCarousel {
    * carrossel: [capa, ...slides, cta]. null = slide sem foto.
    */
   photoHints: (string | null)[];
+  /**
+   * Identidade da empresa analisada (tipo case_empresa): vem do marcador
+   * [MARCA: Nome | #cor | dominio.com] na primeira linha da resposta da IA.
+   * Usada pra fundir a cara do Pedro com a da empresa no design.
+   */
+  companyBrand: CompanyBrand | null;
 }
 
 const FOTO_RE = /\[\s*FOTO:\s*([^\]]+)\]/i;
@@ -44,7 +56,12 @@ function extractPhoto(text: string): { text: string; hint: string | null } {
 }
 
 /** Monta o resultado final extraindo os hints de foto de cada posicao. */
-function withPhotos(hook: string, slides: string[], cta: string): ParsedCarousel {
+function withPhotos(
+  hook: string,
+  slides: string[],
+  cta: string,
+  brand: CompanyBrand | null = null
+): ParsedCarousel {
   const h = extractPhoto(hook);
   const s = slides.map(extractPhoto);
   const c = extractPhoto(cta);
@@ -53,10 +70,34 @@ function withPhotos(hook: string, slides: string[], cta: string): ParsedCarousel
     slides: s.map((x) => x.text),
     cta: c.text,
     photoHints: [h.hint, ...s.map((x) => x.hint), c.hint],
+    companyBrand: brand,
   };
 }
 
-export function parseCarouselSlides(content: string): ParsedCarousel {
+const MARCA_RE =
+  /\[\s*MARCA:\s*([^|\]]+)\|\s*(#[0-9a-fA-F]{3,8})\s*(?:\|\s*([^\]]+))?\]/;
+
+/** Extrai (e remove) o marcador de identidade da empresa, se presente. */
+function extractCompanyBrand(content: string): {
+  content: string;
+  brand: CompanyBrand | null;
+} {
+  const m = content.match(MARCA_RE);
+  if (!m) return { content, brand: null };
+  return {
+    content: content.replace(MARCA_RE, "").trim(),
+    brand: {
+      name: m[1].trim(),
+      color: m[2].trim(),
+      domain: m[3]?.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "") || null,
+    },
+  };
+}
+
+export function parseCarouselSlides(rawContent: string): ParsedCarousel {
+  // 0) Identidade da empresa (case_empresa) — marcador na primeira linha
+  const { content, brand } = extractCompanyBrand(rawContent);
+
   // 1) Separa a legenda — ela e a descricao do post, NAO um slide.
   const [slidesSection] = content.split(/-{2,}\s*LEGENDA\s*-{2,}/i);
 
@@ -71,7 +112,8 @@ export function parseCarouselSlides(content: string): ParsedCarousel {
     return withPhotos(
       slideParts[0],
       slideParts.slice(1, -1),
-      slideParts[slideParts.length - 1]
+      slideParts[slideParts.length - 1],
+      brand
     );
   }
 
@@ -81,7 +123,7 @@ export function parseCarouselSlides(content: string): ParsedCarousel {
     .map((s) => s.trim())
     .filter(Boolean);
   if (parts.length >= 3) {
-    return withPhotos(parts[0], parts.slice(1, -1), parts[parts.length - 1]);
+    return withPhotos(parts[0], parts.slice(1, -1), parts[parts.length - 1], brand);
   }
 
   // 4) Ultimo recurso: paragrafos.
@@ -89,6 +131,7 @@ export function parseCarouselSlides(content: string): ParsedCarousel {
   return withPhotos(
     (lines[0] || "").trim(),
     lines.slice(1, -1).map((s) => s.trim()),
-    (lines[lines.length - 1] || "").trim()
+    (lines[lines.length - 1] || "").trim(),
+    brand
   );
 }

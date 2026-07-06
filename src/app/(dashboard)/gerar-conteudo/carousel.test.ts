@@ -101,3 +101,35 @@ Case real que eu analisei essa semana. #ecommerce`
     expect(r.photoHints).toEqual([null, null, null]);
   });
 });
+
+describe("parseCarouselSlides — identidade da empresa ([MARCA: ...])", () => {
+  it("extrai nome, cor e dominio e limpa o marcador do texto", () => {
+    const r = parseCarouselSlides(
+      `[MARCA: Nubank | #820AD1 | nubank.com.br]
+SLIDE 1:
+O banco que venceu sem agencia
+[FOTO: cartao roxo do Nubank]
+
+SLIDE 2:
+Miolo
+
+SLIDE 3:
+CTA final
+
+---LEGENDA---
+Legenda aqui`
+    );
+    expect(r.companyBrand).toEqual({
+      name: "Nubank",
+      color: "#820AD1",
+      domain: "nubank.com.br",
+    });
+    expect(r.hook).toContain("banco que venceu");
+    expect(r.hook).not.toContain("MARCA");
+  });
+
+  it("sem marcador retorna companyBrand null", () => {
+    const r = parseCarouselSlides(`Capa\n\nMeio\n\nFim`);
+    expect(r.companyBrand).toBeNull();
+  });
+});

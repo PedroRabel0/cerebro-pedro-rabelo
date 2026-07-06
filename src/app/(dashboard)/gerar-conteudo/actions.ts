@@ -1146,8 +1146,16 @@ REGRAS DAS FOTOS (IMPORTANTE):
 - Use o marcador SO onde uma foto real da empresa agrega (capa e OBRIGATORIA; contexto/resultados geralmente sim; insight/opiniao nao).
 - O marcador e SEMPRE a ultima linha do slide, exatamente no formato: [FOTO: descricao curta de qual foto colocar]
 
+PERSONALIDADE DOS SLIDES (OBRIGATORIO):
+- Titulo de cada slide com OPINIAO e punch — NUNCA burocratico. Errado: "O contexto", "Os resultados". Certo: "A loja que ninguem levava a serio", "O erro que quase custou tudo".
+- Frases com a assinatura do Pedro: numeros concretos, contraste ("todo mundo faz X; eles fizeram Y"), zero tom de wikipedia.
+
 FORMATO DE RESPOSTA:
-Cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases diretas (vai ser lido em imagem). Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
+PRIMEIRA LINHA DA RESPOSTA (antes do SLIDE 1) — identidade visual da empresa, exatamente neste formato:
+[MARCA: Nome da Empresa | #COR | dominio.com]
+- #COR = a cor primaria da marca, amplamente conhecida (ex.: Nubank #820AD1, Magalu #0086FF, Coca-Cola #F40009). Se nao tiver certeza, escolha uma cor coerente com o setor.
+- dominio.com = site oficial da empresa (usado pra buscar o logo). Se incerto, omita o terceiro campo: [MARCA: Nome | #COR]
+Depois, cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases diretas (vai ser lido em imagem). Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
 E entao a LEGENDA do post: COMPLEMENTA os slides (nao repete), hook na primeira linha, 3-5 paragrafos curtos, CTA e 5-8 hashtags no final.`;
           break;
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { Download, ChevronLeft, ChevronRight, Loader2, Image as ImageIcon } from "lucide-react";
 
 interface SlideDesignerProps {
@@ -16,6 +16,12 @@ interface SlideDesignerProps {
    * dele no design. null/ausente = slide so de texto (comportamento atual).
    */
   photoHints?: (string | null)[];
+  /**
+   * Identidade da empresa analisada (case_empresa): funde a cara do Pedro
+   * (preto + vermelho, dominante) com a da empresa — cor da marca nos
+   * acentos secundarios e logo oficial (via /api/logo) na capa.
+   */
+  companyBrand?: { name: string; color: string; domain: string | null } | null;
 }
 
 /**
@@ -23,7 +29,7 @@ interface SlideDesignerProps {
  * Renders slides with Pedro's brand identity (black + red).
  * Supports PNG download via canvas.
  */
-export default function SlideDesigner({ slides, hook, cta, title, hashtags, photoHints }: SlideDesignerProps) {
+export default function SlideDesigner({ slides, hook, cta, title, hashtags, photoHints, companyBrand }: SlideDesignerProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const [downloadingAll, setDownloadingAll] = useState(false);
@@ -33,6 +39,27 @@ export default function SlideDesigner({ slides, hook, cta, title, hashtags, phot
   const pendingPhotoIndex = useRef<number | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const slideRef = useRef<HTMLDivElement>(null);
+  // Logo oficial da empresa (same-origin via /api/logo — exportavel no PNG)
+  const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCompanyLogoUrl(null);
+    if (!companyBrand?.domain) return;
+    const url = `/api/logo?domain=${encodeURIComponent(companyBrand.domain)}`;
+    fetch(url)
+      .then((res) => {
+        if (!cancelled && res.ok) setCompanyLogoUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [companyBrand?.domain]);
+
+  const company = companyBrand
+    ? { name: companyBrand.name, color: companyBrand.color, logoUrl: companyLogoUrl }
+    : undefined;
 
   function pickPhoto(index: number) {
     pendingPhotoIndex.current = index;
@@ -199,6 +226,7 @@ export default function SlideDesigner({ slides, hook, cta, title, hashtags, phot
                 index={currentSlide}
                 photoUrl={slidePhotos[currentSlide]}
                 onPickPhoto={() => pickPhoto(currentSlide)}
+                company={company}
               />
             </div>
           </div>
@@ -244,7 +272,7 @@ export default function SlideDesigner({ slides, hook, cta, title, hashtags, phot
       <div className="fixed -left-[9999px] -top-[9999px]" aria-hidden="true">
         {allSlides.map((slide, i) => (
           <div key={i} id={`slide-render-${i}`}>
-            <SlideRenderer slide={slide} index={i} photoUrl={slidePhotos[i]} />
+            <SlideRenderer slide={slide} index={i} photoUrl={slidePhotos[i]} company={company} />
           </div>
         ))}
       </div>
@@ -406,30 +434,39 @@ function PhotoSlot({
 
 // --- Slide Renderer ---
 
+interface CompanyVisual {
+  name: string;
+  color: string;
+  logoUrl: string | null;
+}
+
 function SlideRenderer({
   slide,
   index,
   photoUrl,
   onPickPhoto,
+  company,
 }: {
   slide: SlideData;
   index: number;
   photoUrl?: string;
   onPickPhoto?: () => void;
+  company?: CompanyVisual;
 }) {
   if (slide.type === "cover")
-    return <CoverSlide slide={slide} photoUrl={photoUrl} onPickPhoto={onPickPhoto} />;
+    return <CoverSlide slide={slide} photoUrl={photoUrl} onPickPhoto={onPickPhoto} company={company} />;
   if (slide.type === "cta")
-    return <CTASlide slide={slide} photoUrl={photoUrl} onPickPhoto={onPickPhoto} />;
-  return <ContentSlide slide={slide} photoUrl={photoUrl} onPickPhoto={onPickPhoto} />;
+    return <CTASlide slide={slide} photoUrl={photoUrl} onPickPhoto={onPickPhoto} company={company} />;
+  return <ContentSlide slide={slide} photoUrl={photoUrl} onPickPhoto={onPickPhoto} company={company} />;
 }
 
 interface SlidePhotoProps {
   photoUrl?: string;
   onPickPhoto?: () => void;
+  company?: CompanyVisual;
 }
 
-function CoverSlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & SlidePhotoProps) {
+function CoverSlide({ slide, photoUrl, onPickPhoto, company }: { slide: SlideData } & SlidePhotoProps) {
   return (
     <div
       style={{
@@ -445,7 +482,7 @@ function CoverSlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & Sli
         fontFamily: "'Inter', 'Segoe UI', sans-serif",
       }}
     >
-      {/* Top accent line */}
+      {/* Top accent line — funde o vermelho do Pedro com a cor da empresa */}
       <div
         style={{
           position: "absolute",
@@ -453,9 +490,66 @@ function CoverSlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & Sli
           left: 0,
           right: 0,
           height: 6,
-          background: "linear-gradient(90deg, #E31B23, #FF3333, #E31B23)",
+          background: company
+            ? `linear-gradient(90deg, #E31B23, ${company.color}, #E31B23)`
+            : "linear-gradient(90deg, #E31B23, #FF3333, #E31B23)",
         }}
       />
+
+      {/* Identidade do case: logo + chips CASE / EMPRESA */}
+      {company && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 18,
+            marginBottom: 36,
+          }}
+        >
+          {company.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={company.logoUrl}
+              alt={company.name}
+              style={{
+                width: 72,
+                height: 72,
+                objectFit: "contain",
+                borderRadius: 16,
+                background: "#ffffff",
+                padding: 8,
+              }}
+            />
+          )}
+          <span
+            style={{
+              background: "#E31B23",
+              color: "#fff",
+              padding: "8px 20px",
+              borderRadius: 10,
+              fontSize: 24,
+              fontWeight: 900,
+              letterSpacing: "0.12em",
+            }}
+          >
+            CASE
+          </span>
+          <span
+            style={{
+              border: `3px solid ${company.color}`,
+              color: company.color,
+              padding: "8px 20px",
+              borderRadius: 10,
+              fontSize: 24,
+              fontWeight: 800,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            {company.name}
+          </span>
+        </div>
+      )}
 
       {/* Slot de foto real (case_empresa): a capa leva a foto da empresa */}
       {slide.photoHint && (
@@ -464,16 +558,17 @@ function CoverSlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & Sli
         </div>
       )}
 
-      {/* Main heading */}
+      {/* Main heading — uppercase 900 (vibe Bebas, a cara do Pedro) */}
       <h1
         style={{
           color: "#ffffff",
-          fontSize: slide.photoHint ? 54 : 64,
-          fontWeight: 800,
-          lineHeight: 1.15,
+          fontSize: slide.photoHint ? 52 : 62,
+          fontWeight: 900,
+          lineHeight: 1.08,
           textAlign: "center",
-          letterSpacing: "-0.03em",
-          maxWidth: 900,
+          letterSpacing: "-0.02em",
+          textTransform: company ? "uppercase" : undefined,
+          maxWidth: 920,
         }}
       >
         {slide.heading}
@@ -528,7 +623,7 @@ function CoverSlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & Sli
   );
 }
 
-function ContentSlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & SlidePhotoProps) {
+function ContentSlide({ slide, photoUrl, onPickPhoto, company }: { slide: SlideData } & SlidePhotoProps) {
   const bodyFontSize = (slide.body?.length || 0) > 300 ? 32 : (slide.body?.length || 0) > 150 ? 36 : 40;
 
   return (
@@ -568,21 +663,38 @@ function ContentSlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & S
           style={{
             flex: 1,
             height: 2,
-            background: "linear-gradient(90deg, #E31B23, transparent)",
+            background: company
+              ? `linear-gradient(90deg, #E31B23, ${company.color}, transparent)`
+              : "linear-gradient(90deg, #E31B23, transparent)",
           }}
         />
+        {company && (
+          <span
+            style={{
+              color: company.color,
+              fontSize: 20,
+              fontWeight: 800,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}
+          >
+            CASE · {company.name}
+          </span>
+        )}
       </div>
 
-      {/* Heading */}
+      {/* Heading — barra lateral com a cor da empresa quando e case */}
       {slide.heading && (
         <h2
           style={{
             color: "#ffffff",
             fontSize: 48,
-            fontWeight: 800,
+            fontWeight: company ? 900 : 800,
             lineHeight: 1.2,
             marginBottom: 30,
             letterSpacing: "-0.02em",
+            borderLeft: company ? `8px solid ${company.color}` : undefined,
+            paddingLeft: company ? 24 : undefined,
           }}
         >
           {slide.heading}
@@ -631,7 +743,7 @@ function ContentSlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & S
   );
 }
 
-function CTASlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & SlidePhotoProps) {
+function CTASlide({ slide, photoUrl, onPickPhoto, company }: { slide: SlideData } & SlidePhotoProps) {
   return (
     <div
       style={{
@@ -760,7 +872,9 @@ function CTASlide({ slide, photoUrl, onPickPhoto }: { slide: SlideData } & Slide
           left: 0,
           right: 0,
           height: 6,
-          background: "linear-gradient(90deg, #E31B23, #FF3333, #E31B23)",
+          background: company
+            ? `linear-gradient(90deg, #E31B23, ${company.color}, #E31B23)`
+            : "linear-gradient(90deg, #E31B23, #FF3333, #E31B23)",
         }}
       />
     </div>

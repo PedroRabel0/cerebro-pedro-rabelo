@@ -922,6 +922,7 @@ export default function ContentList({
                             hook={parsed.hook}
                             cta={parsed.cta}
                             photoHints={parsed.photoHints}
+                            companyBrand={parsed.companyBrand}
                             title={
                               c.free_text_input ||
                               c.playbook?.title ||
