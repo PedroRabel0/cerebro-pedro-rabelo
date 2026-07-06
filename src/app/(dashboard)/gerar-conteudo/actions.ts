@@ -1548,7 +1548,7 @@ export async function removeContentImage(
   contentId: string
 ): Promise<{ success: boolean } | { error: string }> {
   await requireStaff();
-  const supabase = await createClient();
+  const supabase = await createAdminClient() /* storage exige service_role */;
 
   try {
     // Get current image_url to delete from storage

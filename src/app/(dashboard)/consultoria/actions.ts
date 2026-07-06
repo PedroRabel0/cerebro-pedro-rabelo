@@ -768,7 +768,9 @@ export async function uploadDocument(
   formData: FormData
 ): Promise<{ id: string } | { error: string }> {
   await requireStaff();
-  const supabase = await createClient();
+  // storage exige service_role (fix: quebrava desde o flip do RLS — o scan
+  // original nao pegou o `.storage` multi-linha desta funcao)
+  const supabase = await createAdminClient();
   const file = formData.get("file") as File | null;
   const kind = ((formData.get("kind") as string) || "outro") as ConsultingDocument["kind"];
   if (!file || file.size === 0) return { error: "Arquivo vazio." };
