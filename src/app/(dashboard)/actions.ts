@@ -450,6 +450,78 @@ export async function prepareUniversalInput(
 }
 
 /**
+ * Transcreve paginas de PDF por VISAO (OCR) — fallback do Alimentar para
+ * PDFs escaneados ou com camada de texto inutil (so marca-d'agua). Recebe
+ * um LOTE de paginas (o cliente envia em lotes pra caber no bodySizeLimit)
+ * e devolve o texto transcrito, que segue pro pipeline normal de captura.
+ */
+export async function transcribePdfPages(
+  pagesBase64: string[],
+  startPage: number
+): Promise<{ text: string } | { error: string }> {
+  await requireStaff();
+
+  const pages = (pagesBase64 || []).filter(
+    (p) => typeof p === "string" && p.length > 0 && p.length < 2_000_000
+  );
+  if (pages.length === 0) return { error: "Nenhuma página recebida." };
+  if (pages.length > 8) return { error: "Lote grande demais (máximo 8 páginas por chamada)." };
+
+  try {
+    const anthropic = getClient();
+    const model = "claude-haiku-4-5-20251001";
+    const response = await anthropic.messages.create({
+      model,
+      max_tokens: 8000,
+      messages: [
+        {
+          role: "user",
+          content: [
+            ...pages.map((data) => ({
+              type: "image" as const,
+              source: {
+                type: "base64" as const,
+                media_type: "image/jpeg" as const,
+                data,
+              },
+            })),
+            {
+              type: "text" as const,
+              text: `Transcreva FIELMENTE o conteúdo destas ${pages.length} páginas de um PDF (páginas ${startPage} a ${startPage + pages.length - 1}), no idioma original.
+
+REGRAS:
+- Transcreva títulos, parágrafos, listas e o texto de diagramas/slides.
+- IGNORE marcas-d'água, rodapés/cabeçalhos repetidos e avisos de licença.
+- Descreva imagens/gráficos em 1 linha entre colchetes só quando carregarem informação (ex.: [gráfico: crescimento de receita 2019-2023]).
+- Separe cada página com uma linha "--- página N ---".
+- Se uma página não tiver conteúdo legível, escreva "--- página N --- (sem conteúdo legível)".
+- Responda SÓ com a transcrição, sem comentários.`,
+            },
+          ],
+        },
+      ],
+    });
+
+    logCost(model, response.usage.input_tokens, response.usage.output_tokens);
+
+    const text = response.content
+      .filter((b) => b.type === "text")
+      .map((b) => (b as { text: string }).text)
+      .join("\n")
+      .trim();
+
+    if (!text) return { error: "A transcrição voltou vazia. Tente novamente." };
+    return { text };
+  } catch (err) {
+    log.error("[TranscribePdf] " + String(err));
+    return {
+      error:
+        "Falha ao ler as páginas do PDF por visão. Tente novamente em instantes.",
+    };
+  }
+}
+
+/**
  * FASE 2 do Alimentar: roda o pipeline de IA sobre uma captura ja salva e
  * grava as propostas. Chamada separada da FASE 1 de proposito — e retryavel:
  * se estourar o teto de 60s, nada se perde (o conteudo esta na captura) e a

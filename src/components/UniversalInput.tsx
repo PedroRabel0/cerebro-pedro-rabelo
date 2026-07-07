@@ -1,8 +1,18 @@
 "use client";
 
-import { extractPdfText, isPdf } from "@/lib/pdf-client";
+import {
+  extractPdfText,
+  isPdf,
+  isUselessPdfText,
+  pdfToVisionPages,
+} from "@/lib/pdf-client";
 import { useState, useRef, useEffect } from "react";
-import { submitFileInput, prepareUniversalInput, processCaptureNow } from "@/app/(dashboard)/actions";
+import {
+  submitFileInput,
+  prepareUniversalInput,
+  processCaptureNow,
+  transcribePdfPages,
+} from "@/app/(dashboard)/actions";
 import VoiceButton from "@/components/VoiceButton";
 import {
   Send,
@@ -340,18 +350,60 @@ export default function UniversalInput() {
         // servidor nao le PDFs modernos (streams FlateDecode) e mandava
         // lixo binario pra IA. De quebra, escapa do limite de 10MB.
         const pdfText = await extractPdfText(selectedFile).catch(() => "");
-        if (pdfText.trim().length < 50) {
-          try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
-          processingRef.current = false;
-          setErrorMessage(
-            `Nao consegui extrair texto de "${selectedFile.name}" — provavelmente e um PDF escaneado (so imagens). Copie o texto do PDF e cole no campo de texto.`
+        let inputText = pdfText;
+
+        if (isUselessPdfText(pdfText)) {
+          // Fallback de VISAO (OCR): PDF escaneado ou com camada de texto
+          // inutil (so marca-d'agua) — le o conteudo pelas IMAGENS das paginas.
+          const { pages, totalPages } = await pdfToVisionPages(selectedFile).catch(
+            () => ({ pages: [] as string[], totalPages: 0 })
           );
-          setState("error");
-          return;
+          if (pages.length === 0) {
+            try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
+            processingRef.current = false;
+            setErrorMessage(
+              `Nao consegui ler "${selectedFile.name}" — nem pelo texto, nem pelas imagens das paginas. Se for material protegido, cole no campo de texto as SUAS anotacoes sobre o conteudo.`
+            );
+            setState("error");
+            return;
+          }
+          setSteps([
+            { label: `Lendo ${pages.length} paginas do PDF por visao (OCR)`, status: "active" as const },
+            { label: "Processando com Claude AI", status: "pending" as const },
+          ]);
+
+          const LOTE = 6;
+          const chunks: string[] = [];
+          for (let i = 0; i < pages.length; i += LOTE) {
+            const r = await transcribePdfPages(pages.slice(i, i + LOTE), i + 1);
+            if ("error" in r) {
+              try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
+              processingRef.current = false;
+              setErrorMessage(r.error);
+              setState("error");
+              return;
+            }
+            chunks.push(r.text);
+          }
+          inputText = chunks.join("\n\n").trim();
+          if (totalPages > pages.length) {
+            inputText += `\n\n[NOTA: o PDF tem ${totalPages} paginas; as ${pages.length} primeiras foram lidas.]`;
+          }
+
+          if (isUselessPdfText(inputText)) {
+            try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
+            processingRef.current = false;
+            setErrorMessage(
+              `Li as paginas de "${selectedFile.name}" por visao, mas nao encontrei conteudo aproveitavel (arquivo protegido ou sem texto legivel). Cole no campo de texto as SUAS anotacoes sobre o conteudo.`
+            );
+            setState("error");
+            return;
+          }
         }
+
         setCurrentStep(1);
         res = await prepareUniversalInput(
-          `[ARQUIVO: ${selectedFile.name}]\n\n${pdfText}`.slice(0, 60000),
+          `[ARQUIVO: ${selectedFile.name}]\n\n${inputText}`.slice(0, 60000),
           contentOrigin,
           skipInsights
         );

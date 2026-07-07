@@ -46,6 +46,64 @@ export function isPdf(f: File): boolean {
 }
 
 /**
+ * Texto de PDF "inutil": vazio ou so marca-d'agua/licenca repetida em toda
+ * pagina (ex.: PDFs protegidos que repetem "licenciado para fulano"). Depois
+ * de deduplicar as linhas, sobra quase nada de conteudo real.
+ */
+export function isUselessPdfText(text: string): boolean {
+  const unique = Array.from(
+    new Set(
+      text
+        .split(/\n+/)
+        .map((l) => l.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
+  return unique.join(" ").length < 200;
+}
+
+/**
+ * Renderiza as paginas do PDF em JPEGs base64 (sem o prefixo data:) para
+ * TRANSCRICAO POR VISAO no servidor — fallback para PDF escaneado ou com
+ * camada de texto inutil. ~1200px le bem texto de slide/pagina e mantem o
+ * payload pequeno (o envio pro servidor vai em lotes).
+ */
+export async function pdfToVisionPages(
+  file: File,
+  opts?: { maxPages?: number; width?: number; quality?: number }
+): Promise<{ pages: string[]; totalPages: number }> {
+  const maxPages = opts?.maxPages ?? 30;
+  const width = opts?.width ?? 1200;
+  const quality = opts?.quality ?? 0.8;
+
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data }).promise;
+  const pages: string[] = [];
+  const count = Math.min(pdf.numPages, maxPages);
+
+  for (let i = 1; i <= count; i++) {
+    const page = await pdf.getPage(i);
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: width / base.width });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) continue;
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const dataUrl = canvas.toDataURL("image/jpeg", quality);
+    const base64 = dataUrl.split(",")[1];
+    if (base64) pages.push(base64);
+  }
+  return { pages, totalPages: pdf.numPages };
+}
+
+/**
  * Extrai o TEXTO de um PDF no navegador via pdf.js — funciona com PDFs
  * modernos (streams comprimidos/FlateDecode), que o extrator caseiro do
  * servidor nao consegue ler. Retorna "" para PDFs so de imagem (scan).
