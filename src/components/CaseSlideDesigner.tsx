@@ -7,10 +7,12 @@ import { Download, ChevronLeft, ChevronRight, Loader2, FileText } from "lucide-r
  * Template DOSSIÊ — design exclusivo do "Case de Empresa". Nao e o carrossel
  * padrao: cada slide tem um LAYOUT proprio pelo papel ([TIPO: ...]):
  *   capa     → dossie editorial: foto grande + carimbo CASE + logo da empresa
- *   contexto → ficha tecnica: label vertical "O CASO" + fatos + foto
+ *   origem   → arquivo de origem: label vertical "A ORIGEM" + ano fantasma + foto
+ *   virada   → o pulo do gato: tag branca de impacto + tipografia gigante + foto
  *   insight  → pull-quote: aspas gigantes + tese em destaque + watermark
  *   acao     → INVERSAO: slide inteiro vermelho, "O QUE EU FARIA"
  *   licao    → fecho emoldurado: a licao + CTA
+ *   contexto → ficha tecnica (legado — cases salvos antes do arco narrativo)
  * Gramatica do Pedro (preto/vermelho/900/caixa alta) fundida com a cor e o
  * logo da empresa analisada. Fotos reais entram nos slots clicaveis.
  */
@@ -33,7 +35,7 @@ interface CaseSlideDesignerProps {
   companyBrand?: CompanyBrandInput | null;
 }
 
-type Role = "capa" | "contexto" | "insight" | "acao" | "licao";
+type Role = "capa" | "origem" | "virada" | "contexto" | "insight" | "acao" | "licao";
 
 interface CaseSlide {
   role: Role;
@@ -60,7 +62,15 @@ function splitHeading(text: string): { heading?: string; body: string } {
 
 function normalizeRole(raw: string | null | undefined, fallback: Role): Role {
   const r = (raw || "").toLowerCase();
-  if (r === "contexto" || r === "insight" || r === "acao" || r === "licao" || r === "capa")
+  if (
+    r === "origem" ||
+    r === "virada" ||
+    r === "contexto" ||
+    r === "insight" ||
+    r === "acao" ||
+    r === "licao" ||
+    r === "capa"
+  )
     return r as Role;
   return fallback;
 }
@@ -334,6 +344,10 @@ function CaseSlideRenderer(props: RenderProps) {
   switch (props.slide.role) {
     case "capa":
       return <CapaDossie {...props} />;
+    case "origem":
+      return <OrigemArquivo {...props} />;
+    case "virada":
+      return <ViradaImpacto {...props} />;
     case "contexto":
       return <ContextoFicha {...props} />;
     case "acao":
@@ -458,15 +472,14 @@ function FotoArea({
         cursor: onPick ? "pointer" : undefined,
       }}
     >
-      <span style={{ fontSize: 40, lineHeight: 1 }}>📷</span>
-      <span style={{ color: accent, fontSize: 20, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-        Foto real aqui
+      <span style={{ color: accent, fontSize: 22, fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+        📷 FOTO
       </span>
-      <span style={{ color: "#bbb", fontSize: 22, fontWeight: 500, textAlign: "center", maxWidth: 640, lineHeight: 1.35 }}>
+      <span style={{ color: "#e5e5e5", fontSize: 24, fontWeight: 600, textAlign: "center", maxWidth: 680, lineHeight: 1.35 }}>
         {hint}
       </span>
       {onPick && (
-        <span style={{ color: "#777", fontSize: 18, fontWeight: 600 }}>Clique para colocar a foto</span>
+        <span style={{ color: "#777", fontSize: 18, fontWeight: 600 }}>Clique para colocar a foto real</span>
       )}
     </div>
   );
@@ -549,6 +562,176 @@ function CapaDossie({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
         </span>
         <div style={{ flex: 1, height: 2, background: `linear-gradient(90deg, ${RED}, ${company.color}, transparent)` }} />
       </div>
+    </div>
+  );
+}
+
+/* ---------- ORIGEM: arquivo de origem — como tudo comecou ---------- */
+function extractYear(slide: CaseSlide): string | null {
+  const m = `${slide.heading ?? ""} ${slide.body ?? ""}`.match(/\b(19|20)\d{2}\b/);
+  return m ? m[0] : null;
+}
+
+function OrigemArquivo({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
+  const year = extractYear(slide);
+  return (
+    <div style={{ ...BASE, background: "#0a0a0a", padding: "72px 80px 120px" }}>
+      <CornerMarks />
+      {/* Label vertical */}
+      <div
+        style={{
+          position: "absolute",
+          left: 34,
+          top: "44%",
+          transform: "rotate(-90deg) translateX(50%)",
+          transformOrigin: "left center",
+          color: company.color,
+          fontSize: 26,
+          fontWeight: 900,
+          letterSpacing: "0.35em",
+          textTransform: "uppercase",
+          whiteSpace: "nowrap",
+        }}
+      >
+        A ORIGEM
+      </div>
+
+      {/* Ano fantasma — o carimbo de epoca do dossie */}
+      <span
+        style={{
+          position: "absolute",
+          top: 34,
+          right: 60,
+          fontSize: year ? 170 : 210,
+          fontWeight: 900,
+          color: "rgba(227,27,35,0.12)",
+          lineHeight: 1,
+          letterSpacing: "-0.05em",
+        }}
+      >
+        {year ?? String(slide.number).padStart(2, "0")}
+      </span>
+
+      <div style={{ marginLeft: 56, position: "relative", borderLeft: `6px solid ${RED}`, paddingLeft: 36 }}>
+        <span
+          style={{
+            color: "#888",
+            fontSize: 21,
+            fontWeight: 800,
+            letterSpacing: "0.24em",
+            textTransform: "uppercase",
+            display: "block",
+            marginBottom: 18,
+          }}
+        >
+          Como tudo começou
+        </span>
+        {slide.heading && (
+          <h2
+            style={{
+              color: "#fff",
+              fontSize: 50,
+              fontWeight: 900,
+              lineHeight: 1.08,
+              textTransform: "uppercase",
+              letterSpacing: "-0.015em",
+              margin: 0,
+            }}
+          >
+            {slide.heading}
+          </h2>
+        )}
+        <p style={{ color: "#d4d4d4", fontSize: 31, fontWeight: 400, lineHeight: 1.55, marginTop: 28, maxWidth: 840 }}>
+          {slide.body}
+        </p>
+
+        {slide.photoHint && (
+          <div style={{ marginTop: 30 }}>
+            <FotoArea hint={slide.photoHint} height={290} photoUrl={photoUrl} onPick={onPickPhoto} accent={company.color} />
+          </div>
+        )}
+      </div>
+
+      <Rodape company={company} number={slide.number} total={slide.total} />
+    </div>
+  );
+}
+
+/* ---------- VIRADA: o pulo do gato — a jogada nao-obvia ---------- */
+function ViradaImpacto({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
+  return (
+    <div
+      style={{
+        ...BASE,
+        background: "#0a0a0a",
+        padding: "80px 80px 120px",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+      }}
+    >
+      <CornerMarks />
+      {/* Numero fantasma em vermelho — assinatura da virada */}
+      <span
+        style={{
+          position: "absolute",
+          bottom: 40,
+          right: 24,
+          fontSize: 300,
+          fontWeight: 900,
+          color: "rgba(227,27,35,0.09)",
+          lineHeight: 1,
+          letterSpacing: "-0.06em",
+        }}
+      >
+        {String(slide.number).padStart(2, "0")}
+      </span>
+
+      <span
+        style={{
+          background: "#fff",
+          color: "#0a0a0a",
+          alignSelf: "flex-start",
+          padding: "10px 22px",
+          fontSize: 22,
+          fontWeight: 900,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+        }}
+      >
+        O pulo do gato
+      </span>
+
+      <div style={{ position: "relative", marginTop: 40 }}>
+        {slide.heading && (
+          <h2
+            style={{
+              color: "#fff",
+              fontSize: 62,
+              fontWeight: 900,
+              lineHeight: 1.05,
+              letterSpacing: "-0.02em",
+              textTransform: "uppercase",
+              margin: 0,
+              maxWidth: 900,
+            }}
+          >
+            {slide.heading}
+          </h2>
+        )}
+        <div style={{ width: 120, height: 10, background: RED, margin: "30px 0" }} />
+        <p style={{ color: "#d4d4d4", fontSize: 30, fontWeight: 400, lineHeight: 1.55, margin: 0, maxWidth: 860 }}>
+          {slide.body}
+        </p>
+
+        {slide.photoHint && (
+          <div style={{ marginTop: 28 }}>
+            <FotoArea hint={slide.photoHint} height={240} photoUrl={photoUrl} onPick={onPickPhoto} accent={company.color} />
+          </div>
+        )}
+      </div>
+
+      <Rodape company={company} number={slide.number} total={slide.total} />
     </div>
   );
 }

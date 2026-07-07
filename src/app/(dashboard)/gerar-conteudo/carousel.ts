@@ -42,9 +42,9 @@ export interface ParsedCarousel {
    */
   companyBrand: CompanyBrand | null;
   /**
-   * Papel de cada slide (marcador [TIPO: contexto|insight|acao|licao]),
-   * alinhado com [capa, ...slides, cta]. O template dossie do case escolhe
-   * o LAYOUT pelo papel. null = sem papel declarado (layout padrao).
+   * Papel de cada slide (marcador [TIPO: origem|virada|insight|acao|licao],
+   * mais "contexto" legado), alinhado com [capa, ...slides, cta]. O template
+   * dossie do case escolhe o LAYOUT pelo papel. null = sem papel declarado.
    */
   slideRoles: (string | null)[];
 }

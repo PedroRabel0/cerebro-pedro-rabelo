@@ -102,6 +102,52 @@ Case real que eu analisei essa semana. #ecommerce`
   });
 });
 
+describe("parseCarouselSlides — papeis dos slides ([TIPO: ...], dossie do case)", () => {
+  it("extrai origem/virada/insight e limpa os marcadores do texto", () => {
+    const r = parseCarouselSlides(
+      `SLIDE 1:
+O banco que venceu REMOVENDO
+[FOTO: o cartao roxo sobre a mesa]
+
+SLIDE 2:
+O ano em que ninguem queria ser banco
+2013. Quatro meses pra abrir uma conta.
+[TIPO: origem]
+[FOTO: os fundadores em 2013 na primeira casa alugada]
+
+SLIDE 3:
+Todo mundo adicionava. Eles removeram.
+[TIPO: virada]
+
+SLIDE 4:
+Na minha visao, eles mudaram o campo.
+[TIPO: insight]
+
+SLIDE 5:
+Salva esse dossie e me diz o que voce cortaria.
+
+---LEGENDA---
+Legenda aqui`
+    );
+    // papeis alinhados com [capa, ...slides, cta]
+    expect(r.slideRoles).toEqual(["capa", "origem", "virada", "insight", "licao"]);
+    // hints seguem alinhados mesmo com [TIPO:] presente
+    expect(r.photoHints).toEqual([
+      "o cartao roxo sobre a mesa",
+      "os fundadores em 2013 na primeira casa alugada",
+      null,
+      null,
+      null,
+    ]);
+    // texto limpo, sem marcador vazando pro design
+    for (const s of [r.hook, ...r.slides, r.cta]) {
+      expect(s).not.toContain("[TIPO");
+      expect(s).not.toContain("[FOTO");
+    }
+    expect(r.slides[0]).toContain("Quatro meses");
+  });
+});
+
 describe("parseCarouselSlides — identidade da empresa ([MARCA: ...])", () => {
   it("extrai nome, cor e dominio e limpa o marcador do texto", () => {
     const r = parseCarouselSlides(
