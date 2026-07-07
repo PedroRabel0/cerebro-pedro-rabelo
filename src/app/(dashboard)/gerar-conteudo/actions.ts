@@ -1514,7 +1514,15 @@ async function generateImagePromptForContent(
  */
 export async function uploadImageToContent(
   contentId: string,
-  formData: FormData
+  formData: FormData,
+  options?: {
+    /**
+     * true = SOMA as imagens deste lote as ja salvas no registro (upload em
+     * lotes do cliente, pra respeitar o bodySizeLimit com slides em alta
+     * resolucao). false/ausente = substitui (comportamento original).
+     */
+    append?: boolean;
+  }
 ): Promise<{ imageUrl: string } | { error: string }> {
   await requireStaff();
   const supabase = await createAdminClient() /* storage/auth.admin exigem service_role */;
@@ -1562,10 +1570,29 @@ export async function uploadImageToContent(
       uploadedUrls.push(publicUrl);
     }
 
+    // Em modo append, junta com as imagens ja salvas (lotes anteriores)
+    let allUrls = uploadedUrls;
+    if (options?.append) {
+      const { data: existing } = await supabase
+        .from("generated_contents")
+        .select("image_url")
+        .eq("id", contentId)
+        .single();
+      const prev = existing?.image_url as string | null;
+      if (prev) {
+        try {
+          const parsed = JSON.parse(prev);
+          allUrls = Array.isArray(parsed)
+            ? [...parsed, ...uploadedUrls]
+            : [prev, ...uploadedUrls];
+        } catch {
+          allUrls = [prev, ...uploadedUrls];
+        }
+      }
+    }
+
     // For multiple images (carousel), store as JSON array; for single, store the URL
-    const imageUrl = uploadedUrls.length === 1
-      ? uploadedUrls[0]
-      : JSON.stringify(uploadedUrls);
+    const imageUrl = allUrls.length === 1 ? allUrls[0] : JSON.stringify(allUrls);
 
     await supabase
       .from("generated_contents")
@@ -1929,11 +1956,11 @@ export async function generateImageForContent(
 
     const imageResult = await generateImage(imagePrompt, {
       size: sizeMap[contentType] || '1024x1024',
-      // 'medium' e suficiente para infografico bold de alto contraste e custa
-      // ~4x menos que 'high' ($0.042 vs $0.167) — alem de gerar mais rapido,
-      // o que importa com o teto de 60s.
-      quality: 'medium',
-      format: 'webp',
+      // 'high' + png (sem perda): qualidade maxima pro Instagram. Custa ~4x o
+      // 'medium' ($0.167 vs $0.042) e gera mais devagar (risco maior de bater
+      // no timeout de 45s) — trade-off aceito pelo usuario em 07/jul/2026.
+      quality: 'high',
+      format: 'png',
     });
 
     if ("error" in imageResult) {

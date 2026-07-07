@@ -28,7 +28,9 @@ export async function generateImage(
   if (!apiKey) return { error: 'OPENAI_API_KEY not configured' };
 
   const size = options?.size || '1024x1024';
-  const quality = options?.quality || 'medium';
+  // 'high' por padrao: qualidade maxima pro Instagram (custa ~4x o 'medium';
+  // decisao do usuario em 07/jul/2026 priorizando nitidez sobre custo).
+  const quality = options?.quality || 'high';
   const format = options?.format || 'png';
 
   try {

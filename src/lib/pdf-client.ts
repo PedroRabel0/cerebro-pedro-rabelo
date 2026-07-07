@@ -2,8 +2,9 @@
 // Runs entirely in the browser via pdf.js so the server never touches the PDF.
 
 /**
- * Render each PDF page to a 1080px-wide JPEG File (Instagram-native size,
- * keeps the payload small enough for server-action uploads).
+ * Render each PDF page to a 2160px-wide JPEG File (2x o 1080 do Instagram —
+ * qualidade maxima; texto sem serrilhado). Com slides mais pesados, o envio
+ * pro servidor e feito em LOTES pelo chamador (uploadFilesInBatches).
  */
 export async function pdfToImageFiles(file: File): Promise<File[]> {
   const pdfjs = await import("pdfjs-dist");
@@ -17,7 +18,7 @@ export async function pdfToImageFiles(file: File): Promise<File[]> {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const base = page.getViewport({ scale: 1 });
-    const scale = 1080 / base.width;
+    const scale = 2160 / base.width;
     const viewport = page.getViewport({ scale });
 
     const canvas = document.createElement("canvas");
@@ -29,7 +30,8 @@ export async function pdfToImageFiles(file: File): Promise<File[]> {
     await page.render({ canvasContext: ctx, viewport }).promise;
 
     const blob = await new Promise<Blob | null>((res) =>
-      canvas.toBlob((b) => res(b), "image/jpeg", 0.85)
+      // 0.95: visualmente sem perda em texto/design (0.85 serrilhava)
+      canvas.toBlob((b) => res(b), "image/jpeg", 0.95)
     );
     if (blob) {
       const name = `${baseName}-slide-${String(i).padStart(2, "0")}.jpg`;

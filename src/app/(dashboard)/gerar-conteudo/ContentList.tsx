@@ -70,6 +70,42 @@ function statusLabel(status: ContentStatus) {
   }
 }
 
+/**
+ * Envia as imagens em LOTES (~8MB por chamada) pra caber no bodySizeLimit
+ * do servidor — necessario desde que os slides sobem em alta resolucao.
+ * O primeiro lote substitui a imagem do post; os seguintes vao somando.
+ */
+async function uploadFilesInBatches(
+  contentId: string,
+  files: File[]
+): Promise<{ imageUrl: string } | { error: string }> {
+  const MAX_BATCH_BYTES = 8 * 1024 * 1024;
+  const batches: File[][] = [];
+  let batch: File[] = [];
+  let batchBytes = 0;
+  for (const f of files) {
+    if (batch.length > 0 && batchBytes + f.size > MAX_BATCH_BYTES) {
+      batches.push(batch);
+      batch = [];
+      batchBytes = 0;
+    }
+    batch.push(f);
+    batchBytes += f.size;
+  }
+  if (batch.length > 0) batches.push(batch);
+
+  let last: { imageUrl: string } | { error: string } = {
+    error: "Nenhuma imagem enviada",
+  };
+  for (let i = 0; i < batches.length; i++) {
+    const formData = new FormData();
+    for (const f of batches[i]) formData.append("images", f);
+    last = await uploadImageToContent(contentId, formData, { append: i > 0 });
+    if ("error" in last) return last;
+  }
+  return last;
+}
+
 /** Parse image_url — could be a single URL, a base64 data URL, or a JSON array of URLs */
 function parseImageUrls(imageUrl: string | null): string[] {
   if (!imageUrl) return [];
@@ -490,9 +526,7 @@ function ImageUploader({
         );
         return;
       }
-      const formData = new FormData();
-      for (const f of imageFiles) formData.append("images", f);
-      const res = await uploadImageToContent(contentId, formData);
+      const res = await uploadFilesInBatches(contentId, imageFiles);
       if ("error" in res) {
         setError(res.error);
       } else {
@@ -778,9 +812,7 @@ export default function ContentList({
                           }
                           // Remove old image first, then upload new
                           await removeContentImage(c.id);
-                          const formData = new FormData();
-                          for (const f of imageFiles) formData.append("images", f);
-                          const res = await uploadImageToContent(c.id, formData);
+                          const res = await uploadFilesInBatches(c.id, imageFiles);
                           if (!("error" in res)) {
                             setFreshImages((prev) => ({ ...prev, [c.id]: res.imageUrl }));
                           }

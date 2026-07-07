@@ -96,7 +96,8 @@ export default function SlideDesigner({ slides, hook, cta, title, hashtags, phot
       const dataUrl = await toPng(el, {
         width: 1080,
         height: 1080,
-        pixelRatio: 1,
+        pixelRatio: 2, // 2160x2160 — nitidez cheia pro Instagram/retina
+        cacheBust: true,
         style: {
           transform: 'scale(1)',
           transformOrigin: 'top left',
@@ -127,7 +128,8 @@ export default function SlideDesigner({ slides, hook, cta, title, hashtags, phot
         const dataUrl = await toPng(el, {
           width: 1080,
           height: 1080,
-          pixelRatio: 1,
+          pixelRatio: 2, // 2160x2160 — nitidez cheia pro Instagram/retina
+        cacheBust: true,
           style: {
             transform: 'scale(1)',
             transformOrigin: 'top left',

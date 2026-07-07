@@ -212,7 +212,8 @@ export default function CaseSlideDesigner({
       const dataUrl = await toPng(el, {
         width: 1080,
         height: 1080,
-        pixelRatio: 1,
+        pixelRatio: 2, // 2160x2160 — nitidez cheia pro Instagram/retina
+        cacheBust: true,
         style: { transform: "scale(1)", transformOrigin: "top left", width: "1080px", height: "1080px" },
       });
       const link = document.createElement("a");
@@ -236,7 +237,8 @@ export default function CaseSlideDesigner({
         const dataUrl = await toPng(el, {
           width: 1080,
           height: 1080,
-          pixelRatio: 1,
+          pixelRatio: 2, // 2160x2160 — nitidez cheia pro Instagram/retina
+        cacheBust: true,
           style: { transform: "scale(1)", transformOrigin: "top left", width: "1080px", height: "1080px" },
         });
         const link = document.createElement("a");
