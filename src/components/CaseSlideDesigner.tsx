@@ -4,20 +4,30 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { Download, ChevronLeft, ChevronRight, Loader2, FileText } from "lucide-react";
 
 /**
- * Template DOSSIÊ — design exclusivo do "Case de Empresa". Nao e o carrossel
- * padrao: cada slide tem um LAYOUT proprio pelo papel ([TIPO: ...]):
- *   capa     → dossie editorial: foto grande + carimbo CASE + logo da empresa
- *   origem   → arquivo de origem: label vertical "A ORIGEM" + ano fantasma + foto
- *   virada   → o pulo do gato: tag branca de impacto + tipografia gigante + foto
- *   insight  → pull-quote: aspas gigantes + tese em destaque + watermark
- *   acao     → INVERSAO: slide inteiro vermelho, "O QUE EU FARIA"
- *   licao    → fecho emoldurado: a licao + CTA
- *   contexto → ficha tecnica (legado — cases salvos antes do arco narrativo)
- * Gramatica do Pedro (preto/vermelho/900/caixa alta) fundida com a cor e o
- * logo da empresa analisada. Fotos reais entram nos slots clicaveis.
+ * Template CARD EDITORIAL — design exclusivo do "Case de Empresa".
+ * Fundo BRANCO proposital: todos os outros posts do app sao pretos; este
+ * destaca no feed. Manchete em BEBAS NEUE (a fonte de titulos do site do
+ * Pedro), detalhes em vermelho da marca e seta de swipe em todo slide menos
+ * o ultimo. Registro por papel ([TIPO: ...]):
+ *   capa     → manchete gigante + isca + foto com moldura fina + logo
+ *   historia → desenvolvimento: kicker "O CASO", manchete, corpo, foto
+ *   analise  → "A LEITURA DO PEDRO": barra vermelha + tese
+ *   ponte    → "E A SUA EMPRESA?": fundo creme, conecta o case ao leitor
+ *   fecho    → "A LICAO" + fecho assinado, sem seta
+ * Papeis do template anterior (dossie) mapeiam pros novos (origem/virada/
+ * contexto→historia, insight/acao→analise, licao→fecho) — cases salvos
+ * continuam abrindo. A IA marca **palavras-chave** que viram VERMELHO.
+ * Nenhuma imagem e gerada por IA: fotos reais entram nos slots clicaveis.
  */
 
-const RED = "#E31B23";
+const RED = "#FF0000";
+const BG = "#FDFCF9";
+const BG_PONTE = "#F6F1E7";
+const INK = "#111111";
+const MUTED = "#A39B86";
+const HAIR = "#E4DFD3";
+/** Fonte de titulos do site do Pedro (carregada no layout como --font-bebas). */
+const DISPLAY = "var(--font-bebas), 'Bebas Neue', 'Arial Narrow', sans-serif";
 
 interface CompanyBrandInput {
   name: string;
@@ -35,7 +45,7 @@ interface CaseSlideDesignerProps {
   companyBrand?: CompanyBrandInput | null;
 }
 
-type Role = "capa" | "origem" | "virada" | "contexto" | "insight" | "acao" | "licao";
+type Role = "capa" | "historia" | "analise" | "ponte" | "fecho";
 
 interface CaseSlide {
   role: Role;
@@ -44,8 +54,6 @@ interface CaseSlide {
   number: number;
   total: number;
   photoHint?: string | null;
-  /** posicao entre os insights (para alternar alinhamento) */
-  insightIndex?: number;
 }
 
 function splitHeading(text: string): { heading?: string; body: string } {
@@ -62,17 +70,18 @@ function splitHeading(text: string): { heading?: string; body: string } {
 
 function normalizeRole(raw: string | null | undefined, fallback: Role): Role {
   const r = (raw || "").toLowerCase();
-  if (
-    r === "origem" ||
-    r === "virada" ||
-    r === "contexto" ||
-    r === "insight" ||
-    r === "acao" ||
-    r === "licao" ||
-    r === "capa"
-  )
+  if (r === "historia" || r === "analise" || r === "ponte" || r === "fecho" || r === "capa")
     return r as Role;
+  // papeis do template anterior (dossie) — mapeiam pro registro novo
+  if (r === "origem" || r === "virada" || r === "contexto") return "historia";
+  if (r === "insight" || r === "acao") return "analise";
+  if (r === "licao") return "fecho";
   return fallback;
+}
+
+/** A seta de swipe e do design; remove qualquer "→"/"->" que a IA escreva. */
+function stripArrow(text?: string): string | undefined {
+  return text?.replace(/\s*(?:→|->)\s*$/g, "").trim() || undefined;
 }
 
 function buildCaseSlides(
@@ -85,42 +94,57 @@ function buildCaseSlides(
   const total = slides.length + 2;
   const out: CaseSlide[] = [];
 
+  const capa = splitHeading(hook);
   out.push({
     role: "capa",
-    heading: hook,
+    heading: stripArrow(capa.heading) ?? stripArrow(capa.body),
+    body: capa.heading ? stripArrow(capa.body) : undefined,
     number: 1,
     total,
     photoHint: photoHints[0] ?? null,
   });
 
-  let insightCount = 0;
   slides.forEach((text, i) => {
     const { heading, body } = splitHeading(text);
-    // fallback de papel: 1o slide do meio = contexto, demais = insight
-    const role = normalizeRole(slideRoles[i + 1], i === 0 ? "contexto" : "insight");
-    const slide: CaseSlide = {
-      role,
-      heading,
-      body,
+    out.push({
+      role: normalizeRole(slideRoles[i + 1], "historia"),
+      heading: stripArrow(heading),
+      body: stripArrow(body),
       number: i + 2,
       total,
       photoHint: photoHints[i + 1] ?? null,
-    };
-    if (role === "insight") slide.insightIndex = insightCount++;
-    out.push(slide);
+    });
   });
 
-  const ctaParts = splitHeading(cta);
+  const fecho = splitHeading(cta);
   out.push({
-    role: "licao",
-    heading: ctaParts.heading,
-    body: ctaParts.body,
+    role: "fecho",
+    heading: stripArrow(fecho.heading),
+    body: stripArrow(fecho.body),
     number: total,
     total,
     photoHint: photoHints[slides.length + 1] ?? null,
   });
 
   return out;
+}
+
+/** Renderiza texto com **trechos** em vermelho — o sublinhado do Pedro. */
+function RedText({ text }: { text: string }) {
+  const parts = text.split(/\*\*(.+?)\*\*/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        i % 2 === 1 ? (
+          <span key={i} style={{ color: RED }}>
+            {p}
+          </span>
+        ) : (
+          <span key={i}>{p}</span>
+        )
+      )}
+    </>
+  );
 }
 
 export default function CaseSlideDesigner({
@@ -234,7 +258,7 @@ export default function CaseSlideDesigner({
         <div className="flex items-center gap-2">
           <FileText className="h-3.5 w-3.5 text-accent" />
           <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-accent">
-            Dossiê do Case ({allSlides.length} slides)
+            Case Editorial ({allSlides.length} slides)
           </span>
         </div>
         <button
@@ -247,12 +271,12 @@ export default function CaseSlideDesigner({
         </button>
       </div>
 
-      <div className="relative overflow-hidden rounded-xl border border-border bg-black">
+      <div className="relative overflow-hidden rounded-xl border border-border" style={{ background: BG }}>
         <div className="relative mx-auto" style={{ maxWidth: 400 }}>
           {current > 0 && (
             <button
               onClick={() => setCurrent((p) => Math.max(p - 1, 0))}
-              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/20 p-1.5 backdrop-blur-sm transition hover:bg-white/30"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 p-1.5 backdrop-blur-sm transition hover:bg-black/60"
             >
               <ChevronLeft className="h-4 w-4 text-white" />
             </button>
@@ -260,7 +284,7 @@ export default function CaseSlideDesigner({
           {current < allSlides.length - 1 && (
             <button
               onClick={() => setCurrent((p) => Math.min(p + 1, allSlides.length - 1))}
-              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/20 p-1.5 backdrop-blur-sm transition hover:bg-white/30"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 p-1.5 backdrop-blur-sm transition hover:bg-black/60"
             >
               <ChevronRight className="h-4 w-4 text-white" />
             </button>
@@ -271,7 +295,8 @@ export default function CaseSlideDesigner({
               <button
                 key={i}
                 onClick={() => setCurrent(i)}
-                className={`h-1.5 rounded-full transition-all ${i === current ? "w-4 bg-white" : "w-1.5 bg-white/40"}`}
+                className="h-1.5 rounded-full transition-all"
+                style={{ width: i === current ? 16 : 6, background: i === current ? RED : "rgba(0,0,0,0.25)" }}
               />
             ))}
           </div>
@@ -343,19 +368,15 @@ interface RenderProps {
 function CaseSlideRenderer(props: RenderProps) {
   switch (props.slide.role) {
     case "capa":
-      return <CapaDossie {...props} />;
-    case "origem":
-      return <OrigemArquivo {...props} />;
-    case "virada":
-      return <ViradaImpacto {...props} />;
-    case "contexto":
-      return <ContextoFicha {...props} />;
-    case "acao":
-      return <AcaoInvertida {...props} />;
-    case "licao":
-      return <LicaoFecho {...props} />;
+      return <CapaCard {...props} />;
+    case "analise":
+      return <AnaliseCard {...props} />;
+    case "ponte":
+      return <PonteCard {...props} />;
+    case "fecho":
+      return <FechoCard {...props} />;
     default:
-      return <InsightQuote {...props} />;
+      return <HistoriaCard {...props} />;
   }
 }
 
@@ -365,84 +386,97 @@ const BASE: React.CSSProperties = {
   position: "relative",
   fontFamily: "'Inter', 'Segoe UI', sans-serif",
   overflow: "hidden",
+  background: BG,
+  padding: "72px 90px 150px",
 };
 
-/** Marcas de registro nos cantos — assinatura editorial do dossie */
-function CornerMarks({ color = "#333" }: { color?: string }) {
-  const mark = (pos: React.CSSProperties) => (
-    <span
-      style={{
-        position: "absolute",
-        width: 26,
-        height: 26,
-        color,
-        fontSize: 26,
-        lineHeight: "26px",
-        fontWeight: 300,
-        ...pos,
-      }}
-    >
-      +
-    </span>
-  );
+/** Cabecalho estilo "post": selinho vermelho + nome + handle. Sem rosto. */
+function PostHeader({ company, showLogo = false }: { company: RenderProps["company"]; showLogo?: boolean }) {
   return (
-    <>
-      {mark({ top: 28, left: 32 })}
-      {mark({ top: 28, right: 32 })}
-      {mark({ bottom: 28, left: 32 })}
-      {mark({ bottom: 28, right: 32 })}
-    </>
-  );
-}
-
-function Rodape({ company, number, total, dark = false }: { company: RenderProps["company"]; number: number; total: number; dark?: boolean }) {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        bottom: 44,
-        left: 80,
-        right: 80,
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        borderTop: `1px solid ${dark ? "rgba(0,0,0,0.25)" : "#222"}`,
-        paddingTop: 18,
-      }}
-    >
-      <span style={{ color: dark ? "rgba(0,0,0,0.7)" : "#666", fontSize: 20, fontWeight: 700, letterSpacing: "0.08em" }}>
-        @pedrorabelo
-      </span>
-      <span
-        style={{
-          color: dark ? "rgba(0,0,0,0.7)" : company.color,
-          fontSize: 19,
-          fontWeight: 800,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-        }}
-      >
-        CASE · {company.name}
-      </span>
-      <span style={{ color: dark ? "rgba(0,0,0,0.6)" : "#555", fontSize: 20, fontFamily: "monospace" }}>
-        {String(number).padStart(2, "0")}/{String(total).padStart(2, "0")}
-      </span>
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <span style={{ width: 20, height: 20, background: RED, display: "block" }} />
+        <span style={{ fontSize: 27, fontWeight: 800, color: INK, letterSpacing: "-0.01em" }}>Pedro Rabelo</span>
+        <span style={{ fontSize: 25, fontWeight: 500, color: MUTED }}>@pedrorabelo</span>
+        {showLogo && company.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={company.logoUrl}
+            alt={company.name}
+            style={{
+              marginLeft: "auto",
+              width: 58,
+              height: 58,
+              objectFit: "contain",
+              background: "#fff",
+              border: `1px solid ${HAIR}`,
+              borderRadius: 10,
+              padding: 6,
+            }}
+          />
+        )}
+      </div>
+      <div style={{ height: 2, background: HAIR, marginTop: 24 }} />
     </div>
   );
 }
 
+function Kicker({ children, color = MUTED }: { children: React.ReactNode; color?: string }) {
+  return (
+    <span
+      style={{
+        display: "block",
+        marginTop: 46,
+        color,
+        fontSize: 21,
+        fontWeight: 800,
+        letterSpacing: "0.24em",
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Rodape: numeracao + seta vermelha de swipe (todo slide menos o ultimo). */
+function CardFooter({ slide }: { slide: CaseSlide }) {
+  const arrow = slide.number < slide.total;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 52,
+        left: 90,
+        right: 90,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
+      <span style={{ fontFamily: "monospace", fontSize: 22, color: MUTED }}>
+        {String(slide.number).padStart(2, "0")}/{String(slide.total).padStart(2, "0")}
+      </span>
+      {arrow ? (
+        <span style={{ color: RED, fontSize: 62, fontWeight: 900, lineHeight: 1 }}>→</span>
+      ) : (
+        <span style={{ fontSize: 22, fontWeight: 700, color: MUTED, letterSpacing: "0.08em" }}>@pedrorabelo</span>
+      )}
+    </div>
+  );
+}
+
+/** Caixa de foto real: moldura fina; vazia mostra a instrucao da IA. */
 function FotoArea({
   hint,
   height,
   photoUrl,
   onPick,
-  accent,
 }: {
   hint: string;
   height: number;
   photoUrl?: string;
   onPick?: () => void;
-  accent: string;
 }) {
   if (photoUrl) {
     return (
@@ -451,7 +485,15 @@ function FotoArea({
         src={photoUrl}
         alt={hint}
         onClick={onPick}
-        style={{ width: "100%", height, objectFit: "cover", borderRadius: 18, cursor: onPick ? "pointer" : undefined, display: "block" }}
+        style={{
+          width: "100%",
+          height,
+          objectFit: "cover",
+          border: `3px solid ${INK}`,
+          borderRadius: 4,
+          cursor: onPick ? "pointer" : undefined,
+          display: "block",
+        }}
       />
     );
   }
@@ -461,633 +503,257 @@ function FotoArea({
       style={{
         width: "100%",
         height,
-        border: `3px dashed ${accent}`,
-        borderRadius: 18,
-        background: "rgba(255,255,255,0.03)",
+        border: `2px solid #C9C2B0`,
+        borderRadius: 4,
+        background: "#F2EEE3",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
-        gap: 10,
+        gap: 12,
         cursor: onPick ? "pointer" : undefined,
       }}
     >
-      <span style={{ color: accent, fontSize: 22, fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+      <span style={{ color: RED, fontSize: 22, fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase" }}>
         📷 FOTO
       </span>
-      <span style={{ color: "#e5e5e5", fontSize: 24, fontWeight: 600, textAlign: "center", maxWidth: 680, lineHeight: 1.35 }}>
+      <span style={{ color: "#55503F", fontSize: 24, fontWeight: 600, textAlign: "center", maxWidth: 680, lineHeight: 1.35 }}>
         {hint}
       </span>
-      {onPick && (
-        <span style={{ color: "#777", fontSize: 18, fontWeight: 600 }}>Clique para colocar a foto real</span>
-      )}
+      {onPick && <span style={{ color: MUTED, fontSize: 18, fontWeight: 600 }}>Clique para colocar a foto real</span>}
     </div>
   );
 }
 
-/* ---------- CAPA: dossie editorial ---------- */
-function CapaDossie({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
+/* ---------- CAPA: manchete editorial gigante + isca ---------- */
+function CapaCard({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
   return (
-    <div style={{ ...BASE, background: "#0a0a0a", padding: "64px 80px" }}>
-      <CornerMarks />
-      {/* Foto grande no topo — a cara REAL da empresa */}
-      <FotoArea
-        hint={slide.photoHint || `foto da ${company.name}`}
-        height={450}
-        photoUrl={photoUrl}
-        onPick={onPickPhoto}
-        accent={RED}
-      />
-
-      {/* Linha de identificacao: logo + carimbos */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 36 }}>
-        {company.logoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={company.logoUrl}
-            alt={company.name}
-            style={{ width: 60, height: 60, objectFit: "contain", background: "#fff", borderRadius: 12, padding: 7 }}
-          />
-        )}
-        <span
-          style={{
-            background: RED,
-            color: "#fff",
-            padding: "8px 18px",
-            fontSize: 21,
-            fontWeight: 900,
-            letterSpacing: "0.16em",
-          }}
-        >
-          DOSSIÊ
-        </span>
-        <span
-          style={{
-            border: `3px solid ${company.color}`,
-            color: company.color,
-            padding: "6px 18px",
-            fontSize: 21,
-            fontWeight: 800,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-          }}
-        >
-          {company.name}
-        </span>
-        <span style={{ marginLeft: "auto", color: "#555", fontSize: 19, fontFamily: "monospace", letterSpacing: "0.1em" }}>
-          Nº {String(slide.number).padStart(2, "0")}
-        </span>
-      </div>
-
-      {/* Titulo — o gancho do Pedro */}
+    <div style={BASE}>
+      <PostHeader company={company} showLogo />
+      <Kicker color={RED}>Case · {company.name}</Kicker>
       <h1
         style={{
-          color: "#fff",
-          fontSize: 58,
-          fontWeight: 900,
-          lineHeight: 1.04,
-          letterSpacing: "-0.02em",
+          fontFamily: DISPLAY,
+          color: INK,
+          fontSize: 92,
+          fontWeight: 400,
+          lineHeight: 0.98,
+          letterSpacing: "0.015em",
           textTransform: "uppercase",
-          margin: "30px 0 0",
+          margin: "20px 0 0",
         }}
       >
-        {slide.heading}
+        <RedText text={slide.heading || ""} />
       </h1>
-
-      {/* Assinatura da analise */}
-      <div style={{ position: "absolute", bottom: 44, left: 80, right: 80, display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ width: 52, height: 6, background: RED }} />
-        <span style={{ color: "#888", fontSize: 20, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase" }}>
-          Análise por Pedro Rabelo
-        </span>
-        <div style={{ flex: 1, height: 2, background: `linear-gradient(90deg, ${RED}, ${company.color}, transparent)` }} />
-      </div>
+      {slide.body && (
+        <p style={{ color: "#4A4436", fontSize: 31, fontWeight: 500, lineHeight: 1.5, marginTop: 28, maxWidth: 820 }}>
+          <RedText text={slide.body} />
+        </p>
+      )}
+      {slide.photoHint && (
+        <div style={{ marginTop: 36 }}>
+          <FotoArea hint={slide.photoHint} height={330} photoUrl={photoUrl} onPick={onPickPhoto} />
+        </div>
+      )}
+      <CardFooter slide={slide} />
     </div>
   );
 }
 
-/* ---------- ORIGEM: arquivo de origem — como tudo comecou ---------- */
-function extractYear(slide: CaseSlide): string | null {
-  const m = `${slide.heading ?? ""} ${slide.body ?? ""}`.match(/\b(19|20)\d{2}\b/);
-  return m ? m[0] : null;
-}
-
-function OrigemArquivo({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
-  const year = extractYear(slide);
+/* ---------- HISTORIA: o desenvolvimento do case ---------- */
+function HistoriaCard({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
   return (
-    <div style={{ ...BASE, background: "#0a0a0a", padding: "72px 80px 120px" }}>
-      <CornerMarks />
-      {/* Label vertical */}
-      <div
-        style={{
-          position: "absolute",
-          left: 34,
-          top: "44%",
-          transform: "rotate(-90deg) translateX(50%)",
-          transformOrigin: "left center",
-          color: company.color,
-          fontSize: 26,
-          fontWeight: 900,
-          letterSpacing: "0.35em",
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
-        }}
-      >
-        A ORIGEM
-      </div>
-
-      {/* Ano fantasma — o carimbo de epoca do dossie */}
-      <span
-        style={{
-          position: "absolute",
-          top: 34,
-          right: 60,
-          fontSize: year ? 170 : 210,
-          fontWeight: 900,
-          color: "rgba(227,27,35,0.12)",
-          lineHeight: 1,
-          letterSpacing: "-0.05em",
-        }}
-      >
-        {year ?? String(slide.number).padStart(2, "0")}
-      </span>
-
-      <div style={{ marginLeft: 56, position: "relative", borderLeft: `6px solid ${RED}`, paddingLeft: 36 }}>
-        <span
+    <div style={BASE}>
+      <PostHeader company={company} />
+      <Kicker>O caso · {company.name}</Kicker>
+      {slide.heading && (
+        <h2
           style={{
-            color: "#888",
-            fontSize: 21,
-            fontWeight: 800,
-            letterSpacing: "0.24em",
+            fontFamily: DISPLAY,
+            color: INK,
+            fontSize: 64,
+            fontWeight: 400,
+            lineHeight: 1,
+            letterSpacing: "0.015em",
             textTransform: "uppercase",
-            display: "block",
-            marginBottom: 18,
+            margin: "16px 0 0",
+            maxWidth: 880,
           }}
         >
-          Como tudo começou
-        </span>
-        {slide.heading && (
-          <h2
-            style={{
-              color: "#fff",
-              fontSize: 50,
-              fontWeight: 900,
-              lineHeight: 1.08,
-              textTransform: "uppercase",
-              letterSpacing: "-0.015em",
-              margin: 0,
-            }}
-          >
-            {slide.heading}
-          </h2>
-        )}
-        <p style={{ color: "#d4d4d4", fontSize: 31, fontWeight: 400, lineHeight: 1.55, marginTop: 28, maxWidth: 840 }}>
-          {slide.body}
-        </p>
-
-        {slide.photoHint && (
-          <div style={{ marginTop: 30 }}>
-            <FotoArea hint={slide.photoHint} height={290} photoUrl={photoUrl} onPick={onPickPhoto} accent={company.color} />
-          </div>
-        )}
-      </div>
-
-      <Rodape company={company} number={slide.number} total={slide.total} />
-    </div>
-  );
-}
-
-/* ---------- VIRADA: o pulo do gato — a jogada nao-obvia ---------- */
-function ViradaImpacto({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
-  return (
-    <div
-      style={{
-        ...BASE,
-        background: "#0a0a0a",
-        padding: "80px 80px 120px",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}
-    >
-      <CornerMarks />
-      {/* Numero fantasma em vermelho — assinatura da virada */}
-      <span
-        style={{
-          position: "absolute",
-          bottom: 40,
-          right: 24,
-          fontSize: 300,
-          fontWeight: 900,
-          color: "rgba(227,27,35,0.09)",
-          lineHeight: 1,
-          letterSpacing: "-0.06em",
-        }}
-      >
-        {String(slide.number).padStart(2, "0")}
-      </span>
-
-      <span
-        style={{
-          background: "#fff",
-          color: "#0a0a0a",
-          alignSelf: "flex-start",
-          padding: "10px 22px",
-          fontSize: 22,
-          fontWeight: 900,
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-        }}
-      >
-        O pulo do gato
-      </span>
-
-      <div style={{ position: "relative", marginTop: 40 }}>
-        {slide.heading && (
-          <h2
-            style={{
-              color: "#fff",
-              fontSize: 62,
-              fontWeight: 900,
-              lineHeight: 1.05,
-              letterSpacing: "-0.02em",
-              textTransform: "uppercase",
-              margin: 0,
-              maxWidth: 900,
-            }}
-          >
-            {slide.heading}
-          </h2>
-        )}
-        <div style={{ width: 120, height: 10, background: RED, margin: "30px 0" }} />
-        <p style={{ color: "#d4d4d4", fontSize: 30, fontWeight: 400, lineHeight: 1.55, margin: 0, maxWidth: 860 }}>
-          {slide.body}
-        </p>
-
-        {slide.photoHint && (
-          <div style={{ marginTop: 28 }}>
-            <FotoArea hint={slide.photoHint} height={240} photoUrl={photoUrl} onPick={onPickPhoto} accent={company.color} />
-          </div>
-        )}
-      </div>
-
-      <Rodape company={company} number={slide.number} total={slide.total} />
-    </div>
-  );
-}
-
-/* ---------- CONTEXTO: ficha tecnica ---------- */
-function ContextoFicha({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
-  return (
-    <div style={{ ...BASE, background: "#0a0a0a", padding: "72px 80px 120px" }}>
-      <CornerMarks />
-      {/* Label vertical */}
-      <div
-        style={{
-          position: "absolute",
-          left: 34,
-          top: "44%",
-          transform: "rotate(-90deg) translateX(50%)",
-          transformOrigin: "left center",
-          color: company.color,
-          fontSize: 26,
-          fontWeight: 900,
-          letterSpacing: "0.35em",
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
-        }}
-      >
-        O CASO
-      </div>
-
-      {/* Numero fantasma */}
-      <span
-        style={{
-          position: "absolute",
-          top: 30,
-          right: 64,
-          fontSize: 210,
-          fontWeight: 900,
-          color: "#161616",
-          lineHeight: 1,
-          letterSpacing: "-0.05em",
-        }}
-      >
-        {String(slide.number).padStart(2, "0")}
-      </span>
-
-      <div style={{ marginLeft: 56, position: "relative" }}>
-        {slide.heading && (
-          <h2
-            style={{
-              color: "#fff",
-              fontSize: 47,
-              fontWeight: 900,
-              lineHeight: 1.1,
-              textTransform: "uppercase",
-              letterSpacing: "-0.01em",
-              margin: 0,
-              paddingBottom: 18,
-              borderBottom: `6px solid ${RED}`,
-              display: "inline-block",
-            }}
-          >
-            {slide.heading}
-          </h2>
-        )}
-        <p style={{ color: "#d4d4d4", fontSize: 31, fontWeight: 400, lineHeight: 1.55, marginTop: 30, maxWidth: 860 }}>
-          {slide.body}
-        </p>
-
-        {slide.photoHint && (
-          <div style={{ marginTop: 30 }}>
-            <FotoArea hint={slide.photoHint} height={280} photoUrl={photoUrl} onPick={onPickPhoto} accent={company.color} />
-          </div>
-        )}
-      </div>
-
-      <Rodape company={company} number={slide.number} total={slide.total} />
-    </div>
-  );
-}
-
-/* ---------- INSIGHT: pull-quote com watermark ---------- */
-function InsightQuote({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
-  const alignRight = (slide.insightIndex ?? 0) % 2 === 1;
-  return (
-    <div
-      style={{
-        ...BASE,
-        background: "#0a0a0a",
-        padding: "80px 80px 120px",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}
-    >
-      <CornerMarks />
-      {/* Watermark gigante */}
-      <span
-        style={{
-          position: "absolute",
-          bottom: 60,
-          [alignRight ? "left" : "right"]: 40,
-          fontSize: 300,
-          fontWeight: 900,
-          color: "#141414",
-          lineHeight: 1,
-          letterSpacing: "-0.06em",
-        }}
-      >
-        {String(slide.number).padStart(2, "0")}
-      </span>
-
-      {/* Aspas do Pedro */}
-      <span
-        style={{
-          color: RED,
-          fontSize: 170,
-          fontWeight: 900,
-          lineHeight: 0.6,
-          display: "block",
-          textAlign: alignRight ? "right" : "left",
-          marginBottom: 8,
-        }}
-      >
-        “
-      </span>
-
-      <div style={{ position: "relative", textAlign: alignRight ? "right" : "left" }}>
-        {slide.heading && (
-          <h2
-            style={{
-              color: "#fff",
-              fontSize: 52,
-              fontWeight: 900,
-              lineHeight: 1.12,
-              letterSpacing: "-0.015em",
-              margin: 0,
-              maxWidth: 880,
-              marginLeft: alignRight ? "auto" : 0,
-            }}
-          >
-            {slide.heading}
-          </h2>
-        )}
-        <div
-          style={{
-            width: 96,
-            height: 7,
-            background: company.color,
-            margin: alignRight ? "26px 0 26px auto" : "26px 0",
-          }}
-        />
+          <RedText text={slide.heading} />
+        </h2>
+      )}
+      {slide.body && (
         <p
           style={{
-            color: "#b9b9b9",
-            fontSize: 30,
+            color: "#3A3529",
+            fontSize: 29,
             fontWeight: 400,
-            lineHeight: 1.55,
-            margin: 0,
-            maxWidth: 820,
-            marginLeft: alignRight ? "auto" : 0,
+            lineHeight: 1.62,
+            marginTop: 26,
+            maxWidth: 860,
+            whiteSpace: "pre-line",
           }}
         >
-          {slide.body}
+          <RedText text={slide.body} />
         </p>
-
-        {slide.photoHint && (
-          <div style={{ marginTop: 28 }}>
-            <FotoArea hint={slide.photoHint} height={240} photoUrl={photoUrl} onPick={onPickPhoto} accent={company.color} />
-          </div>
-        )}
-      </div>
-
-      <Rodape company={company} number={slide.number} total={slide.total} />
+      )}
+      {slide.photoHint && (
+        <div style={{ marginTop: 30 }}>
+          <FotoArea hint={slide.photoHint} height={280} photoUrl={photoUrl} onPick={onPickPhoto} />
+        </div>
+      )}
+      <CardFooter slide={slide} />
     </div>
   );
 }
 
-/* ---------- ACAO: inversao total — slide vermelho ---------- */
-function AcaoInvertida({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
+/* ---------- ANALISE: a leitura do Pedro ---------- */
+function AnaliseCard({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
   return (
-    <div
-      style={{
-        ...BASE,
-        background: `linear-gradient(150deg, ${RED} 0%, #b8121a 100%)`,
-        padding: "80px 80px 120px",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}
-    >
-      <CornerMarks color="rgba(0,0,0,0.3)" />
-      {/* Monograma fantasma */}
-      <span
-        style={{
-          position: "absolute",
-          bottom: -40,
-          right: 24,
-          fontSize: 380,
-          fontWeight: 900,
-          color: "rgba(0,0,0,0.14)",
-          lineHeight: 1,
-        }}
-      >
-        PR
-      </span>
-
-      <span
-        style={{
-          background: "#0a0a0a",
-          color: "#fff",
-          alignSelf: "flex-start",
-          padding: "10px 22px",
-          fontSize: 22,
-          fontWeight: 900,
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-        }}
-      >
-        O que EU faria
-      </span>
-
-      <div style={{ position: "relative", marginTop: 36 }}>
+    <div style={BASE}>
+      <PostHeader company={company} />
+      <Kicker color={RED}>A leitura do Pedro</Kicker>
+      <div style={{ borderLeft: `8px solid ${RED}`, paddingLeft: 36, marginTop: 26 }}>
         {slide.heading && (
           <h2
             style={{
-              color: "#fff",
-              fontSize: 52,
-              fontWeight: 900,
-              lineHeight: 1.1,
-              letterSpacing: "-0.015em",
-              textTransform: "uppercase",
-              margin: 0,
-              maxWidth: 880,
-            }}
-          >
-            {slide.heading}
-          </h2>
-        )}
-        <p style={{ color: "rgba(255,255,255,0.94)", fontSize: 31, fontWeight: 500, lineHeight: 1.55, marginTop: 28, maxWidth: 860 }}>
-          {slide.body}
-        </p>
-
-        {slide.photoHint && (
-          <div style={{ marginTop: 28 }}>
-            <FotoArea hint={slide.photoHint} height={240} photoUrl={photoUrl} onPick={onPickPhoto} accent="#ffffff" />
-          </div>
-        )}
-      </div>
-
-      <Rodape company={company} number={slide.number} total={slide.total} dark />
-    </div>
-  );
-}
-
-/* ---------- LICAO: fecho emoldurado ---------- */
-function LicaoFecho({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
-  return (
-    <div
-      style={{
-        ...BASE,
-        background: "#0a0a0a",
-        padding: 56,
-      }}
-    >
-      {/* Moldura dupla: vermelho do Pedro + cor da empresa */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 40,
-          border: `3px solid ${RED}`,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          inset: 54,
-          border: `1px solid ${company.color}`,
-        }}
-      />
-
-      <div
-        style={{
-          position: "relative",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          textAlign: "center",
-          padding: "0 90px",
-        }}
-      >
-        <span
-          style={{
-            background: RED,
-            color: "#fff",
-            padding: "9px 24px",
-            fontSize: 21,
-            fontWeight: 900,
-            letterSpacing: "0.2em",
-            textTransform: "uppercase",
-            marginBottom: 36,
-          }}
-        >
-          A LIÇÃO
-        </span>
-
-        {slide.heading && (
-          <h2
-            style={{
-              color: "#fff",
-              fontSize: 50,
-              fontWeight: 900,
-              lineHeight: 1.12,
-              letterSpacing: "-0.015em",
+              fontFamily: DISPLAY,
+              color: INK,
+              fontSize: 62,
+              fontWeight: 400,
+              lineHeight: 1,
+              letterSpacing: "0.015em",
               textTransform: "uppercase",
               margin: 0,
               maxWidth: 840,
             }}
           >
-            {slide.heading}
+            <RedText text={slide.heading} />
           </h2>
         )}
         {slide.body && (
-          <p style={{ color: "#c9c9c9", fontSize: 30, fontWeight: 400, lineHeight: 1.55, marginTop: 26, maxWidth: 780 }}>
-            {slide.body}
-          </p>
-        )}
-
-        {slide.photoHint && (
-          <div style={{ marginTop: 28, width: "100%", maxWidth: 700 }}>
-            <FotoArea hint={slide.photoHint} height={220} photoUrl={photoUrl} onPick={onPickPhoto} accent={company.color} />
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 18, marginTop: 44 }}>
-          <span style={{ background: RED, color: "#fff", padding: "14px 36px", borderRadius: 10, fontSize: 23, fontWeight: 800 }}>
-            💾 SALVAR
-          </span>
-          <span
+          <p
             style={{
-              border: `2px solid ${company.color}`,
-              color: company.color,
-              padding: "14px 36px",
-              borderRadius: 10,
-              fontSize: 23,
-              fontWeight: 800,
+              color: "#3A3529",
+              fontSize: 29,
+              fontWeight: 400,
+              lineHeight: 1.62,
+              marginTop: 26,
+              maxWidth: 820,
+              whiteSpace: "pre-line",
             }}
           >
-            ↗ COMPARTILHAR
-          </span>
-        </div>
-
-        <span style={{ position: "absolute", bottom: 34, color: "#666", fontSize: 20, fontWeight: 700, letterSpacing: "0.1em" }}>
-          @pedrorabelo · CASE {company.name.toUpperCase()}
-        </span>
+            <RedText text={slide.body} />
+          </p>
+        )}
+        {slide.photoHint && (
+          <div style={{ marginTop: 28 }}>
+            <FotoArea hint={slide.photoHint} height={240} photoUrl={photoUrl} onPick={onPickPhoto} />
+          </div>
+        )}
       </div>
+      <CardFooter slide={slide} />
+    </div>
+  );
+}
+
+/* ---------- PONTE: a virada — conecta o case ao leitor ---------- */
+function PonteCard({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
+  return (
+    <div style={{ ...BASE, background: BG_PONTE }}>
+      <PostHeader company={company} />
+      <Kicker color={RED}>E a sua empresa?</Kicker>
+      {slide.heading && (
+        <h2
+          style={{
+            fontFamily: DISPLAY,
+            color: INK,
+            fontSize: 70,
+            fontWeight: 400,
+            lineHeight: 0.98,
+            letterSpacing: "0.015em",
+            textTransform: "uppercase",
+            margin: "18px 0 0",
+            maxWidth: 880,
+          }}
+        >
+          <RedText text={slide.heading} />
+        </h2>
+      )}
+      {slide.body && (
+        <p
+          style={{
+            color: "#3A3529",
+            fontSize: 30,
+            fontWeight: 400,
+            lineHeight: 1.6,
+            marginTop: 28,
+            maxWidth: 840,
+            whiteSpace: "pre-line",
+          }}
+        >
+          <RedText text={slide.body} />
+        </p>
+      )}
+      {slide.photoHint && (
+        <div style={{ marginTop: 28 }}>
+          <FotoArea hint={slide.photoHint} height={240} photoUrl={photoUrl} onPick={onPickPhoto} />
+        </div>
+      )}
+      <CardFooter slide={slide} />
+    </div>
+  );
+}
+
+/* ---------- FECHO: a licao + assinatura, sem seta ---------- */
+function FechoCard({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
+  return (
+    <div style={BASE}>
+      <PostHeader company={company} />
+      <Kicker color={RED}>A lição</Kicker>
+      {slide.heading && (
+        <h2
+          style={{
+            fontFamily: DISPLAY,
+            color: INK,
+            fontSize: 66,
+            fontWeight: 400,
+            lineHeight: 1,
+            letterSpacing: "0.015em",
+            textTransform: "uppercase",
+            margin: "18px 0 0",
+            maxWidth: 860,
+          }}
+        >
+          <RedText text={slide.heading} />
+        </h2>
+      )}
+      {slide.body && (
+        <p
+          style={{
+            color: "#3A3529",
+            fontSize: 30,
+            fontWeight: 400,
+            lineHeight: 1.6,
+            marginTop: 28,
+            maxWidth: 840,
+            whiteSpace: "pre-line",
+          }}
+        >
+          <RedText text={slide.body} />
+        </p>
+      )}
+      {slide.photoHint && (
+        <div style={{ marginTop: 28 }}>
+          <FotoArea hint={slide.photoHint} height={220} photoUrl={photoUrl} onPick={onPickPhoto} />
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 44 }}>
+        <span style={{ width: 64, height: 3, background: RED, display: "block" }} />
+        <span style={{ fontFamily: DISPLAY, fontSize: 32, letterSpacing: "0.06em", color: "#3A3529" }}>Pedro Rabelo</span>
+      </div>
+      <CardFooter slide={slide} />
     </div>
   );
 }

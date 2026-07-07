@@ -1121,64 +1121,65 @@ Depois de TODOS os slides, escreva uma linha exatamente assim: ---LEGENDA---
 E entao a LEGENDA do post de Instagram: 3-4 paragrafos curtos que COMPLEMENTAM o carrossel (NAO repita o conteudo dos slides; contextualize, provoque ou conte um bastidor pessoal) e termine com um CTA. Essa legenda e o texto que vai na descricao do post.`;
           break;
         case "case_empresa":
-          typeInstructions = `FORMATO: Case de Empresa — DOSSIE narrativo na voz do Pedro (carrossel de Instagram, 6 a 10 slides)
+          typeInstructions = `FORMATO: Case de Empresa — carrossel editorial "case analisado pelo Pedro" (7 a 10 slides, storytelling jornalistico)
 
 O TOPICO e a EMPRESA a analisar e o RECORTE e o ANGULO/tese da analise. Use o que voce SABE sobre essa empresa (fatos amplamente conhecidos e verificaveis da historia dela); numeros exatos incertos viram ordens de grandeza honestas ("multiplicou por ~10", "bilhoes em GMV") — NUNCA invente numero preciso.
 
-ISTO NAO E: resumo institucional, texto neutro de wikipedia, listinha de dicas, nem carrossel educativo. ISTO E: uma HISTORIA destrinchada com a opiniao explicita do Pedro — a leitura e os frameworks DELE (use a base de conhecimento abaixo como lente; cite o conceito quando couber). Teste antes de responder: se der pra trocar o nome da empresa e o texto continuar de pe, REFACA.
+ISTO NAO E: resumo institucional, texto neutro de wikipedia, listinha de dicas, nem carrossel educativo. ISTO E: uma HISTORIA de jornalismo de negocios contada na voz do Pedro — abre loops, prende o leitor, opina. Use a base de conhecimento abaixo como lente (cite o conceito quando couber). Teste antes de responder: se der pra trocar o nome da empresa e o texto continuar de pe, REFACA.
 
 AMPLITUDE DE TEMA: a analise NAO precisa ser de marketing/vendas. Siga o angulo do RECORTE: estrategia, cultura e gente, operacao/logistica, produto, pricing, dados/tecnologia, gestao de crise, sucessao, marca. O leitor deve sentir que o Pedro domina QUALQUER assunto de negocios.
 
-ARCO NARRATIVO OBRIGATORIO (nesta ordem):
+ESTRUTURA OBRIGATORIA (nesta ordem):
 
-**SLIDE 1 — CAPA (hook):**
-- Angulo CONTRA-INTUITIVO sobre a empresa, maximo 10 palavras de impacto. Ex.: "O banco que venceu REMOVENDO." Paradoxo, contradicao ou verdade incomoda — tem que parar o scroll.
+**SLIDE 1 — CAPA:**
+- MANCHETE curta e contra-intuitiva sobre a empresa, maximo 12 palavras. Ex.: "Nubank: sem agencia, sem gerente, sem PowerPoint."
+- Depois da manchete, 1 linha de isca que promete a explicacao, nesse espirito: "Isso muda mais coisa do que parece. Te explico."
 - FOTO obrigatoria: termine o slide com [FOTO: instrucao detalhada de qual foto usar]
 
-**A ORIGEM (1-2 slides) [TIPO: origem]:**
-- Como a empresa comecou: o contexto da epoca, o problema, o cenario que ninguem via.
-- Concreto: ano, lugar, quem eram os fundadores, o que existia antes.
-- FOTO: [FOTO: os fundadores no comeco / a primeira sede / a garagem]
+**DESENVOLVIMENTO (3-5 slides) [TIPO: historia]:**
+- UMA ideia por slide, tom de conversa inteligente. Cada slide termina abrindo uma pergunta ou tensao que o proximo resolve (a seta de swipe o design coloca sozinho — nao escreva "->" no texto).
+- Obrigatorio cobrir ao longo do desenvolvimento: a ORIGEM (como e por que a empresa comecou — ano, lugar, fundadores, o cenario da epoca), O QUE FEZ DE DIFERENTE (a jogada nao-obvia que a tornou o que e — o pulo do gato; contraste explicito: "todo mundo fazia X; eles fizeram Y") e FATOS/NUMEROS concretos que dao credibilidade.
+- FOTO onde agregar: [FOTO: ...]
 
-**O QUE FEZ DE DIFERENTE (1-2 slides) [TIPO: virada]:**
-- A jogada NAO-OBVIA que tornou a empresa o que e — o pulo do gato, o moat.
-- Contraste explicito: "todo mundo fazia X; eles fizeram Y".
-- FOTO quando agregar: [FOTO: a primeira versao do produto / o momento da virada]
+**A ANALISE DO PEDRO (1-2 slides) [TIPO: analise]:**
+- A leitura DELE, explicita e em 1a pessoa: "na minha visao...", "o que pouca gente percebe...". Frameworks da base de conhecimento aplicados como lente. Provocador, pessoal. SEM foto nesses slides.
 
-**A ANALISE DO PEDRO (2-3 slides) [TIPO: insight]:**
-- A leitura DELE: o que ele enxerga que os outros nao veem. Frameworks da base de conhecimento aplicados + opiniao explicita em 1a pessoa: "na minha visao...", "o que pouca gente percebe...".
-- SEM foto nesses slides — a estrela e a tese.
-- Opcional (no maximo 1 slide): [TIPO: acao] "O QUE EU FARIA" — o que o Pedro replicaria ou faria diferente. Vira o slide vermelho de impacto no design.
+**A VIRADA (1 slide) [TIPO: ponte]:**
+- Conecta o case ao LEITOR: o que isso ensina pra empresa DELE. A pergunta ou constatacao que faz o empreendedor se enxergar no case. SEM foto.
 
-**A LICAO (1 slide) [TIPO: licao]:**
-- O que o empreendedor que esta lendo tira disso PRA APLICAR no proprio negocio. Concreto, acionavel — termine com uma pergunta que ele consegue responder hoje.
+**ULTIMO SLIDE — FECHO:**
+- A licao pratica (pegada de ensinamento, acionavel) + fecho forte na voz do Pedro. Nada de CTA generico: motivo concreto pra salvar/comentar/compartilhar.
 
-**ULTIMO SLIDE — FECHO/CTA:**
-- Fecho na voz do Pedro + CTA especifico com motivo concreto (salvar/comentar/compartilhar e POR QUE).
+DESTAQUE EM VERMELHO: em cada slide, marque 1-3 palavras/expressoes de MAIOR impacto entre **asteriscos duplos** — elas aparecem em VERMELHO no design. Com parcimonia: e o sublinhado do Pedro, nao decoracao.
+
+PONTUACAO (OBRIGATORIO): NUNCA use travessao (—), meia-risca (–) ou hifen como pontuacao nos textos dos slides e da legenda. Reescreva a frase com ponto final, virgula ou dois-pontos. Hifen SO em palavras compostas ("nao-obvia", "e-commerce").
+
+LINGUAGEM SIMPLES (OBRIGATORIO): escreva pra QUALQUER empreendedor entender de primeira, sem dicionario. PROIBIDO jargao de MBA/consultoria: "incumbente", "moat", "estrutura de custo", "CAC", "NPS", "market share", "escalabilidade", "proposta de valor". Traduza pra lingua de conversa: em vez de "incumbente", "o gigante do setor"; em vez de "moat", "a protecao que ninguem consegue copiar"; em vez de "custo de aquisicao", "o que custa conquistar um cliente". Se um termo tecnico for inevitavel, explique na mesma frase em palavras do dia a dia. Frases curtas. Palavra facil vale mais que palavra bonita.
 
 PAPEL DE CADA SLIDE (IMPORTANTE — define o layout do design):
-- Em CADA slide do meio, inclua uma linha com o papel dele, exatamente neste formato: [TIPO: origem], [TIPO: virada], [TIPO: insight], [TIPO: acao] ou [TIPO: licao].
+- Em CADA slide do meio, inclua uma linha com o papel dele, exatamente neste formato: [TIPO: historia], [TIPO: analise] ou [TIPO: ponte].
 - Capa (SLIDE 1) e ultimo slide nao precisam do marcador.
 
 CAIXAS DE FOTO ([FOTO: ...]) — IMPORTANTE:
 - Nenhuma imagem e gerada por IA. Cada marcador vira uma CAIXA no design com a instrucao de qual foto REAL colocar.
 - Instrucao DETALHADA (o Pedro vai buscar a foto por ela): "os fundadores do Nubank em 2013 na primeira casa alugada" e melhor que "foto dos fundadores".
 - Categorias que funcionam: o comeco (garagem/primeira sede), fundador(es), primeira versao do produto/servico, o momento da virada, sede/escritorio hoje, produto/app atual, numeros e crescimento (grafico/print), cliente/impacto real. Proponha outras se o case pedir.
-- Use SO onde foto real agrega (capa OBRIGATORIA; origem/virada sim; insight/licao nao).
+- Use SO onde foto real agrega (capa OBRIGATORIA; historia sim; analise/ponte/fecho nao).
 - O marcador e SEMPRE a ultima linha do slide, exatamente no formato: [FOTO: instrucao detalhada de qual foto colocar]
 
 VOZ (INEGOCIAVEL):
 - Opinativo, direto, provocador, pessoal — a personalidade do Pedro em 100%.
-- Titulo de cada slide com OPINIAO e punch — NUNCA burocratico. Errado: "A origem", "Os resultados". Certo: "O ano em que ninguem queria ser banco", "O erro que quase custou tudo".
-- Numeros concretos, contraste ("todo mundo faz X; eles fizeram Y"), zero tom de wikipedia.
-- Tem que soar DIFERENTE do carrossel educativo: aqui o Pedro esta DESTRINCHANDO uma empresa, nao ensinando passo-a-passo.
+- Manchete de cada slide com OPINIAO e punch — NUNCA burocratica. Errado: "A origem", "Os resultados". Certo: "O ano em que ninguem queria ser banco", "O erro que quase custou tudo".
+- Numeros concretos, contraste, zero tom de wikipedia.
+- TEXTOS ENXUTOS: e carrossel — manchete curta + 2-4 frases por slide, no maximo.
+- Tem que soar DIFERENTE de qualquer outro post do app: aqui o Pedro esta DESTRINCHANDO uma empresa como um jornalista de negocios que opina.
 
 FORMATO DE RESPOSTA:
 PRIMEIRA LINHA DA RESPOSTA (antes do SLIDE 1) — identidade visual da empresa, exatamente neste formato:
 [MARCA: Nome da Empresa | #COR | dominio.com]
 - #COR = a cor primaria da marca, amplamente conhecida (ex.: Nubank #820AD1, Magalu #0086FF, Coca-Cola #F40009). Se nao tiver certeza, escolha uma cor coerente com o setor.
 - dominio.com = site oficial da empresa (usado pra buscar o logo). Se incerto, omita o terceiro campo: [MARCA: Nome | #COR]
-Depois, cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases diretas (vai ser lido em imagem). Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
+Depois, cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com a manchete curta na primeira linha e 2-4 frases enxutas (vai ser lido em imagem), com os marcadores [TIPO: ...] e [FOTO: ...] conforme as regras acima. Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
 E entao a LEGENDA do post: COMPLEMENTA os slides (nao repete), hook na primeira linha, 3-5 paragrafos curtos, CTA e 5-8 hashtags no final.`;
           break;
       }

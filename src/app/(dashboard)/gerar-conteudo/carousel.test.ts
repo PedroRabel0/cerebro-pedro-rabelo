@@ -148,6 +148,48 @@ Legenda aqui`
   });
 });
 
+describe("parseCarouselSlides — papeis v3 do card editorial (historia/analise/ponte)", () => {
+  it("extrai os papeis novos e mantem hints alinhados", () => {
+    const r = parseCarouselSlides(
+      `SLIDE 1:
+Nubank: sem agencia, sem gerente, sem PowerPoint.
+Isso muda mais coisa do que parece. Te explico.
+[FOTO: o cartao roxo sobre a mesa]
+
+SLIDE 2:
+O ano em que ninguem queria ser banco
+[TIPO: historia]
+[FOTO: os fundadores em 2013]
+
+SLIDE 3:
+Na minha visao, eles mudaram o campo.
+[TIPO: analise]
+
+SLIDE 4:
+E o que isso ensina pra sua empresa?
+[TIPO: ponte]
+
+SLIDE 5:
+A licao: coragem de nao fazer.
+
+---LEGENDA---
+Legenda aqui`
+    );
+    expect(r.slideRoles).toEqual(["capa", "historia", "analise", "ponte", "licao"]);
+    expect(r.photoHints).toEqual([
+      "o cartao roxo sobre a mesa",
+      "os fundadores em 2013",
+      null,
+      null,
+      null,
+    ]);
+    for (const s of [r.hook, ...r.slides, r.cta]) {
+      expect(s).not.toContain("[TIPO");
+      expect(s).not.toContain("[FOTO");
+    }
+  });
+});
+
 describe("parseCarouselSlides — identidade da empresa ([MARCA: ...])", () => {
   it("extrai nome, cor e dominio e limpa o marcador do texto", () => {
     const r = parseCarouselSlides(
