@@ -111,6 +111,36 @@ function extractCompanyBrand(content: string): {
   };
 }
 
+const DESIGN_RE = /-{2,}\s*PROMPT DE DESIGN\s*-{2,}/i;
+const LEGENDA_RE = /-{2,}\s*LEGENDA\s*-{2,}/i;
+
+/**
+ * Extrai SO a legenda do post a partir do content_text salvo — e o que a
+ * area de legenda do card (e o "Copiar legenda") deve mostrar:
+ * - corta o bloco "---PROMPT DE DESIGN---" (registros antigos salvavam o
+ *   prompt grudado na legenda);
+ * - em carrossel/case (texto com "---LEGENDA---"), devolve so o que vem
+ *   DEPOIS do marcador (os slides ficam pro design, nao pra legenda).
+ */
+export function extractCaption(contentText: string | null): string {
+  if (!contentText) return "";
+  const semDesign = contentText.split(DESIGN_RE)[0];
+  const parts = semDesign.split(LEGENDA_RE);
+  return (parts.length > 1 ? parts[parts.length - 1] : parts[0]).trim();
+}
+
+/**
+ * Registros antigos (frase/educativo) salvaram o prompt de design DENTRO do
+ * content_text. Devolve esse bloco (para o painel "Ver Prompt") ou null.
+ */
+export function extractLegacyDesignPrompt(contentText: string | null): string | null {
+  if (!contentText) return null;
+  const parts = contentText.split(DESIGN_RE);
+  if (parts.length < 2) return null;
+  const block = parts.slice(1).join("\n").trim();
+  return block || null;
+}
+
 export function parseCarouselSlides(rawContent: string): ParsedCarousel {
   // 0) Identidade da empresa (case_empresa) — marcador na primeira linha
   const { content, brand } = extractCompanyBrand(rawContent);

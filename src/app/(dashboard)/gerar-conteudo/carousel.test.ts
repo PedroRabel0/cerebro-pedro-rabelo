@@ -1,5 +1,39 @@
 import { describe, it, expect } from "vitest";
-import { parseCarouselSlides } from "./carousel";
+import {
+  parseCarouselSlides,
+  extractCaption,
+  extractLegacyDesignPrompt,
+} from "./carousel";
+
+describe("extractCaption — area de legenda mostra SO a legenda", () => {
+  it("carrossel/case: devolve so o que vem depois de ---LEGENDA---", () => {
+    const t = `SLIDE 1:\nCapa\n\nSLIDE 2:\nMeio\n\n---LEGENDA---\nA legenda de verdade. #tag`;
+    expect(extractCaption(t)).toBe("A legenda de verdade. #tag");
+  });
+
+  it("registro antigo com prompt grudado: corta o bloco de design", () => {
+    const t = `Legenda salva antes da correcao.\n\n---PROMPT DE DESIGN---\nCrie um carrossel preto e vermelho...`;
+    expect(extractCaption(t)).toBe("Legenda salva antes da correcao.");
+    expect(extractCaption(t)).not.toContain("PROMPT");
+  });
+
+  it("texto simples (post normal) volta inteiro", () => {
+    expect(extractCaption("So a legenda mesmo.")).toBe("So a legenda mesmo.");
+    expect(extractCaption(null)).toBe("");
+  });
+});
+
+describe("extractLegacyDesignPrompt — prompt colado no content_text antigo", () => {
+  it("devolve o bloco depois de ---PROMPT DE DESIGN---", () => {
+    const t = `Legenda.\n\n---PROMPT DE DESIGN---\nCrie um post 1080x1080...`;
+    expect(extractLegacyDesignPrompt(t)).toBe("Crie um post 1080x1080...");
+  });
+
+  it("sem marcador devolve null", () => {
+    expect(extractLegacyDesignPrompt("Legenda normal")).toBeNull();
+    expect(extractLegacyDesignPrompt(null)).toBeNull();
+  });
+});
 
 // Resposta no formato que o prompt do wizard exige (SLIDE N: + ---LEGENDA---)
 const RESPOSTA_CANONICA = `SLIDE 1:

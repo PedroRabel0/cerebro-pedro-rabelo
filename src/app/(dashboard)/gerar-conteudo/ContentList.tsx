@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { GeneratedContent, ContentStatus } from "@/lib/supabase/types";
 import {
   updateContentStatus,
   updateContentText,
+  updateImagePrompt,
   deleteContent,
   savePublishedUrl,
   uploadImageToContent,
@@ -15,7 +16,11 @@ import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
 import CaseSlideDesigner from "@/components/CaseSlideDesigner";
-import { parseCarouselSlides } from "./carousel";
+import {
+  parseCarouselSlides,
+  extractCaption,
+  extractLegacyDesignPrompt,
+} from "./carousel";
 import { useConfirm } from "@/components/ConfirmProvider";
 import {
   MessageSquare,
@@ -27,6 +32,9 @@ import {
   X,
   Save,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
   Link,
   ExternalLink,
   Layout,
@@ -90,6 +98,133 @@ function SourceMapDisplay({
           {String(val)} {key}
         </span>
       ))}
+    </div>
+  );
+}
+
+// --- Lightbox: visualizador grande do design (imagem/slides) ---
+
+function ImageLightbox({
+  urls,
+  index,
+  onClose,
+  onIndex,
+}: {
+  urls: string[];
+  index: number;
+  onClose: () => void;
+  onIndex: (i: number) => void;
+}) {
+  const [downloading, setDownloading] = useState(false);
+  const url = urls[index];
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight" && index < urls.length - 1) onIndex(index + 1);
+      if (e.key === "ArrowLeft" && index > 0) onIndex(index - 1);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [index, urls.length, onClose, onIndex]);
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const ext = blob.type.includes("png")
+        ? "png"
+        : blob.type.includes("webp")
+          ? "webp"
+          : "jpg";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `design-slide-${index + 1}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      // Fallback: abre numa aba nova pro usuario salvar manualmente
+      window.open(url, "_blank", "noopener");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Visualizador do design"
+    >
+      <div
+        className="absolute right-4 top-4 z-10 flex items-center gap-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 font-mono text-xs text-white backdrop-blur-sm transition hover:bg-white/20 disabled:opacity-50"
+        >
+          {downloading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          Baixar
+        </button>
+        <button
+          onClick={onClose}
+          aria-label="Fechar visualizador"
+          className="rounded-xl bg-white/10 p-2 text-white backdrop-blur-sm transition hover:bg-white/20"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {urls.length > 1 && index > 0 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onIndex(index - 1);
+          }}
+          aria-label="Slide anterior"
+          className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white backdrop-blur-sm transition hover:bg-white/20"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+      )}
+      {urls.length > 1 && index < urls.length - 1 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onIndex(index + 1);
+          }}
+          aria-label="Proximo slide"
+          className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white backdrop-blur-sm transition hover:bg-white/20"
+        >
+          <ChevronRight className="h-6 w-6" />
+        </button>
+      )}
+
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={urls.length > 1 ? `Slide ${index + 1}` : "Design do post"}
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[85vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
+      />
+
+      {urls.length > 1 && (
+        <span
+          className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 font-mono text-xs text-white backdrop-blur-sm"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {index + 1}/{urls.length}
+        </span>
+      )}
     </div>
   );
 }
@@ -538,6 +673,12 @@ export default function ContentList({
   const [refinedPrompts, setRefinedPrompts] = useState<Record<string, string>>({});
   // Track images that were just uploaded (not yet in server data)
   const [freshImages, setFreshImages] = useState<Record<string, string>>({});
+  // Lightbox: qual card e qual slide estao abertos no visualizador grande
+  const [lightbox, setLightbox] = useState<{ id: string; index: number } | null>(null);
+  // Edicao manual do prompt de imagem (rascunho por card, antes de Salvar)
+  const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({});
+  const [savingPromptId, setSavingPromptId] = useState<string | null>(null);
+  const [promptError, setPromptError] = useState<string | null>(null);
 
   async function handleDelete(id: string) {
     if (!(await confirm("Apagar este conteudo?"))) return;
@@ -577,9 +718,16 @@ export default function ContentList({
           const isCopied = copiedId === c.id;
           const isCarousel =
             c.content_type === "instagram_carousel" ||
+            c.content_type === "instagram_carousel_educativo" ||
             c.content_type === "case_empresa";
           const displayText = refinedTexts[c.id] || c.content_text;
-          const displayPrompt = refinedPrompts[c.id] || c.image_prompt;
+          // A area de legenda mostra SO a legenda — nunca slides nem o bloco
+          // de design que registros antigos salvaram grudado no content_text.
+          const caption = extractCaption(displayText);
+          const displayPrompt =
+            refinedPrompts[c.id] ||
+            c.image_prompt ||
+            extractLegacyDesignPrompt(c.content_text);
 
           return (
             <div
@@ -591,18 +739,25 @@ export default function ContentList({
                 <div className="relative">
                   <div className={`${imageUrls.length > 1 ? "grid grid-cols-3 gap-0.5" : ""} bg-surface`}>
                     {imageUrls.map((url, i) => (
-                      <div key={i} className="relative aspect-square">
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setLightbox({ id: c.id, index: i })}
+                        title="Clique para ampliar"
+                        aria-label={`Ampliar ${imageUrls.length > 1 ? `slide ${i + 1}` : "imagem do post"}`}
+                        className="relative block aspect-square w-full cursor-zoom-in"
+                      >
                         <img
                           src={url}
                           alt={imageUrls.length > 1 ? `Slide ${i + 1}` : "Imagem do post"}
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-cover transition hover:opacity-90"
                         />
                         {imageUrls.length > 1 && (
                           <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">
                             {i + 1}
                           </span>
                         )}
-                      </div>
+                      </button>
                     ))}
                   </div>
                   {/* Overlay buttons to replace/remove image */}
@@ -732,9 +887,13 @@ export default function ContentList({
                         expandedId === c.id ? "" : "line-clamp-3"
                       }`}
                     >
-                      {displayText}
+                      {caption || (
+                        <span className="italic text-text-muted">
+                          Sem legenda salva neste post. Clique em Editar para adicionar.
+                        </span>
+                      )}
                     </div>
-                    {displayText && displayText.length > 150 && expandedId !== c.id && (
+                    {caption && caption.length > 150 && expandedId !== c.id && (
                       <span className="mt-1 block font-mono text-[10px] text-accent">
                         Clique pra ver tudo ↓
                       </span>
@@ -769,9 +928,9 @@ export default function ContentList({
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
-                  {/* Copy caption */}
+                  {/* Copy caption — copia SO a legenda, nunca slides/prompt */}
                   <button
-                    onClick={() => handleCopy(displayText || "", c.id)}
+                    onClick={() => handleCopy(caption, c.id)}
                     className="flex items-center gap-1 rounded-xl bg-accent/10 px-3 py-1.5 font-mono text-[11px] font-medium text-accent transition hover:bg-accent/20"
                   >
                     {isCopied ? (
@@ -878,7 +1037,9 @@ export default function ContentList({
                       </div>
                       <button
                         onClick={async () => {
-                          await navigator.clipboard.writeText(displayPrompt);
+                          await navigator.clipboard.writeText(
+                            promptDrafts[c.id] ?? displayPrompt
+                          );
                           setCopiedPromptId(c.id);
                           setTimeout(() => setCopiedPromptId(null), 2000);
                         }}
@@ -892,9 +1053,53 @@ export default function ContentList({
                         {copiedPromptId === c.id ? "Copiado!" : "Copiar prompt"}
                       </button>
                     </div>
-                    <p className="whitespace-pre-wrap text-xs text-text-secondary leading-relaxed">
-                      {displayPrompt}
-                    </p>
+                    <textarea
+                      value={promptDrafts[c.id] ?? displayPrompt}
+                      onChange={(e) =>
+                        setPromptDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))
+                      }
+                      rows={8}
+                      aria-label="Prompt de imagem (editável)"
+                      className="w-full rounded-xl border border-purple/20 bg-card px-3 py-2 text-xs text-text-secondary leading-relaxed focus:border-purple focus:outline-none resize-y"
+                    />
+                    {promptError && savingPromptId === null && promptDrafts[c.id] !== undefined && (
+                      <p className="text-xs text-red" role="alert">{promptError}</p>
+                    )}
+                    <button
+                      onClick={async () => {
+                        const novo = (promptDrafts[c.id] ?? displayPrompt).trim();
+                        setSavingPromptId(c.id);
+                        setPromptError(null);
+                        try {
+                          await updateImagePrompt(c.id, novo);
+                          setRefinedPrompts((prev) => ({ ...prev, [c.id]: novo }));
+                          setPromptDrafts((prev) => {
+                            const next = { ...prev };
+                            delete next[c.id];
+                            return next;
+                          });
+                        } catch {
+                          setPromptError(
+                            "Falha ao salvar o prompt. Tente de novo — seu texto continua aí."
+                          );
+                        } finally {
+                          setSavingPromptId(null);
+                        }
+                      }}
+                      disabled={
+                        savingPromptId === c.id ||
+                        promptDrafts[c.id] === undefined ||
+                        promptDrafts[c.id] === displayPrompt
+                      }
+                      className="flex items-center gap-1.5 rounded-xl bg-purple/10 px-3 py-1.5 font-mono text-xs font-bold text-purple transition hover:bg-purple/20 disabled:opacity-50"
+                    >
+                      {savingPromptId === c.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Save className="h-3 w-3" />
+                      )}
+                      {savingPromptId === c.id ? "Salvando..." : "Salvar prompt"}
+                    </button>
                   </div>
                 )}
                 {refineId === c.id && (
@@ -911,11 +1116,10 @@ export default function ContentList({
                     }}
                   />
                 )}
-                {designId === c.id &&
-                  isCarousel &&
-                  c.content_text && (
-                    <div className="rounded-xl border border-border bg-surface/30 p-4">
-                      {(() => {
+                {designId === c.id && isCarousel && (
+                  <div className="rounded-xl border border-border bg-surface/30 p-4">
+                    {c.content_text && /SLIDE\s*\d/i.test(c.content_text) ? (
+                      (() => {
                         const parsed = parseCarouselSlides(c.content_text);
                         const designTitle =
                           c.free_text_input || c.playbook?.title || "Carousel";
@@ -939,14 +1143,39 @@ export default function ContentList({
                             hashtags={[]}
                           />
                         );
-                      })()}
-                    </div>
-                  )}
+                      })()
+                    ) : (
+                      <p className="text-xs leading-relaxed text-text-muted">
+                        Este post foi salvo sem a estrutura dos slides (gerado
+                        antes da correção), então o design não pode ser remontado
+                        aqui. Gere um conteúdo novo para ver o design — ou use o
+                        &quot;Ver Prompt&quot; pra recuperar o prompt de design dele.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Visualizador grande (lightbox) — abre ao clicar na imagem do card */}
+      {lightbox &&
+        (() => {
+          const c = contents.find((x) => x.id === lightbox.id);
+          const urls = parseImageUrls(c ? freshImages[c.id] || c.image_url : null);
+          if (urls.length === 0) return null;
+          const idx = Math.min(lightbox.index, urls.length - 1);
+          return (
+            <ImageLightbox
+              urls={urls}
+              index={idx}
+              onClose={() => setLightbox(null)}
+              onIndex={(i) => setLightbox({ id: lightbox.id, index: i })}
+            />
+          );
+        })()}
     </div>
   );
 }

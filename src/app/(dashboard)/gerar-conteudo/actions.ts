@@ -1292,7 +1292,12 @@ INSTRUCOES FINAIS:
         throw new Error(result.error);
       }
 
-      // For instagram_frase, append a clean quote-card design prompt
+      // Bloco de design (prompt pra colar em IA de imagem) vai pra coluna
+      // image_prompt — NUNCA grudado no content_text: a aba Salvos mostra o
+      // content_text como legenda, e o prompt aparecia no lugar dela.
+      let designPromptBlock: string | null = null;
+
+      // For instagram_frase, build a clean quote-card design prompt
       if (contentType === "instagram_frase") {
         const raw = result.content_text
           .split(/LEGENDA/i)[0]
@@ -1304,7 +1309,7 @@ INSTRUCOES FINAIS:
           redParts.length > 0
             ? `Esta parte da frase DEVE ficar em VERMELHO (#E31B23): "${redParts.join(" / ")}". Todo o RESTO da frase fica em BRANCO (#FFFFFF).`
             : `A ultima clausula (a parte de maior impacto) deve ficar em VERMELHO (#E31B23); o resto em BRANCO (#FFFFFF).`;
-        result.content_text += `\n\n---PROMPT DE DESIGN---\nCrie um post de Instagram quadrado 1080x1080px — card de citacao minimalista (estilo @alfredosoares).
+        designPromptBlock = `Crie um post de Instagram quadrado 1080x1080px — card de citacao minimalista (estilo @alfredosoares).
 
 ATENCAO: o post e COLORIDO, NAO e preto e branco. Fundo PRETO, texto BRANCO, e uma parte em VERMELHO. O vermelho e OBRIGATORIO.
 
@@ -1324,13 +1329,14 @@ REGRAS:
 - Muito espaco em branco (respiro), nada de poluicao visual`;
       }
 
-      // For carousel_educativo: separa SLIDES (vao pro design) da LEGENDA (vai no topo)
+      // For carousel_educativo: gera o prompt de design a partir dos SLIDES.
+      // O content_text fica INTACTO (slides + ---LEGENDA--- + legenda): a UI
+      // extrai a legenda pra exibir e o SlideDesigner precisa dos slides.
       if (contentType === "instagram_carousel_educativo") {
         const totalSlides = (parseInt(details.num_slides) || 6) + 3;
         const parts = result.content_text.split(/---\s*LEGENDA\s*---/i);
         const slides = parts[0].trim();
-        const legenda = (parts[1] || "").trim();
-        const designBlock = `Crie um carrossel de Instagram com ${totalSlides} slides no formato 1080x1350px.
+        designPromptBlock = `Crie um carrossel de Instagram com ${totalSlides} slides no formato 1080x1350px.
 
 ESTILO VISUAL (paleta VERMELHO + PRETO):
 - Fundo preto (#0A0A0A) como base de todos os slides
@@ -1362,7 +1368,6 @@ REGRAS:
 - Blocos de explicacao em box cinza escuro (#1A1A1A)
 - Use a foto real do Pedro no header de todos os slides
 - Cada slide deve ser legivel sem zoom no celular`;
-        result.content_text = `${legenda || "(legenda nao gerada — clique em Regerar)"}\n\n---PROMPT DE DESIGN---\n${designBlock}`;
       }
 
       // Save to DB
@@ -1376,6 +1381,9 @@ REGRAS:
           content_type: contentType,
           format_id: null,
           content_text: result.content_text,
+          ...(designPromptBlock
+            ? { image_prompt: designPromptBlock, image_model: "prompt-only" }
+            : {}),
           source_map: result.source_map,
           generation_params: {
             wizard: true,
@@ -1391,12 +1399,14 @@ REGRAS:
 
       if (insertError) throw insertError;
 
-      // Generate image prompt inline (skip for carousel_educativo — it embeds its own design prompt)
-      let imagePrompt: string | null = null;
+      // Generate image prompt inline (skip para tipos que ja tem bloco de
+      // design proprio — frase/educativo — senao ele sobrescreveria o bloco)
+      let imagePrompt: string | null = designPromptBlock;
       // case_empresa tambem fica FORA do gerador de prompt de imagem:
       // as fotos sao REAIS (slots no design), nada e gerado por IA.
       if (
         contentType !== "instagram_carousel_educativo" &&
+        contentType !== "instagram_frase" &&
         contentType !== "case_empresa"
       ) {
         try {
@@ -1850,6 +1860,18 @@ export async function updateContentText(id: string, text: string) {
   const { error } = await supabase
     .from("generated_contents")
     .update({ content_text: text })
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath(PATH);
+}
+
+/** Edicao MANUAL do prompt de imagem (painel "Ver Prompt" da aba Salvos). */
+export async function updateImagePrompt(id: string, prompt: string) {
+  await requireStaff();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("generated_contents")
+    .update({ image_prompt: prompt.trim() || null })
     .eq("id", id);
   if (error) throw error;
   revalidatePath(PATH);
