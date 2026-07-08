@@ -182,6 +182,17 @@ Legenda aqui`
   });
 });
 
+describe("parseCarouselSlides — linha FONTE das Atualidades", () => {
+  it("remove a linha FONTE do topo (nao vira capa) e mantem os slides", () => {
+    const r = parseCarouselSlides(
+      `FONTE: The Verge — https://theverge.com/x\n\nSLIDE 1:\nA capa de verdade\n\nSLIDE 2:\nMeio\n\nSLIDE 3:\nCTA\n\n---LEGENDA---\nLegenda aqui`
+    );
+    expect(r.hook).toBe("A capa de verdade");
+    expect(r.hook).not.toContain("FONTE");
+    expect(r.slides).toEqual(["Meio"]);
+  });
+});
+
 describe("parseCarouselSlides — papeis v3 do card editorial (historia/analise/ponte)", () => {
   it("extrai os papeis novos e mantem hints alinhados", () => {
     const r = parseCarouselSlides(

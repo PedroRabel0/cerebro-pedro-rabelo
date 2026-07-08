@@ -1,11 +1,13 @@
 ﻿"use server";
 
 
+import Anthropic from "@anthropic-ai/sdk";
 import { log } from '@/lib/logger';
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
-import { getClient, logCost, parseJSON } from "@/lib/ai/client";
+import { getClient, logCost, logApiCost, parseJSON } from "@/lib/ai/client";
+import type { AtualidadePick } from "./atualidades-types";
 import { generateImagePrompt } from "@/lib/ai/gemini";
 import { generateImage } from "@/lib/ai/image-gen";
 import { uploadImageToStorage } from "@/lib/supabase/storage";
@@ -476,6 +478,246 @@ export async function deleteContent(id: string) {
     .eq("id", id);
   if (error) throw error;
   revalidatePath(PATH);
+}
+
+// --- "O que esta rolando" (Atualidades) ---
+// Click-and-generate: CHAMADA 1 busca as noticias na web (server tool) e
+// escolhe 3-5 manchetes; a UI entao chama gerarPostAtualidade UMA VEZ POR
+// PICK (loop no cliente) — cada request fica bem abaixo do teto de 60s.
+
+const ATUALIDADES_LIMITE_DIA = 10;
+
+/**
+ * CHAMADA 1 — busca na web as noticias mais quentes de negocios e escolhe
+ * as 3-5 mais fortes. So devolve os picks; nao gera nem salva post nenhum.
+ */
+export async function buscarAtualidades(): Promise<
+  { picks: AtualidadePick[] } | { error: string }
+> {
+  await requireStaff();
+
+  // Limite diario: cada busca loga exatamente 1 linha com provider
+  // 'anthropic-web-search' no api_cost_log — contar essas linhas nas
+  // ultimas 24h e o marcador mais limpo sem criar coluna/migration.
+  const admin = await createAdminClient();
+  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count } = await admin
+    .from("api_cost_log")
+    .select("*", { count: "exact", head: true })
+    .eq("provider", "anthropic-web-search")
+    .gte("created_at", desde);
+  if ((count ?? 0) >= ATUALIDADES_LIMITE_DIA) {
+    return { error: "Limite diário de Atualidades atingido (10/dia). Tente amanhã." };
+  }
+
+  // Client dedicado: o getClient() tem timeout de 50s, que estoura com web
+  // search. Streaming mantem a conexao viva; maxRetries 0 pra nao dobrar.
+  const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    timeout: 110_000,
+    maxRetries: 0,
+  });
+  const model = "claude-sonnet-4-6";
+
+  const promptBusca = `Busque na web as noticias MAIS RELEVANTES e MAIS RECENTES do mundo dos negocios. Priorize as ultimas 24-72 horas; algo de poucos dias atras so entra se for grande demais pra ignorar (voce decide).
+
+TEMAS QUE INTERESSAM:
+- Startups & venture capital: rodada relevante, IPO, venda de empresa, unicornio novo.
+- Inteligencia artificial: modelos novos, movimentos das big techs, IA aplicada a negocio.
+- Brasil: regulacao, banimento, big tech no pais, economia real.
+- Negocios e lideranca em geral.
+
+ESCOLHA as 3 a 5 mais fortes. Descarte noticia morna e politica sem gancho de negocio. O filtro e: "o Pedro Rabelo (empresario, conteudo de negocios no Instagram) conseguiria dar uma opiniao forte em cima disso pra quem esta construindo empresa?"
+
+RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
+{"picks":[{"manchete":"a manchete em PT-BR","resumo_fato":"2-4 frases objetivas do que aconteceu, com numeros concretos","angulo_pedro":"1-2 frases: a leitura/opiniao do Pedro sobre esse fato para quem constroi empresa","fonte_veiculo":"nome do veiculo","fonte_url":"https://..."}]}`;
+
+  try {
+    let mensagens: Anthropic.MessageParam[] = [
+      { role: "user", content: promptBusca },
+    ];
+    let final: Anthropic.Message | null = null;
+    let totalIn = 0;
+    let totalOut = 0;
+    let totalBuscas = 0;
+
+    // stop_reason "pause_turn": a API pausou um turno longo de web search —
+    // reenvia com o conteudo acumulado ate terminar de verdade.
+    for (let turno = 0; turno < 4; turno++) {
+      const stream = anthropic.messages.stream({
+        model,
+        max_tokens: 3000,
+        system:
+          "Voce e o radar de noticias do Pedro Rabelo (empresario brasileiro, conteudo de negocios no Instagram). Voce busca na web, escolhe as noticias com gancho de negocio e responde SEMPRE e SOMENTE com o JSON pedido, em PT-BR.",
+        messages: mensagens,
+        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
+      });
+      const msg = await stream.finalMessage();
+      totalIn += msg.usage.input_tokens;
+      totalOut += msg.usage.output_tokens;
+      totalBuscas +=
+        (msg.usage as { server_tool_use?: { web_search_requests?: number } })
+          .server_tool_use?.web_search_requests ?? 0;
+
+      if (msg.stop_reason === "pause_turn") {
+        mensagens = [...mensagens, { role: "assistant", content: msg.content }];
+        continue;
+      }
+      final = msg;
+      break;
+    }
+
+    logCost(model, totalIn, totalOut);
+    // Loga SEMPRE (mesmo com 0 buscas): esta linha e o marcador do limite diario.
+    logApiCost("anthropic-web-search", "web_search", totalBuscas * 0.01, {
+      unit: "search",
+      quantity: totalBuscas,
+    });
+
+    if (!final) {
+      return { error: "A busca de notícias não terminou a tempo. Tente de novo." };
+    }
+
+    const texto = final.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("\n");
+    const parsed = parseJSON<{ picks: AtualidadePick[] }>(texto);
+    const picks = (parsed?.picks ?? [])
+      .filter(
+        (p) =>
+          p &&
+          typeof p.manchete === "string" &&
+          p.manchete.trim() &&
+          typeof p.resumo_fato === "string" &&
+          p.resumo_fato.trim()
+      )
+      .slice(0, 5)
+      .map((p) => ({
+        manchete: p.manchete.trim().slice(0, 300),
+        resumo_fato: p.resumo_fato.trim().slice(0, 1500),
+        angulo_pedro: (p.angulo_pedro || "").trim().slice(0, 600),
+        fonte_veiculo: (p.fonte_veiculo || "").trim().slice(0, 120),
+        fonte_url: (p.fonte_url || "").trim().slice(0, 500),
+      }));
+
+    if (picks.length === 0) {
+      return { error: "Não encontrei notícias fortes o suficiente agora. Tente de novo em instantes." };
+    }
+    return { picks };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "erro desconhecido";
+    log.error("[Atualidades] busca falhou: " + message);
+    return { error: "Falha ao buscar as notícias. Tente de novo em instantes." };
+  }
+}
+
+/**
+ * CHAMADA 2 — gera UM post (carrossel na voz do Pedro) a partir de um pick
+ * da busca. A UI chama em loop, um por vez, pra cada request ficar curta.
+ */
+export async function gerarPostAtualidade(
+  pick: AtualidadePick
+): Promise<{ id: string; manchete: string } | { error: string }> {
+  await requireStaff();
+  const supabase = await createClient();
+
+  const manchete = (pick?.manchete || "").trim().slice(0, 300);
+  const resumoFato = (pick?.resumo_fato || "").trim().slice(0, 1500);
+  if (!manchete || !resumoFato) return { error: "Notícia inválida." };
+  const anguloPedro = (pick?.angulo_pedro || "").trim().slice(0, 600);
+  const fonteVeiculo = (pick?.fonte_veiculo || "").trim().slice(0, 120) || "fonte não informada";
+  const fonteUrl = (pick?.fonte_url || "").trim().slice(0, 500);
+
+  try {
+    const [identityRes, feedbackRes, rulesRes] = await Promise.all([
+      supabase.from("identity").select("*").limit(1).single(),
+      supabase
+        .from("generated_contents")
+        .select("feedback_text, feedback_rating")
+        .not("feedback_text", "is", null)
+        .eq("feedback_rating", "bad")
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase.from("decision_rules").select("rule_text, context, category").order("category"),
+    ]);
+    if (!identityRes.data) return { error: "Identidade do Pedro não configurada." };
+
+    const freeText = `REGRA ABSOLUTA: TODA A RESPOSTA EM PORTUGUES BRASILEIRO (PT-BR).
+
+VOCE NAO E UM JORNAL. Pegue a noticia abaixo e de A LEITURA DO PEDRO em cima dela: o que isso significa pra quem esta construindo empresa. Nao e "aconteceu X" e sim "aconteceu X, e e por isso que Y importa pra voce". Tom direto, sem enrolacao, opiniao forte, provocativo, de quem ja viveu isso na pele.
+
+A NOTICIA (fato real de hoje — use como materia-prima; NAO invente detalhes alem do que esta aqui):
+- MANCHETE: ${manchete}
+- O FATO: ${resumoFato}
+${anguloPedro ? `- ANGULO DO PEDRO (use como semente da analise): ${anguloPedro}` : ""}
+- FONTE: ${fonteVeiculo}${fonteUrl ? ` (${fonteUrl})` : ""}
+
+FORMATO: Carrossel de Instagram, 5 a 7 slides:
+**SLIDE 1 — CAPA:** gancho de PARAR O SCROLL sobre a noticia. Nao e a manchete do jornal: e a versao Pedro (contraste, provocacao, o angulo que ninguem esta dando).
+**SLIDES DO MEIO (1 ideia por slide):** 1 slide com O FATO, concreto e com numeros; 2 a 4 slides com A ANALISE DO PEDRO em 1a pessoa: por que isso importa, o que muda pra quem empreende, o que fazer com essa informacao.
+**ULTIMO SLIDE:** CTA com motivo concreto (salvar/comentar/compartilhar e POR QUE).
+
+REGRAS DE VOZ:
+- Opiniao explicita em 1a pessoa ("na minha visao...", "o que pouca gente percebe...").
+- PONTUACAO: NUNCA use travessao (—) nem meia-risca (–) nos slides ou na legenda. Ponto, virgula ou dois-pontos.
+- LINGUAGEM SIMPLES: proibido jargao de MBA ("incumbente", "moat", "CAC", "market share"). Palavra facil vale mais que palavra bonita.
+- Numeros concretos > generalidades. Zero tom de wikipedia.
+
+FORMATO DE RESPOSTA: cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases diretas. Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
+E entao a LEGENDA: hook forte na primeira linha, 100-120 palavras, CTA e 5-8 hashtags no final.`;
+
+    const result = await generateContent({
+      identity: identityRes.data,
+      contentType: "instagram_carousel",
+      freeText,
+      recentFeedbacks: feedbackRes.data ?? [],
+      rules: rulesRes.data ?? undefined,
+    });
+    if ("error" in result) return { error: result.error };
+
+    // Linha FONTE no topo: o Pedro confere a noticia antes de postar. O
+    // parser do carrossel remove essa linha do design, e a legenda exibida
+    // no card vem depois de ---LEGENDA---, entao ela nao vaza pro post.
+    const contentText = `FONTE: ${fonteVeiculo}${fonteUrl ? ` — ${fonteUrl}` : ""}\n\n${result.content_text}`;
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("generated_contents")
+      .insert({
+        source_type: "free_text" as const,
+        playbook_id: null,
+        story_id: null,
+        free_text_input: manchete,
+        content_type: "instagram_carousel",
+        format_id: null,
+        content_text: contentText,
+        source_map: result.source_map,
+        generation_params: { atualidades: true, fonte_veiculo: fonteVeiculo, fonte_url: fonteUrl },
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (insertError) throw insertError;
+
+    try {
+      const promptResult = await generateImagePrompt(result.content_text, "instagram_carousel");
+      if (!("error" in promptResult)) {
+        await supabase
+          .from("generated_contents")
+          .update({ image_prompt: promptResult.image_prompt, image_model: "prompt-only" })
+          .eq("id", inserted.id);
+      }
+    } catch (e) {
+      log.error("[Atualidades] Image prompt error: " + String(e));
+    }
+
+    revalidatePath(PATH);
+    return { id: inserted.id, manchete };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "erro desconhecido";
+    log.error("[Atualidades] geracao falhou: " + message);
+    return { error: `Falha ao gerar o post de "${manchete.slice(0, 60)}...". ` };
+  }
 }
 
 // --- Lookup data ---

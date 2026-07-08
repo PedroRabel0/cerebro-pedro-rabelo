@@ -141,9 +141,16 @@ export function extractLegacyDesignPrompt(contentText: string | null): string | 
   return block || null;
 }
 
+/**
+ * Linha "FONTE: veiculo — url" no topo do content_text (posts de
+ * Atualidades): e metadado pro Pedro conferir a noticia, nao slide —
+ * sem remover, ela viraria a capa do design.
+ */
+const FONTE_LINE_RE = /^\s*FONTE:[^\n]*\n+/i;
+
 export function parseCarouselSlides(rawContent: string): ParsedCarousel {
   // 0) Identidade da empresa (case_empresa) — marcador na primeira linha
-  const { content, brand } = extractCompanyBrand(rawContent);
+  const { content, brand } = extractCompanyBrand(rawContent.replace(FONTE_LINE_RE, ""));
 
   // 1) Separa a legenda — ela e a descricao do post, NAO um slide.
   const [slidesSection] = content.split(/-{2,}\s*LEGENDA\s*-{2,}/i);
