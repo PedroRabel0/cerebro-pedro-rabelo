@@ -372,10 +372,41 @@ export default function UniversalInput() {
             { label: "Processando com Claude AI", status: "pending" as const },
           ]);
 
-          const LOTE = 6;
+          // Lotes por TAMANHO, nao por quantidade fixa: paginas pesadas (curso
+          // cheio de imagem) estouravam o bodySizeLimit e a chamada morria com
+          // erro generico antes do nosso tratamento rodar.
+          const MAX_LOTE_BYTES = 2_500_000; // ~2.5MB de base64 por chamada
+          const MAX_LOTE_PAGES = 4;
+          const lotes: { pgs: string[]; start: number }[] = [];
+          let lote: string[] = [];
+          let loteBytes = 0;
+          let loteStart = 1;
+          pages.forEach((p, idx) => {
+            if (
+              lote.length > 0 &&
+              (loteBytes + p.length > MAX_LOTE_BYTES || lote.length >= MAX_LOTE_PAGES)
+            ) {
+              lotes.push({ pgs: lote, start: loteStart });
+              lote = [];
+              loteBytes = 0;
+              loteStart = idx + 1;
+            }
+            lote.push(p);
+            loteBytes += p.length;
+          });
+          if (lote.length > 0) lotes.push({ pgs: lote, start: loteStart });
+
           const chunks: string[] = [];
-          for (let i = 0; i < pages.length; i += LOTE) {
-            const r = await transcribePdfPages(pages.slice(i, i + LOTE), i + 1);
+          for (const l of lotes) {
+            let r: { text: string } | { error: string };
+            try {
+              r = await transcribePdfPages(l.pgs, l.start);
+            } catch {
+              r = {
+                error:
+                  "O servidor recusou um lote de paginas (arquivo pesado demais). Tente um PDF menor ou cole o texto no campo.",
+              };
+            }
             if ("error" in r) {
               try { sessionStorage.removeItem(PROCESSING_KEY); } catch {}
               processingRef.current = false;

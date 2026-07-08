@@ -73,8 +73,10 @@ export async function pdfToVisionPages(
   opts?: { maxPages?: number; width?: number; quality?: number }
 ): Promise<{ pages: string[]; totalPages: number }> {
   const maxPages = opts?.maxPages ?? 30;
-  const width = opts?.width ?? 1200;
-  const quality = opts?.quality ?? 0.8;
+  // 1100px/0.75 le bem texto de slide e mantem cada pagina em ~100-250KB —
+  // paginas pesadas demais estouravam o bodySizeLimit na chamada da action.
+  const width = opts?.width ?? 1100;
+  const quality = opts?.quality ?? 0.75;
 
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
