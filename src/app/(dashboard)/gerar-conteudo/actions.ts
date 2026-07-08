@@ -7,7 +7,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
 import { getClient, logCost, logApiCost, parseJSON } from "@/lib/ai/client";
-import type { AtualidadePick } from "./atualidades-types";
+import type { Noticia } from "./atualidades-types";
 import { generateImagePrompt } from "@/lib/ai/gemini";
 import { generateImage } from "@/lib/ai/image-gen";
 import { uploadImageToStorage } from "@/lib/supabase/storage";
@@ -481,24 +481,34 @@ export async function deleteContent(id: string) {
 }
 
 // --- "O que esta rolando" (Atualidades) ---
-// Click-and-generate: CHAMADA 1 busca as noticias na web (server tool) e
-// escolhe 3-5 manchetes; a UI entao chama gerarPostAtualidade UMA VEZ POR
-// PICK (loop no cliente) — cada request fica bem abaixo do teto de 60s.
+// Fluxo em 2 passos COM ESCOLHA DO USUARIO: searchTrendingNews busca na web
+// e devolve uma LISTA de 8-12 noticias (nao gera post nenhum); o Pedro marca
+// as que quer e a UI chama generateNewsPosts UMA VEZ POR NOTICIA (loop no
+// cliente) — cada chamada gera 2 opcoes de post EM PARALELO e fica dentro do
+// teto de 120s da pagina. Visual: o mesmo carrossel editorial fundo branco
+// do Cases de Empresas (roteado por generation_params.atualidades).
 
 const ATUALIDADES_LIMITE_DIA = 10;
 
+const TEMA_LABEL: Record<string, string> = {
+  startups: "Startups",
+  ia: "IA",
+  brasil: "Brasil",
+  negocios: "Negócios",
+};
+
 /**
- * CHAMADA 1 — busca na web as noticias mais quentes de negocios e escolhe
- * as 3-5 mais fortes. So devolve os picks; nao gera nem salva post nenhum.
+ * PASSO 1 — busca na web as noticias mais quentes de negocios e devolve a
+ * LISTA pro Pedro escolher. Nao gera nem salva post nenhum.
  */
-export async function buscarAtualidades(): Promise<
-  { picks: AtualidadePick[] } | { error: string }
+export async function searchTrendingNews(): Promise<
+  { noticias: Noticia[] } | { error: string }
 > {
   await requireStaff();
 
-  // Limite diario: cada busca loga exatamente 1 linha com provider
-  // 'anthropic-web-search' no api_cost_log — contar essas linhas nas
-  // ultimas 24h e o marcador mais limpo sem criar coluna/migration.
+  // Limite diario (10 buscas/dia): cada busca loga exatamente 1 linha com
+  // provider 'anthropic-web-search' no api_cost_log — contar essas linhas
+  // nas ultimas 24h e o marcador mais limpo sem criar coluna/migration.
   const admin = await createAdminClient();
   const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count, error: countError } = await admin
@@ -514,7 +524,7 @@ export async function buscarAtualidades(): Promise<
     };
   }
   if ((count ?? 0) >= ATUALIDADES_LIMITE_DIA) {
-    return { error: "Limite diário de Atualidades atingido (10/dia). Tente amanhã." };
+    return { error: "Limite diário atingido (10/dia). Tente amanhã." };
   }
 
   // Client dedicado: o getClient() tem timeout de 50s, que estoura com web
@@ -533,15 +543,15 @@ export async function buscarAtualidades(): Promise<
   const promptBusca = `Busque na web as noticias MAIS RELEVANTES e MAIS RECENTES do mundo dos negocios. Priorize as ultimas 24-72 horas; algo de poucos dias atras so entra se for grande demais pra ignorar (voce decide).
 
 TEMAS QUE INTERESSAM:
-- Startups & venture capital: rodada relevante, IPO, venda de empresa, unicornio novo.
-- Inteligencia artificial: modelos novos, movimentos das big techs, IA aplicada a negocio.
-- Brasil: regulacao, banimento, big tech no pais, economia real.
-- Negocios e lideranca em geral.
+- startups: startups & venture capital (rodada relevante, IPO, venda de empresa, unicornio novo).
+- ia: inteligencia artificial (modelos novos, movimentos das big techs, IA aplicada a negocio).
+- brasil: Brasil (regulacao, banimento, big tech no pais, economia real).
+- negocios: negocios e lideranca em geral.
 
-ESCOLHA as 3 a 5 mais fortes. Descarte noticia morna e politica sem gancho de negocio. O filtro e: "o Pedro Rabelo (empresario, conteudo de negocios no Instagram) conseguiria dar uma opiniao forte em cima disso pra quem esta construindo empresa?"
+LISTE de 8 a 12 noticias — descarte noticia morna e politica sem gancho de negocio. O filtro e: "o Pedro Rabelo (empresario, conteudo de negocios no Instagram) conseguiria dar uma opiniao forte em cima disso pra quem esta construindo empresa?"
 
 RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
-{"picks":[{"manchete":"a manchete em PT-BR","resumo_fato":"2-4 frases objetivas do que aconteceu, com numeros concretos","angulo_pedro":"1-2 frases: a leitura/opiniao do Pedro sobre esse fato para quem constroi empresa","fonte_veiculo":"nome do veiculo","fonte_url":"https://..."}]}`;
+{"noticias":[{"id":"1","manchete":"a manchete em PT-BR","resumo":"1-2 frases objetivas do fato, com numeros concretos","tema":"startups|ia|brasil|negocios","fonte_veiculo":"nome do veiculo","fonte_url":"https://..."}]}`;
 
   let totalIn = 0;
   let totalOut = 0;
@@ -558,7 +568,7 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
     for (let turno = 0; turno < 4 && Date.now() - inicio < 80_000; turno++) {
       const stream = anthropic.messages.stream({
         model,
-        max_tokens: 3000,
+        max_tokens: 4000,
         system:
           "Voce e o radar de noticias do Pedro Rabelo (empresario brasileiro, conteudo de negocios no Instagram). Voce busca na web, escolhe as noticias com gancho de negocio e responde SEMPRE e SOMENTE com o JSON pedido, em PT-BR.",
         messages: mensagens,
@@ -590,29 +600,32 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
       .join("");
-    const parsed = parseJSON<{ picks: AtualidadePick[] }>(texto);
-    const picks = (parsed?.picks ?? [])
+    const parsed = parseJSON<{ noticias: Noticia[] }>(texto);
+    const noticias: Noticia[] = (parsed?.noticias ?? [])
       .filter(
-        (p) =>
-          p &&
-          typeof p.manchete === "string" &&
-          p.manchete.trim() &&
-          typeof p.resumo_fato === "string" &&
-          p.resumo_fato.trim()
+        (n) =>
+          n &&
+          typeof n.manchete === "string" &&
+          n.manchete.trim() &&
+          typeof n.resumo === "string" &&
+          n.resumo.trim()
       )
-      .slice(0, 5)
-      .map((p) => ({
-        manchete: p.manchete.trim().slice(0, 300),
-        resumo_fato: p.resumo_fato.trim().slice(0, 1500),
-        angulo_pedro: (p.angulo_pedro || "").trim().slice(0, 600),
-        fonte_veiculo: (p.fonte_veiculo || "").trim().slice(0, 120),
-        fonte_url: (p.fonte_url || "").trim().slice(0, 500),
+      .slice(0, 12)
+      .map((n, i) => ({
+        id: String(i + 1),
+        manchete: n.manchete.trim().slice(0, 300),
+        resumo: n.resumo.trim().slice(0, 600),
+        tema: (["startups", "ia", "brasil", "negocios"].includes(n.tema)
+          ? n.tema
+          : "negocios") as Noticia["tema"],
+        fonte_veiculo: (n.fonte_veiculo || "").trim().slice(0, 120),
+        fonte_url: (n.fonte_url || "").trim().slice(0, 500),
       }));
 
-    if (picks.length === 0) {
+    if (noticias.length === 0) {
       return { error: "Não encontrei notícias fortes o suficiente agora. Tente de novo em instantes." };
     }
-    return { picks };
+    return { noticias };
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
     log.error("[Atualidades] busca falhou: " + message);
@@ -631,22 +644,38 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
   }
 }
 
+// Cada noticia selecionada vira 2 OPCOES de post com angulos diferentes —
+// o Pedro escolhe a melhor na aba Salvos.
+const ANGULOS_ATUALIDADES = [
+  {
+    chave: "contraria",
+    instrucao:
+      "A LEITURA CONTRARIA: o angulo que ninguem esta dando. Onde todo mundo ve uma coisa, o Pedro ve outra. Provocativo, contra-intuitivo, desconfortavel na medida certa.",
+  },
+  {
+    chave: "pratica",
+    instrucao:
+      "O QUE FAZER COM ISSO: o angulo pratico. O que essa noticia muda AMANHA pra quem esta construindo empresa: a decisao, o ajuste, a oportunidade concreta que ela abre.",
+  },
+] as const;
+
 /**
- * CHAMADA 2 — gera UM post (carrossel na voz do Pedro) a partir de um pick
- * da busca. A UI chama em loop, um por vez, pra cada request ficar curta.
+ * PASSO 2 — gera as opcoes de post (2 angulos em paralelo) para UMA noticia
+ * selecionada. A UI chama em loop, uma noticia por vez.
  */
-export async function gerarPostAtualidade(
-  pick: AtualidadePick
-): Promise<{ id: string; manchete: string } | { error: string }> {
+export async function generateNewsPosts(
+  noticia: Noticia
+): Promise<{ criados: number; manchete: string } | { error: string }> {
   await requireStaff();
   const supabase = await createClient();
 
-  const manchete = (pick?.manchete || "").trim().slice(0, 300);
-  const resumoFato = (pick?.resumo_fato || "").trim().slice(0, 1500);
-  if (!manchete || !resumoFato) return { error: "Notícia inválida." };
-  const anguloPedro = (pick?.angulo_pedro || "").trim().slice(0, 600);
-  const fonteVeiculo = (pick?.fonte_veiculo || "").trim().slice(0, 120) || "fonte não informada";
-  const fonteUrl = (pick?.fonte_url || "").trim().slice(0, 500);
+  const manchete = (noticia?.manchete || "").trim().slice(0, 300);
+  const resumo = (noticia?.resumo || "").trim().slice(0, 600);
+  if (!manchete || !resumo) return { error: "Notícia inválida." };
+  const tema = TEMA_LABEL[noticia?.tema] ? noticia.tema : "negocios";
+  const temaLabel = TEMA_LABEL[tema];
+  const fonteVeiculo = (noticia?.fonte_veiculo || "").trim().slice(0, 120) || "fonte não informada";
+  const fonteUrl = (noticia?.fonte_url || "").trim().slice(0, 500);
 
   try {
     const [identityRes, feedbackRes, rulesRes] = await Promise.all([
@@ -662,80 +691,111 @@ export async function gerarPostAtualidade(
     ]);
     if (!identityRes.data) return { error: "Identidade do Pedro não configurada." };
 
-    const freeText = `REGRA ABSOLUTA: TODA A RESPOSTA EM PORTUGUES BRASILEIRO (PT-BR).
+    const gerarOpcao = async (angulo: (typeof ANGULOS_ATUALIDADES)[number]) => {
+      const freeText = `REGRA ABSOLUTA: TODA A RESPOSTA EM PORTUGUES BRASILEIRO (PT-BR).
 
-VOCE NAO E UM JORNAL. Pegue a noticia abaixo e de A LEITURA DO PEDRO em cima dela: o que isso significa pra quem esta construindo empresa. Nao e "aconteceu X" e sim "aconteceu X, e e por isso que Y importa pra voce". Tom direto, sem enrolacao, opiniao forte, provocativo, de quem ja viveu isso na pele.
+VOCE NAO E UM JORNAL. Pegue a noticia abaixo e de A LEITURA DO PEDRO em cima dela: o que isso significa pra quem esta construindo empresa. Nao e "aconteceu X" e sim "aconteceu X, e e por isso que Y importa pra voce". Tom direto, sem enrolacao, opiniao forte, de quem ja viveu isso na pele.
 
-A NOTICIA (fato real de hoje — use como materia-prima; NAO invente detalhes alem do que esta aqui):
+A NOTICIA (fato real — use como materia-prima; NAO invente detalhes alem do que esta aqui):
 - MANCHETE: ${manchete}
-- O FATO: ${resumoFato}
-${anguloPedro ? `- ANGULO DO PEDRO (use como semente da analise): ${anguloPedro}` : ""}
+- O FATO: ${resumo}
 - FONTE: ${fonteVeiculo}${fonteUrl ? ` (${fonteUrl})` : ""}
 
-FORMATO: Carrossel de Instagram, 5 a 7 slides:
-**SLIDE 1 — CAPA:** gancho de PARAR O SCROLL sobre a noticia. Nao e a manchete do jornal: e a versao Pedro (contraste, provocacao, o angulo que ninguem esta dando).
-**SLIDES DO MEIO (1 ideia por slide):** 1 slide com O FATO, concreto e com numeros; 2 a 4 slides com A ANALISE DO PEDRO em 1a pessoa: por que isso importa, o que muda pra quem empreende, o que fazer com essa informacao.
-**ULTIMO SLIDE:** CTA com motivo concreto (salvar/comentar/compartilhar e POR QUE).
+ANGULO OBRIGATORIO DESTA VERSAO — ${angulo.instrucao}
 
-REGRAS DE VOZ:
-- Opiniao explicita em 1a pessoa ("na minha visao...", "o que pouca gente percebe...").
-- PONTUACAO: NUNCA use travessao (—) nem meia-risca (–) nos slides ou na legenda. Ponto, virgula ou dois-pontos.
-- LINGUAGEM SIMPLES: proibido jargao de MBA ("incumbente", "moat", "CAC", "market share"). Palavra facil vale mais que palavra bonita.
-- Numeros concretos > generalidades. Zero tom de wikipedia.
+FORMATO: carrossel editorial (6 a 8 slides), mesmo modelo do "case analisado pelo Pedro":
 
-FORMATO DE RESPOSTA: cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases diretas. Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
+PRIMEIRA LINHA DA RESPOSTA, exatamente assim: [MARCA: ${temaLabel} | #FF0000]
+
+**SLIDE 1 — CAPA:** manchete curta DO PEDRO sobre o fato (nao a manchete do jornal), maximo 12 palavras, + 1 linha de isca ("Isso muda mais coisa do que parece. Te explico."). SEM foto na capa (nao inclua [FOTO:]).
+
+**O FATO (1-2 slides) [TIPO: historia]:** o que aconteceu, concreto, com os numeros da noticia. Se UMA imagem real agregar muito (print do anuncio, grafico da noticia), pode incluir NO MAXIMO UM marcador [FOTO: instrucao detalhada] em UM unico slide de fato — e opcional, prefira nenhum.
+
+**A ANALISE DO PEDRO (2-3 slides) [TIPO: analise]:** a leitura DELE em 1a pessoa ("na minha visao...", "o que pouca gente percebe..."). Opiniao explicita, provocadora. SEM foto.
+
+**E A SUA EMPRESA? (1 slide) [TIPO: ponte]:** o que isso muda pra quem esta construindo empresa. SEM foto.
+
+**ULTIMO SLIDE:** fecho forte + CTA com motivo concreto (salvar/comentar e POR QUE).
+
+DESTAQUE EM VERMELHO: em cada slide, marque 1-3 palavras de MAIOR impacto entre **asteriscos duplos** (viram vermelho no design). Com parcimonia.
+PONTUACAO: NUNCA use travessao (—) nem meia-risca (–) nos slides ou na legenda. Ponto, virgula ou dois-pontos.
+LINGUAGEM SIMPLES: proibido jargao de MBA ("incumbente", "moat", "CAC", "market share"). Palavra facil vale mais que palavra bonita. Numeros concretos.
+
+FORMATO DE RESPOSTA: a linha [MARCA: ...], depois cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases, com os marcadores [TIPO: ...] nos slides do meio. Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
 E entao a LEGENDA: hook forte na primeira linha, 100-120 palavras, CTA e 5-8 hashtags no final.`;
 
-    const result = await generateContent({
-      identity: identityRes.data,
-      contentType: "instagram_carousel",
-      freeText,
-      recentFeedbacks: feedbackRes.data ?? [],
-      rules: rulesRes.data ?? undefined,
-    });
-    if ("error" in result) return { error: result.error };
+      const result = await generateContent({
+        identity: identityRes.data,
+        contentType: "instagram_carousel",
+        freeText,
+        recentFeedbacks: feedbackRes.data ?? [],
+        rules: rulesRes.data ?? undefined,
+      });
+      if ("error" in result) throw new Error(result.error);
 
-    // Linha FONTE no topo: o Pedro confere a noticia antes de postar. O
-    // parser do carrossel remove essa linha do design, e a legenda exibida
-    // no card vem depois de ---LEGENDA---, entao ela nao vaza pro post.
-    const contentText = `FONTE: ${fonteVeiculo}${fonteUrl ? ` — ${fonteUrl}` : ""}\n\n${result.content_text}`;
+      // Linha FONTE no topo: o Pedro confere a noticia antes de postar. O
+      // parser do carrossel remove essa linha do design, e a legenda exibida
+      // no card vem depois de ---LEGENDA---, entao ela nao vaza pro post.
+      const contentText = `FONTE: ${fonteVeiculo}${fonteUrl ? ` — ${fonteUrl}` : ""}\n\n${result.content_text}`;
 
-    const { data: inserted, error: insertError } = await supabase
-      .from("generated_contents")
-      .insert({
-        source_type: "free_text" as const,
-        playbook_id: null,
-        story_id: null,
-        free_text_input: manchete,
-        content_type: "instagram_carousel",
-        format_id: null,
-        content_text: contentText,
-        source_map: result.source_map,
-        generation_params: { atualidades: true, fonte_veiculo: fonteVeiculo, fonte_url: fonteUrl },
-        status: "draft",
-      })
-      .select("id")
-      .single();
-    if (insertError) throw insertError;
+      const { data: inserted, error: insertError } = await supabase
+        .from("generated_contents")
+        .insert({
+          source_type: "free_text" as const,
+          playbook_id: null,
+          story_id: null,
+          free_text_input: manchete,
+          content_type: "instagram_carousel",
+          format_id: null,
+          content_text: contentText,
+          source_map: result.source_map,
+          generation_params: {
+            atualidades: true,
+            opcao: angulo.chave,
+            tema,
+            fonte_veiculo: fonteVeiculo,
+            fonte_url: fonteUrl,
+          },
+          status: "draft",
+        })
+        .select("id")
+        .single();
+      if (insertError) throw insertError;
 
-    try {
-      const promptResult = await generateImagePrompt(result.content_text, "instagram_carousel");
-      if (!("error" in promptResult)) {
-        await supabase
-          .from("generated_contents")
-          .update({ image_prompt: promptResult.image_prompt, image_model: "prompt-only" })
-          .eq("id", inserted.id);
+      try {
+        const promptResult = await generateImagePrompt(result.content_text, "instagram_carousel");
+        if (!("error" in promptResult)) {
+          await supabase
+            .from("generated_contents")
+            .update({ image_prompt: promptResult.image_prompt, image_model: "prompt-only" })
+            .eq("id", inserted.id);
+        }
+      } catch (e) {
+        log.error("[Atualidades] Image prompt error: " + String(e));
       }
-    } catch (e) {
-      log.error("[Atualidades] Image prompt error: " + String(e));
-    }
+      return inserted.id as string;
+    };
+
+    // As 2 opcoes EM PARALELO: ~1 tempo de geracao por noticia, bem dentro
+    // do teto de 120s. allSettled: uma opcao falhar nao derruba a outra.
+    const settled = await Promise.allSettled(ANGULOS_ATUALIDADES.map((a) => gerarOpcao(a)));
+    const criados = settled.filter((s) => s.status === "fulfilled").length;
 
     revalidatePath(PATH);
-    return { id: inserted.id, manchete };
+    if (criados === 0) {
+      const primeiroErro = settled.find(
+        (s): s is PromiseRejectedResult => s.status === "rejected"
+      );
+      const detalhe =
+        primeiroErro?.reason instanceof Error ? primeiroErro.reason.message : "";
+      log.error("[Atualidades] nenhuma opcao gerada: " + detalhe);
+      return { error: `Falha ao gerar os posts de "${manchete.slice(0, 60)}...".` };
+    }
+    return { criados, manchete };
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
     log.error("[Atualidades] geracao falhou: " + message);
-    return { error: `Falha ao gerar o post de "${manchete.slice(0, 60)}...". ` };
+    return { error: `Falha ao gerar os posts de "${manchete.slice(0, 60)}...".` };
   }
 }
 

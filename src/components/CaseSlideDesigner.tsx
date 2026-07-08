@@ -43,6 +43,11 @@ interface CaseSlideDesignerProps {
   photoHints?: (string | null)[];
   slideRoles?: (string | null)[];
   companyBrand?: CompanyBrandInput | null;
+  /**
+   * Rotulo dos kickers ("Case · Nubank" / "O caso · Nubank"). O formato
+   * Atualidades reusa este template com rotulo="Agora" ("Agora · IA").
+   */
+  rotulo?: string;
 }
 
 type Role = "capa" | "historia" | "analise" | "ponte" | "fecho";
@@ -155,6 +160,7 @@ export default function CaseSlideDesigner({
   photoHints = [],
   slideRoles = [],
   companyBrand,
+  rotulo,
 }: CaseSlideDesignerProps) {
   const [current, setCurrent] = useState(0);
   const [downloading, setDownloading] = useState(false);
@@ -165,9 +171,11 @@ export default function CaseSlideDesigner({
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const allSlides = buildCaseSlides(slides, hook, cta, photoHints, slideRoles);
+  const rotuloCapa = rotulo ?? "Case";
+  const rotuloMeio = rotulo ?? "O caso";
   const company = companyBrand
-    ? { name: companyBrand.name, color: companyBrand.color, logoUrl }
-    : { name: title, color: RED, logoUrl: null };
+    ? { name: companyBrand.name, color: companyBrand.color, logoUrl, rotuloCapa, rotuloMeio }
+    : { name: title, color: RED, logoUrl: null, rotuloCapa, rotuloMeio };
 
   useEffect(() => {
     let cancelled = false;
@@ -362,7 +370,13 @@ export default function CaseSlideDesigner({
 
 interface RenderProps {
   slide: CaseSlide;
-  company: { name: string; color: string; logoUrl: string | null };
+  company: {
+    name: string;
+    color: string;
+    logoUrl: string | null;
+    rotuloCapa: string;
+    rotuloMeio: string;
+  };
   photoUrl?: string;
   onPickPhoto?: () => void;
 }
@@ -532,7 +546,7 @@ function CapaCard({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
   return (
     <div style={BASE}>
       <PostHeader company={company} showLogo />
-      <Kicker color={RED}>Case · {company.name}</Kicker>
+      <Kicker color={RED}>{company.rotuloCapa} · {company.name}</Kicker>
       <h1
         style={{
           fontFamily: DISPLAY,
@@ -567,7 +581,7 @@ function HistoriaCard({ slide, company, photoUrl, onPickPhoto }: RenderProps) {
   return (
     <div style={BASE}>
       <PostHeader company={company} />
-      <Kicker>O caso · {company.name}</Kicker>
+      <Kicker>{company.rotuloMeio} · {company.name}</Kicker>
       {slide.heading && (
         <h2
           style={{

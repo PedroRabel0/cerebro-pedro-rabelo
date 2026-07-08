@@ -1155,7 +1155,12 @@ export default function ContentList({
                         const parsed = parseCarouselSlides(c.content_text);
                         const designTitle =
                           c.free_text_input || c.playbook?.title || "Carousel";
-                        return c.content_type === "case_empresa" ? (
+                        // Atualidades reusa o template editorial branco do
+                        // Cases (rotulo "Agora"), roteado por generation_params.
+                        const isAtualidades = !!(
+                          c.generation_params as { atualidades?: boolean } | null
+                        )?.atualidades;
+                        return c.content_type === "case_empresa" || isAtualidades ? (
                           <CaseSlideDesigner
                             slides={parsed.slides}
                             hook={parsed.hook}
@@ -1164,6 +1169,7 @@ export default function ContentList({
                             photoHints={parsed.photoHints}
                             slideRoles={parsed.slideRoles}
                             companyBrand={parsed.companyBrand}
+                            rotulo={isAtualidades ? "Agora" : undefined}
                           />
                         ) : (
                           <SlideDesigner
