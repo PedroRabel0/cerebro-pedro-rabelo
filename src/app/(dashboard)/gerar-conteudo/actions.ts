@@ -5,6 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { log } from '@/lib/logger';
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { generateContent } from "@/lib/ai";
 import { getClient, logCost, logApiCost, parseJSON } from "@/lib/ai/client";
 import type { Noticia } from "./atualidades-types";
@@ -563,17 +564,26 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
     let final: Anthropic.Message | null = null;
 
     // stop_reason "pause_turn": a API pausou um turno longo de web search —
-    // reenvia com o conteudo acumulado ate terminar de verdade. So abre um
-    // turno novo se ainda houver orcamento de tempo (teto da pagina: 120s).
-    for (let turno = 0; turno < 4 && Date.now() - inicio < 80_000; turno++) {
-      const stream = anthropic.messages.stream({
-        model,
-        max_tokens: 4000,
-        system:
-          "Voce e o radar de noticias do Pedro Rabelo (empresario brasileiro, conteudo de negocios no Instagram). Voce busca na web, escolhe as noticias com gancho de negocio e responde SEMPRE e SOMENTE com o JSON pedido, em PT-BR.",
-        messages: mensagens,
-        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
-      });
+    // reenvia com o conteudo acumulado ate terminar de verdade. Orcamento
+    // FECHADO no teto de 120s da pagina: cada chamada recebe so o tempo que
+    // resta (115s - decorrido) e turno novo so abre com >=20s de sobra.
+    for (
+      let turno = 0;
+      turno < 4 && 115_000 - (Date.now() - inicio) >= 20_000;
+      turno++
+    ) {
+      const restante = 115_000 - (Date.now() - inicio);
+      const stream = anthropic.messages.stream(
+        {
+          model,
+          max_tokens: 4000,
+          system:
+            "Voce e o radar de noticias do Pedro Rabelo (empresario brasileiro, conteudo de negocios no Instagram). Voce busca na web, escolhe as noticias com gancho de negocio e responde SEMPRE e SOMENTE com o JSON pedido, em PT-BR.",
+          messages: mensagens,
+          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
+        },
+        { timeout: Math.min(100_000, restante) }
+      );
       const msg = await stream.finalMessage();
       totalIn += msg.usage.input_tokens;
       totalOut += msg.usage.output_tokens;
@@ -672,7 +682,10 @@ export async function generateNewsPosts(
   const manchete = (noticia?.manchete || "").trim().slice(0, 300);
   const resumo = (noticia?.resumo || "").trim().slice(0, 600);
   if (!manchete || !resumo) return { error: "Notícia inválida." };
-  const tema = TEMA_LABEL[noticia?.tema] ? noticia.tema : "negocios";
+  // hasOwnProperty: lookup direto aceitaria chaves do prototype ("toString")
+  const tema = Object.prototype.hasOwnProperty.call(TEMA_LABEL, noticia?.tema)
+    ? noticia.tema
+    : "negocios";
   const temaLabel = TEMA_LABEL[tema];
   const fonteVeiculo = (noticia?.fonte_veiculo || "").trim().slice(0, 120) || "fonte não informada";
   const fonteUrl = (noticia?.fonte_url || "").trim().slice(0, 500);
@@ -762,18 +775,25 @@ E entao a LEGENDA: hook forte na primeira linha, 100-120 palavras, CTA e 5-8 has
         .single();
       if (insertError) throw insertError;
 
-      try {
-        const promptResult = await generateImagePrompt(result.content_text, "instagram_carousel");
-        if (!("error" in promptResult)) {
-          await supabase
-            .from("generated_contents")
-            .update({ image_prompt: promptResult.image_prompt, image_model: "prompt-only" })
-            .eq("id", inserted.id);
+      // Image prompt FORA do orcamento da request (after() roda pos-resposta):
+      // a cadeia gemini -> fallback GPT-4o pode passar de 60s e, somada ao
+      // generateContent, estourava o teto de 120s. Admin client dispensa sessao.
+      const contentId = inserted.id as string;
+      after(async () => {
+        try {
+          const promptResult = await generateImagePrompt(result.content_text, "instagram_carousel");
+          if (!("error" in promptResult)) {
+            const adminPos = await createAdminClient();
+            await adminPos
+              .from("generated_contents")
+              .update({ image_prompt: promptResult.image_prompt, image_model: "prompt-only" })
+              .eq("id", contentId);
+          }
+        } catch (e) {
+          log.error("[Atualidades] Image prompt error: " + String(e));
         }
-      } catch (e) {
-        log.error("[Atualidades] Image prompt error: " + String(e));
-      }
-      return inserted.id as string;
+      });
+      return contentId;
     };
 
     // As 2 opcoes EM PARALELO: ~1 tempo de geracao por noticia, bem dentro
