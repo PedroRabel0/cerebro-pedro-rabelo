@@ -2,8 +2,9 @@
 
 import { useState, useMemo, useEffect, useTransition } from "react";
 import type { ContentType } from "@/lib/supabase/types";
-import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent, refineContent, addStoryToContent, suggestCompanyCases } from "./actions";
+import { createWizardContent, updateContentStatus, generateImageForContent, uploadImageToContent, refineContent, addStoryToContent, suggestCompanyCases, searchTrendingNews, generateNewsPosts } from "./actions";
 import type { StorySuggestion, CaseSuggestion } from "./actions";
+import type { Noticia } from "./atualidades-types";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
 import CaseSlideDesigner from "@/components/CaseSlideDesigner";
@@ -46,13 +47,19 @@ const SOURCE_OPTIONS = [
 ] as const;
 
 
+// Pseudo-tipo do wizard: "atualidades" NAO e um ContentType do banco (os
+// posts sao salvos como instagram_carousel) — e um fluxo proprio do wizard,
+// igual ao case_empresa: escolher noticias no passo 2 e gerar 2 opcoes cada.
+type WizardType = ContentType | "atualidades";
+
 // Labels completos (usados nos resultados / lookup por valor)
-const CONTENT_TYPES: { value: ContentType; label: string }[] = [
+const CONTENT_TYPES: { value: WizardType; label: string }[] = [
   { value: "instagram_reel", label: "Instagram Reels" },
   { value: "instagram_frase", label: "Instagram Frase" },
   { value: "instagram_carousel_educativo", label: "Instagram Educativo" },
   { value: "instagram_static", label: "Instagram Estatico" },
   { value: "case_empresa", label: "Case de Empresa (Analise do Pedro)" },
+  { value: "atualidades", label: "O que está rolando (Atualidades)" },
   { value: "youtube_long", label: "YouTube Longo" },
   { value: "youtube_short", label: "YouTube Short" },
   { value: "linkedin_post", label: "LinkedIn Post" },
@@ -61,7 +68,7 @@ const CONTENT_TYPES: { value: ContentType; label: string }[] = [
 ];
 
 // Agrupado por plataforma (usado no seletor de tipos)
-const CONTENT_GROUPS: { platform: string; types: { value: ContentType; label: string }[] }[] = [
+const CONTENT_GROUPS: { platform: string; types: { value: WizardType; label: string }[] }[] = [
   {
     platform: "Instagram",
     types: [
@@ -70,6 +77,7 @@ const CONTENT_GROUPS: { platform: string; types: { value: ContentType; label: st
       { value: "instagram_carousel_educativo", label: "Educativo" },
       { value: "instagram_static", label: "Estático" },
       { value: "case_empresa", label: "Case de Empresa" },
+      { value: "atualidades", label: "O que está rolando" },
     ],
   },
   {
@@ -170,7 +178,7 @@ interface WizardState {
   audience: string;
   extraContext: string;
   // Step 2
-  selectedTypes: ContentType[];
+  selectedTypes: WizardType[];
   // Step 3 - per type details
   typeDetails: Record<string, Record<string, string>>;
 }
@@ -890,7 +898,7 @@ function TypeDetailFields({
   details,
   update,
 }: {
-  type: ContentType;
+  type: WizardType;
   details: Record<string, string>;
   update: (k: string, v: string) => void;
 }) {
@@ -917,12 +925,27 @@ function TypeDetailFields({
       return <InstagramEstaticoFields details={details} update={update} />;
     case "case_empresa":
       return <CaseEmpresaFields />;
+    case "atualidades":
+      return <AtualidadesFields />;
     default:
       return null;
   }
 }
 
-function typeLabel(t: ContentType): string {
+function AtualidadesFields() {
+  return (
+    <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-xs text-text-secondary">
+      <p className="font-semibold text-accent">Sem campos extras</p>
+      <p className="mt-1 leading-relaxed">
+        Nada a preencher: você já escolheu as notícias na etapa anterior. Cada
+        notícia vira 2 opções de post (a leitura contrária e o &quot;o que fazer
+        com isso&quot;), no carrossel editorial branco, direto na aba Salvos.
+      </p>
+    </div>
+  );
+}
+
+function typeLabel(t: WizardType): string {
   return CONTENT_TYPES.find((c) => c.value === t)?.label ?? t;
 }
 
@@ -936,6 +959,11 @@ interface GenerationResult {
   imagePrompt?: string | null;
   source?: "base_only" | "references_only" | "both";
   storySuggestions?: StorySuggestion[];
+  /** Post de Atualidades: preview no template editorial branco (rotulo Agora),
+   *  label proprio no header e sem botoes de regenerar/gerar imagem. */
+  atualidades?: boolean;
+  /** Label do header do card (Atualidades: manchete + angulo da opcao). */
+  labelOverride?: string;
 }
 
 const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
@@ -964,10 +992,12 @@ function CarouselDesignPreview({
   content,
   wizardState,
   contentType = "instagram_carousel",
+  atualidades = false,
 }: {
   content: string;
   wizardState: WizardState;
   contentType?: ContentType;
+  atualidades?: boolean;
 }) {
   const parsed = parseCarouselSlides(content);
   const details = wizardState.typeDetails[contentType] || {};
@@ -977,7 +1007,7 @@ function CarouselDesignPreview({
     "Carousel";
 
   return (
-    contentType === "case_empresa" ? (
+    contentType === "case_empresa" || atualidades ? (
       <CaseSlideDesigner
         slides={parsed.slides}
         hook={details.gancho || parsed.hook}
@@ -986,6 +1016,7 @@ function CarouselDesignPreview({
         photoHints={parsed.photoHints}
         slideRoles={parsed.slideRoles}
         companyBrand={parsed.companyBrand}
+        rotulo={atualidades ? "Agora" : undefined}
       />
     ) : (
       <SlideDesigner
@@ -1179,7 +1210,7 @@ function ResultCard({
     <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
       <div className="flex items-center justify-between">
         <span className="font-mono text-xs font-bold text-accent uppercase tracking-wider">
-          {typeLabel(result.contentType)}
+          {result.labelOverride ?? typeLabel(result.contentType)}
         </span>
         {result.source && SOURCE_LABELS[result.source] && (
           <span className={`rounded-full border px-2 py-0.5 font-mono text-[11px] font-medium ${SOURCE_LABELS[result.source].className}`}>
@@ -1445,6 +1476,7 @@ function ResultCard({
             content={text}
             wizardState={wizardState}
             contentType={result.contentType}
+            atualidades={result.atualidades}
           />
         </div>
       )}
@@ -1513,21 +1545,25 @@ function ResultCard({
       )}
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <button
-          onClick={onRegenerate}
-          disabled={regenerating}
-          className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 font-mono text-xs text-text-muted transition hover:border-accent/50 hover:text-text disabled:opacity-50"
-        >
-          {regenerating ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <RotateCcw className="h-3 w-3" />
-          )}
-          Regenerar
-        </button>
+        {/* atualidades: regenerar iria pro createWizardContent generico e
+            perderia a noticia — gere de novo pela lista de noticias */}
+        {!result.atualidades && (
+          <button
+            onClick={onRegenerate}
+            disabled={regenerating}
+            className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 font-mono text-xs text-text-muted transition hover:border-accent/50 hover:text-text disabled:opacity-50"
+          >
+            {regenerating ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3 w-3" />
+            )}
+            Regenerar
+          </button>
+        )}
 
-        {/* case_empresa usa FOTOS REAIS (slots no design) — sem imagem de IA */}
-        {result.contentType !== "case_empresa" && (
+        {/* case_empresa/atualidades: design proprio — sem imagem de IA */}
+        {result.contentType !== "case_empresa" && !result.atualidades && (
           <button
             onClick={async () => {
               setGeneratingImage(true);
@@ -1606,10 +1642,20 @@ export default function GenerationWizard({
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState("");
   const [seenSuggestions, setSeenSuggestions] = useState<string[]>([]);
+  // Atualidades ("O que esta rolando"): a IA busca as noticias na web, o
+  // usuario SELECIONA as que quer (max 4) e cada uma vira 2 opcoes de post
+  const [noticias, setNoticias] = useState<Noticia[]>([]);
+  const [loadingNoticias, setLoadingNoticias] = useState(false);
+  const [noticiasError, setNoticiasError] = useState("");
+  const [noticiasSelecionadas, setNoticiasSelecionadas] = useState<string[]>([]);
 
   const stepIdx = STEPS.indexOf(step);
 
   const caseSelected = state.selectedTypes.includes("case_empresa");
+  const atualidadesSelected = state.selectedTypes.includes("atualidades");
+  const atualidadesOnly =
+    state.selectedTypes.length > 0 &&
+    state.selectedTypes.every((t) => t === "atualidades");
 
   async function fetchCaseSuggestions(shuffle = false) {
     setLoadingSuggestions(true);
@@ -1640,6 +1686,44 @@ export default function GenerationWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, caseSelected]);
 
+  async function fetchNoticias() {
+    setLoadingNoticias(true);
+    setNoticiasError("");
+    try {
+      const res = await searchTrendingNews();
+      if ("error" in res) {
+        setNoticiasError(res.error);
+      } else {
+        setNoticias(res.noticias);
+        setNoticiasSelecionadas([]);
+      }
+    } catch {
+      setNoticiasError(
+        "A busca demorou demais e foi interrompida. Tente de novo."
+      );
+    } finally {
+      setLoadingNoticias(false);
+    }
+  }
+
+  // Ao entrar no passo de assunto com Atualidades selecionado, busca noticias
+  // (setTimeout 0: adia o setState pra fora do corpo sincrono do efeito)
+  useEffect(() => {
+    if (step === "source" && atualidadesSelected && noticias.length === 0 && !loadingNoticias) {
+      const t = setTimeout(() => fetchNoticias(), 0);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, atualidadesSelected]);
+
+  function toggleNoticia(id: string) {
+    setNoticiasSelecionadas((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 4) return prev; // max 4 por rodada
+      return [...prev, id];
+    });
+  }
+
   function updateState<K extends keyof WizardState>(key: K, val: WizardState[K]) {
     setState((prev) => ({ ...prev, [key]: val }));
   }
@@ -1657,7 +1741,7 @@ export default function GenerationWizard({
     }));
   }
 
-  function toggleType(t: ContentType) {
+  function toggleType(t: WizardType) {
     setState((prev) => {
       const sel = prev.selectedTypes.includes(t)
         ? prev.selectedTypes.filter((x) => x !== t)
@@ -1667,7 +1751,7 @@ export default function GenerationWizard({
   }
 
   // Auto-advance when a type is selected (go to details step)
-  function selectTypeAndAdvance(t: ContentType) {
+  function selectTypeAndAdvance(t: WizardType) {
     setState((prev) => {
       const sel = prev.selectedTypes.includes(t)
         ? prev.selectedTypes.filter((x) => x !== t)
@@ -1683,7 +1767,10 @@ export default function GenerationWizard({
   const canNext = useMemo(() => {
     switch (step) {
       case "source":
-        return state.topic.trim().length > 0;
+        // Atualidades (sozinho): avancar exige noticia marcada, nao topic
+        return atualidadesOnly
+          ? noticiasSelecionadas.length > 0
+          : state.topic.trim().length > 0;
       case "types":
         return state.selectedTypes.length > 0;
       case "details":
@@ -1691,7 +1778,7 @@ export default function GenerationWizard({
       default:
         return false;
     }
-  }, [step, state.topic, state.selectedTypes]);
+  }, [step, state.topic, state.selectedTypes, atualidadesOnly, noticiasSelecionadas]);
 
   function goNext() {
     const i = STEPS.indexOf(step);
@@ -1714,26 +1801,90 @@ export default function GenerationWizard({
 
     startTransition(async () => {
       try {
-        const payload = {
-          source: state.source,
-          topic: state.topic,
-          recorte: state.recorte || undefined,
-          audience: state.audience || undefined,
-          extraContext: state.extraContext || undefined,
-          contentTypes: state.selectedTypes,
-          typeDetails: state.typeDetails,
-        };
+        // "atualidades" e pseudo-tipo do wizard: nao vai pro createWizardContent
+        // (nao e content_type do banco) — gera pelo proprio fluxo de noticias.
+        const tiposNormais = state.selectedTypes.filter(
+          (t): t is ContentType => t !== "atualidades"
+        );
+        const novosResults: GenerationResult[] = [];
+        let avisoParcial = "";
 
-        const res = await createWizardContent(payload);
-
-        if ("error" in res) {
-          setError(res.error);
-        } else {
-          setResults(res.results);
-          setStep("result");
-          // Sucesso parcial: mostra os formatos que vieram e avisa dos que falharam
-          if (res.partialError) setError(res.partialError);
+        if (tiposNormais.length > 0) {
+          const payload = {
+            source: state.source,
+            topic: state.topic,
+            recorte: state.recorte || undefined,
+            audience: state.audience || undefined,
+            extraContext: state.extraContext || undefined,
+            contentTypes: tiposNormais,
+            typeDetails: state.typeDetails,
+          };
+          const res = await createWizardContent(payload);
+          if ("error" in res) {
+            setError(res.error);
+            return;
+          }
+          novosResults.push(...res.results);
+          if (res.partialError) avisoParcial = res.partialError;
         }
+
+        if (atualidadesSelected) {
+          const escolhidas = noticias.filter((n) =>
+            noticiasSelecionadas.includes(n.id)
+          );
+          if (escolhidas.length === 0) {
+            avisoParcial = [
+              avisoParcial,
+              "Atualidades: nenhuma notícia selecionada (marque as notícias no passo Fonte & Assunto com só 'O que está rolando' escolhido).",
+            ]
+              .filter(Boolean)
+              .join(" ");
+          }
+          let falhasNoticias = 0;
+          for (const noticia of escolhidas) {
+            try {
+              const r = await generateNewsPosts(noticia);
+              if ("error" in r) {
+                falhasNoticias += 1;
+                continue;
+              }
+              const mancheteCurta =
+                noticia.manchete.length > 55
+                  ? noticia.manchete.slice(0, 52) + "..."
+                  : noticia.manchete;
+              for (const p of r.posts) {
+                novosResults.push({
+                  id: p.id,
+                  contentType: "instagram_carousel",
+                  content: p.content,
+                  sourceMap: null,
+                  atualidades: true,
+                  labelOverride: `${mancheteCurta} · ${
+                    p.opcao === "contraria" ? "Leitura contrária" : "O que fazer"
+                  }`,
+                });
+              }
+            } catch {
+              falhasNoticias += 1;
+            }
+          }
+          if (falhasNoticias > 0) {
+            avisoParcial = [
+              avisoParcial,
+              `${falhasNoticias} notícia${falhasNoticias !== 1 ? "s" : ""} falhou na geração — tente de novo.`,
+            ]
+              .filter(Boolean)
+              .join(" ");
+          }
+        }
+
+        if (novosResults.length === 0) {
+          setError(avisoParcial || "Nada foi gerado. Tente de novo.");
+          return;
+        }
+        setResults(novosResults);
+        setStep("result");
+        if (avisoParcial) setError(avisoParcial);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error("[GenerationWizard] Error:", msg);
@@ -1792,6 +1943,8 @@ export default function GenerationWizard({
     setState(initialState);
     setResults([]);
     setError("");
+    // Mantem a LISTA de noticias (nao gasta outra busca), so limpa a selecao
+    setNoticiasSelecionadas([]);
     setStep("types");
   }
 
@@ -1803,17 +1956,110 @@ export default function GenerationWizard({
       state.selectedTypes.every((t) => t === "case_empresa");
     return (
       <div className="space-y-5">
-        <div>
-          <FieldLabel>Fonte</FieldLabel>
-          <PillSelect
-            options={[...SOURCE_OPTIONS]}
-            value={state.source}
-            onChange={(v) => updateState("source", v as SourceType)}
-          />
-        </div>
+        {/* Atualidades: fonte e a noticia real buscada na web — o seletor
+            de fonte da base nao se aplica */}
+        {!atualidadesOnly && (
+          <div>
+            <FieldLabel>Fonte</FieldLabel>
+            <PillSelect
+              options={[...SOURCE_OPTIONS]}
+              value={state.source}
+              onChange={(v) => updateState("source", v as SourceType)}
+            />
+          </div>
+        )}
 
-        {/* Temas macro da base (case_empresa: sugestoes de empresas pela IA) */}
-        {caseOnly ? (
+        {/* Temas macro da base (case_empresa: sugestoes de empresas pela IA;
+            atualidades: noticias buscadas na web pra selecionar) */}
+        {atualidadesOnly ? (
+          <div>
+            <div className="flex items-center justify-between">
+              <FieldLabel>
+                Quais notícias viram post? (marque até 4)
+              </FieldLabel>
+              <button
+                type="button"
+                onClick={() => fetchNoticias()}
+                disabled={loadingNoticias}
+                className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 font-mono text-[10px] text-text-muted transition hover:border-accent/40 hover:text-text disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3 ${loadingNoticias ? "animate-spin" : ""}`} />
+                Buscar de novo
+              </button>
+            </div>
+
+            {loadingNoticias && (
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-6 text-sm text-text-muted">
+                <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                Buscando o que rolou no mundo… (leva alguns segundos)
+              </div>
+            )}
+
+            {noticiasError && (
+              <p className="rounded-xl border border-red/20 bg-red/5 px-3 py-2 text-xs text-red">
+                {noticiasError}
+              </p>
+            )}
+
+            {!loadingNoticias && noticias.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {noticias.map((n) => {
+                  const marcada = noticiasSelecionadas.includes(n.id);
+                  const bloqueada = !marcada && noticiasSelecionadas.length >= 4;
+                  return (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => toggleNoticia(n.id)}
+                      disabled={bloqueada}
+                      className={`w-full rounded-xl border-2 p-3.5 text-left transition-all ${
+                        marcada
+                          ? "border-accent bg-accent/10"
+                          : bloqueada
+                            ? "border-border opacity-40"
+                            : "border-border bg-card hover:border-accent/40"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span
+                          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                            marcada ? "border-accent bg-accent" : "border-border-light"
+                          }`}
+                        >
+                          {marcada && <Check className="h-3 w-3 text-white" />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                              {n.tema}
+                            </span>
+                            <span className={`text-sm font-bold ${marcada ? "text-accent" : "text-text"}`}>
+                              {n.manchete}
+                            </span>
+                          </span>
+                          <span className="mt-1.5 block text-xs leading-relaxed text-text-secondary">
+                            {n.resumo}
+                          </span>
+                          {n.fonte_veiculo && (
+                            <span className="mt-1 block text-[10px] text-text-muted">
+                              Fonte: {n.fonte_veiculo}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="mt-2 text-[11px] text-text-muted">
+              Cada notícia marcada vira 2 opções de post na voz do Pedro (a
+              leitura contrária e o &quot;o que fazer com isso&quot;). O limite é
+              de 10 buscas por dia — aproveite a lista antes de buscar de novo.
+            </p>
+          </div>
+        ) : caseOnly ? (
           <div>
             <div className="flex items-center justify-between">
               <FieldLabel>Qual case analisar? (sugestoes da IA)</FieldLabel>
@@ -1960,27 +2206,32 @@ export default function GenerationWizard({
         </div>
         )}
 
-        <TextField
-          label="Recorte especifico (opcional)"
-          value={state.recorte}
-          onChange={(v) => updateState("recorte", v)}
-          placeholder="Angulo ou recorte especifico"
-        />
+        {/* Atualidades: a noticia ja traz o assunto — sem campos livres */}
+        {!atualidadesOnly && (
+          <>
+            <TextField
+              label="Recorte especifico (opcional)"
+              value={state.recorte}
+              onChange={(v) => updateState("recorte", v)}
+              placeholder="Angulo ou recorte especifico"
+            />
 
-        <TextField
-          label="Pra quem e (opcional)"
-          value={state.audience}
-          onChange={(v) => updateState("audience", v)}
-          placeholder="Ex: empreendedores iniciantes, lideres de equipe..."
-        />
+            <TextField
+              label="Pra quem e (opcional)"
+              value={state.audience}
+              onChange={(v) => updateState("audience", v)}
+              placeholder="Ex: empreendedores iniciantes, lideres de equipe..."
+            />
 
-        <TextField
-          label="Contexto extra (opcional)"
-          value={state.extraContext}
-          onChange={(v) => updateState("extraContext", v)}
-          placeholder="Qualquer contexto adicional para a IA..."
-          rows={2}
-        />
+            <TextField
+              label="Contexto extra (opcional)"
+              value={state.extraContext}
+              onChange={(v) => updateState("extraContext", v)}
+              placeholder="Qualquer contexto adicional para a IA..."
+              rows={2}
+            />
+          </>
+        )}
       </div>
     );
   }
@@ -2082,7 +2333,7 @@ export default function GenerationWizard({
       <div className="space-y-4">
         {results.map((r) => (
           <ResultCard
-            key={r.contentType}
+            key={r.id}
             result={r}
             onRegenerate={() => handleRegenerate(r.contentType)}
             regenerating={regeneratingType === r.contentType}

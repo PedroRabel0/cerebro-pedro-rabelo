@@ -681,11 +681,15 @@ const ANGULOS_ATUALIDADES = [
 
 /**
  * PASSO 2 — gera as opcoes de post (2 angulos em paralelo) para UMA noticia
- * selecionada. A UI chama em loop, uma noticia por vez.
+ * selecionada. A UI chama em loop, uma noticia por vez, e recebe os posts
+ * completos pra renderizar no passo RESULTADO do wizard.
  */
 export async function generateNewsPosts(
   noticia: Noticia
-): Promise<{ criados: number; manchete: string } | { error: string }> {
+): Promise<
+  | { posts: { id: string; content: string; opcao: string }[]; manchete: string }
+  | { error: string }
+> {
   await requireStaff();
   const supabase = await createClient();
 
@@ -803,16 +807,19 @@ E entao a LEGENDA: hook forte na primeira linha, 100-120 palavras, CTA e 5-8 has
           log.error("[Atualidades] Image prompt error: " + String(e));
         }
       });
-      return contentId;
+      return { id: contentId, content: contentText, opcao: angulo.chave };
     };
 
     // As 2 opcoes EM PARALELO: ~1 tempo de geracao por noticia, bem dentro
     // do teto de 120s. allSettled: uma opcao falhar nao derruba a outra.
     const settled = await Promise.allSettled(ANGULOS_ATUALIDADES.map((a) => gerarOpcao(a)));
-    const criados = settled.filter((s) => s.status === "fulfilled").length;
+    const posts: { id: string; content: string; opcao: string }[] = [];
+    for (const s of settled) {
+      if (s.status === "fulfilled") posts.push(s.value);
+    }
 
     revalidatePath(PATH);
-    if (criados === 0) {
+    if (posts.length === 0) {
       const primeiroErro = settled.find(
         (s): s is PromiseRejectedResult => s.status === "rejected"
       );
@@ -821,7 +828,7 @@ E entao a LEGENDA: hook forte na primeira linha, 100-120 palavras, CTA e 5-8 has
       log.error("[Atualidades] nenhuma opcao gerada: " + detalhe);
       return { error: `Falha ao gerar os posts de "${manchete.slice(0, 60)}...".` };
     }
-    return { criados, manchete };
+    return { posts, manchete };
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
     log.error("[Atualidades] geracao falhou: " + message);
