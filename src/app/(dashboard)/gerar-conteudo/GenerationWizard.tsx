@@ -2052,8 +2052,8 @@ export default function GenerationWizard({
 
             <p className="mt-2 text-[11px] text-text-muted">
               Cada notícia marcada vira 1 edição do DIÁRIO DO INVESTIDOR na
-              voz do Pedro. O limite é de 10 buscas por dia — aproveite a
-              lista antes de buscar de novo.
+              voz do Pedro. Pode buscar de novo à vontade: a busca agora é
+              feita por RSS e custa centavos.
             </p>
           </div>
         ) : caseOnly ? (

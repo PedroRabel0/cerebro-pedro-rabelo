@@ -6,7 +6,7 @@ import { log } from '@/lib/logger';
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
-import { getClient, logCost, logApiCost, parseJSON } from "@/lib/ai/client";
+import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import type { Noticia } from "./atualidades-types";
 import { generateImagePrompt } from "@/lib/ai/gemini";
 import { generateImage } from "@/lib/ai/image-gen";
@@ -488,8 +488,6 @@ export async function deleteContent(id: string) {
 // do DIARIO DO INVESTIDOR cada. O design NAO e renderizado na plataforma:
 // o Ver Prompt carrega a especificacao completa pro Claude Design.
 
-const ATUALIDADES_LIMITE_DIA = 10;
-
 const TEMA_LABEL: Record<string, string> = {
   empresas: "Empresas BR",
   marketing: "Marketing",
@@ -512,26 +510,8 @@ export async function searchTrendingNews(): Promise<
 > {
   await requireStaff();
 
-  // Limite diario (10 buscas/dia): cada busca loga exatamente 1 linha com
-  // provider 'anthropic-web-search' no api_cost_log (o nome ficou como
-  // marcador do contador; a busca em si agora e RSS + Haiku).
-  const admin = await createAdminClient();
-  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await admin
-    .from("api_cost_log")
-    .select("*", { count: "exact", head: true })
-    .eq("provider", "anthropic-web-search")
-    .gte("created_at", desde);
-  if (countError) {
-    // Fail-CLOSED: sem conseguir checar o limite, nao gastamos chamada de IA.
-    log.error("[Atualidades] falha ao checar limite diario: " + countError.message);
-    return {
-      error: "Não consegui verificar o limite diário de Atualidades. Tente de novo em instantes.",
-    };
-  }
-  if ((count ?? 0) >= ATUALIDADES_LIMITE_DIA) {
-    return { error: "Limite diário atingido (10/dia). Tente amanhã." };
-  }
+  // Sem limite diario: a busca custa centavos (RSS gratis + Haiku) — o
+  // limite de 10/dia existia por causa do web search pago, ja removido.
 
   // 1) RSS do Google Noticias — 1 feed por tema, em paralelo, timeout 8s.
   const FEEDS: { tema: Noticia["tema"]; url: string }[] = [
@@ -658,8 +638,6 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
     }
 
     logCost(model, response.usage.input_tokens, response.usage.output_tokens);
-    // Marcador do limite diario (custo do RSS = zero; o do Haiku ja foi logado acima)
-    logApiCost("anthropic-web-search", "google-news-rss", 0, { unit: "busca", quantity: 1 });
 
     const texto = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
