@@ -57,60 +57,35 @@ interface RepurposeContent {
   created_at: string;
 }
 
+type AtualidadesFase = "idle" | "buscando" | "gerando" | "pronto" | "erro";
+
+interface AtualidadesEstado {
+  fase: AtualidadesFase;
+  progresso: { atual: number; total: number; manchete: string };
+  criadas: string[];
+  falhas: number;
+  erro: string | null;
+}
+
 /**
  * "O que esta rolando" (Atualidades) — click-and-generate: busca as noticias
  * mais quentes de negocios na web e gera 3-5 posts prontos na voz do Pedro.
- * Sem formulario: a busca (chamada 1) devolve os picks e a UI gera um post
- * por vez (chamada 2 em loop) pra cada request ficar abaixo do teto de 60s.
+ * Sem formulario. Componente APRESENTACIONAL: o estado vive no Tabs (que
+ * fica montado o tempo todo) — se morasse aqui, trocar de aba no meio da
+ * geracao desmontaria o card, zeraria o progresso e perderia a trava
+ * contra clique duplo enquanto o loop antigo continua rodando.
  */
-function AtualidadesCard({ onVerSalvos }: { onVerSalvos: () => void }) {
-  const [fase, setFase] = useState<"idle" | "buscando" | "gerando" | "pronto" | "erro">("idle");
-  const [progresso, setProgresso] = useState({ atual: 0, total: 0, manchete: "" });
-  const [criadas, setCriadas] = useState<string[]>([]);
-  const [falhas, setFalhas] = useState(0);
-  const [erro, setErro] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
-
+function AtualidadesCard({
+  estado,
+  onGerar,
+  onVerSalvos,
+}: {
+  estado: AtualidadesEstado;
+  onGerar: () => void;
+  onVerSalvos: () => void;
+}) {
+  const { fase, progresso, criadas, falhas, erro } = estado;
   const ocupado = fase === "buscando" || fase === "gerando";
-
-  function handleGerar() {
-    if (ocupado) return;
-    setFase("buscando");
-    setErro(null);
-    setCriadas([]);
-    setFalhas(0);
-    startTransition(async () => {
-      try {
-        const busca = await buscarAtualidades();
-        if ("error" in busca) {
-          setErro(busca.error);
-          setFase("erro");
-          return;
-        }
-        setFase("gerando");
-        const ok: string[] = [];
-        let ruim = 0;
-        for (let i = 0; i < busca.picks.length; i++) {
-          const pick = busca.picks[i];
-          setProgresso({ atual: i + 1, total: busca.picks.length, manchete: pick.manchete });
-          const r = await gerarPostAtualidade(pick);
-          if ("error" in r) ruim += 1;
-          else ok.push(r.manchete);
-          setCriadas([...ok]);
-          setFalhas(ruim);
-        }
-        if (ok.length === 0) {
-          setErro("Nenhum post pôde ser gerado agora. Tente de novo.");
-          setFase("erro");
-          return;
-        }
-        setFase("pronto");
-      } catch (err) {
-        setErro(err instanceof Error ? err.message : "Erro inesperado ao gerar.");
-        setFase("erro");
-      }
-    });
-  }
 
   return (
     <div className="mb-6 rounded-2xl border border-accent/25 bg-gradient-to-br from-accent/10 to-transparent p-4">
@@ -125,7 +100,7 @@ function AtualidadesCard({ onVerSalvos }: { onVerSalvos: () => void }) {
           </p>
         </div>
         <button
-          onClick={handleGerar}
+          onClick={onGerar}
           disabled={ocupado}
           className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 font-mono text-xs font-bold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -159,7 +134,7 @@ function AtualidadesCard({ onVerSalvos }: { onVerSalvos: () => void }) {
           <p className="text-xs font-medium text-text">
             {criadas.length} rascunho{criadas.length !== 1 ? "s" : ""} criado
             {criadas.length !== 1 ? "s" : ""}
-            {falhas > 0 ? ` (${falhas} falhou${falhas !== 1 ? "ram" : ""}, tente de novo mais tarde)` : ""}:
+            {falhas > 0 ? ` (${falhas} não deu certo — tente de novo mais tarde)` : ""}:
           </p>
           {criadas.map((m, i) => (
             <p key={i} className="flex items-center gap-1.5 text-xs text-text-muted">
@@ -175,10 +150,33 @@ function AtualidadesCard({ onVerSalvos }: { onVerSalvos: () => void }) {
         </div>
       )}
 
-      {fase === "erro" && erro && (
-        <p className="mt-3 text-xs text-red" role="alert">
-          {erro}
-        </p>
+      {fase === "erro" && (
+        <div className="mt-3 space-y-1.5">
+          {erro && (
+            <p className="text-xs text-red" role="alert">
+              {erro}
+            </p>
+          )}
+          {criadas.length > 0 && (
+            <>
+              <p className="text-xs text-text-muted">
+                Mesmo assim, {criadas.length} post{criadas.length !== 1 ? "s" : ""} já{" "}
+                {criadas.length !== 1 ? "foram criados" : "foi criado"}:
+              </p>
+              {criadas.map((m, i) => (
+                <p key={i} className="flex items-center gap-1.5 text-xs text-text-muted">
+                  <Check className="h-3 w-3 shrink-0 text-green" /> {m}
+                </p>
+              ))}
+              <button
+                onClick={onVerSalvos}
+                className="mt-1 rounded-xl bg-accent/10 px-3 py-1.5 font-mono text-[11px] font-medium text-accent transition hover:bg-accent/20"
+              >
+                Ver na aba Salvos →
+              </button>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -203,6 +201,82 @@ export default function Tabs({
 }) {
   const [tab, setTab] = useState<Tab>("novo");
 
+  // Estado das Atualidades no Tabs (sempre montado) — sobrevive a troca de aba.
+  const [atualidades, setAtualidades] = useState<AtualidadesEstado>({
+    fase: "idle",
+    progresso: { atual: 0, total: 0, manchete: "" },
+    criadas: [],
+    falhas: 0,
+    erro: null,
+  });
+  const [, startTransition] = useTransition();
+
+  function handleGerarAtualidades() {
+    if (atualidades.fase === "buscando" || atualidades.fase === "gerando") return;
+    setAtualidades({
+      fase: "buscando",
+      progresso: { atual: 0, total: 0, manchete: "" },
+      criadas: [],
+      falhas: 0,
+      erro: null,
+    });
+    startTransition(async () => {
+      let busca: Awaited<ReturnType<typeof buscarAtualidades>>;
+      try {
+        busca = await buscarAtualidades();
+      } catch {
+        // Erro lancado (ex.: funcao morta pelo teto de tempo do servidor) —
+        // mensagem amigavel em vez do digest cru do Next.
+        setAtualidades((prev) => ({
+          ...prev,
+          fase: "erro",
+          erro: "A busca demorou demais e foi interrompida pelo servidor. Tente de novo.",
+        }));
+        return;
+      }
+      if ("error" in busca) {
+        setAtualidades((prev) => ({ ...prev, fase: "erro", erro: busca.error }));
+        return;
+      }
+
+      const picks = busca.picks;
+      setAtualidades((prev) => ({
+        ...prev,
+        fase: "gerando",
+        progresso: { atual: 0, total: picks.length, manchete: "" },
+      }));
+
+      const ok: string[] = [];
+      let ruim = 0;
+      for (let i = 0; i < picks.length; i++) {
+        const pick = picks[i];
+        setAtualidades((prev) => ({
+          ...prev,
+          progresso: { atual: i + 1, total: picks.length, manchete: pick.manchete },
+        }));
+        let r: Awaited<ReturnType<typeof gerarPostAtualidade>>;
+        try {
+          r = await gerarPostAtualidade(pick);
+        } catch {
+          r = { error: "interrompido" };
+        }
+        if ("error" in r) ruim += 1;
+        else ok.push(r.manchete);
+        setAtualidades((prev) => ({ ...prev, criadas: [...ok], falhas: ruim }));
+      }
+
+      if (ok.length === 0) {
+        setAtualidades((prev) => ({
+          ...prev,
+          fase: "erro",
+          erro: "Nenhum post pôde ser gerado agora. Tente de novo.",
+        }));
+        return;
+      }
+      setAtualidades((prev) => ({ ...prev, fase: "pronto" }));
+    });
+  }
+
   return (
     <div>
       <div className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-surface p-1">
@@ -224,7 +298,11 @@ export default function Tabs({
 
       {tab === "novo" && (
         <>
-          <AtualidadesCard onVerSalvos={() => setTab("salvos")} />
+          <AtualidadesCard
+            estado={atualidades}
+            onGerar={handleGerarAtualidades}
+            onVerSalvos={() => setTab("salvos")}
+          />
           <GenerationWizard playbooks={playbooks} stories={stories} themes={themes} />
         </>
       )}

@@ -501,23 +501,34 @@ export async function buscarAtualidades(): Promise<
   // ultimas 24h e o marcador mais limpo sem criar coluna/migration.
   const admin = await createAdminClient();
   const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count } = await admin
+  const { count, error: countError } = await admin
     .from("api_cost_log")
     .select("*", { count: "exact", head: true })
     .eq("provider", "anthropic-web-search")
     .gte("created_at", desde);
+  if (countError) {
+    // Fail-CLOSED: sem conseguir checar o limite, nao gastamos busca paga.
+    log.error("[Atualidades] falha ao checar limite diario: " + countError.message);
+    return {
+      error: "Não consegui verificar o limite diário de Atualidades. Tente de novo em instantes.",
+    };
+  }
   if ((count ?? 0) >= ATUALIDADES_LIMITE_DIA) {
     return { error: "Limite diário de Atualidades atingido (10/dia). Tente amanhã." };
   }
 
   // Client dedicado: o getClient() tem timeout de 50s, que estoura com web
   // search. Streaming mantem a conexao viva; maxRetries 0 pra nao dobrar.
+  // O teto REAL e o maxDuration=120 da pagina de gerar-conteudo: o orcamento
+  // abaixo (turno novo so ate 80s decorridos + timeout de 100s por chamada)
+  // cabe nele com folga pro parse/retorno.
   const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
-    timeout: 110_000,
+    timeout: 100_000,
     maxRetries: 0,
   });
   const model = "claude-sonnet-4-6";
+  const inicio = Date.now();
 
   const promptBusca = `Busque na web as noticias MAIS RELEVANTES e MAIS RECENTES do mundo dos negocios. Priorize as ultimas 24-72 horas; algo de poucos dias atras so entra se for grande demais pra ignorar (voce decide).
 
@@ -532,18 +543,19 @@ ESCOLHA as 3 a 5 mais fortes. Descarte noticia morna e politica sem gancho de ne
 RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
 {"picks":[{"manchete":"a manchete em PT-BR","resumo_fato":"2-4 frases objetivas do que aconteceu, com numeros concretos","angulo_pedro":"1-2 frases: a leitura/opiniao do Pedro sobre esse fato para quem constroi empresa","fonte_veiculo":"nome do veiculo","fonte_url":"https://..."}]}`;
 
+  let totalIn = 0;
+  let totalOut = 0;
+  let totalBuscas = 0;
   try {
     let mensagens: Anthropic.MessageParam[] = [
       { role: "user", content: promptBusca },
     ];
     let final: Anthropic.Message | null = null;
-    let totalIn = 0;
-    let totalOut = 0;
-    let totalBuscas = 0;
 
     // stop_reason "pause_turn": a API pausou um turno longo de web search —
-    // reenvia com o conteudo acumulado ate terminar de verdade.
-    for (let turno = 0; turno < 4; turno++) {
+    // reenvia com o conteudo acumulado ate terminar de verdade. So abre um
+    // turno novo se ainda houver orcamento de tempo (teto da pagina: 120s).
+    for (let turno = 0; turno < 4 && Date.now() - inicio < 80_000; turno++) {
       const stream = anthropic.messages.stream({
         model,
         max_tokens: 3000,
@@ -567,21 +579,17 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
       break;
     }
 
-    logCost(model, totalIn, totalOut);
-    // Loga SEMPRE (mesmo com 0 buscas): esta linha e o marcador do limite diario.
-    logApiCost("anthropic-web-search", "web_search", totalBuscas * 0.01, {
-      unit: "search",
-      quantity: totalBuscas,
-    });
-
     if (!final) {
       return { error: "A busca de notícias não terminou a tempo. Tente de novo." };
     }
 
+    // join("") — com web search a resposta vem FATIADA em varios text blocks
+    // nas fronteiras de citacao (inclusive no MEIO de uma string do JSON);
+    // juntar com "\n" injetaria newline cru dentro da string e quebraria o parse.
     const texto = final.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
-      .join("\n");
+      .join("");
     const parsed = parseJSON<{ picks: AtualidadePick[] }>(texto);
     const picks = (parsed?.picks ?? [])
       .filter(
@@ -609,6 +617,17 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
     const message = err instanceof Error ? err.message : "erro desconhecido";
     log.error("[Atualidades] busca falhou: " + message);
     return { error: "Falha ao buscar as notícias. Tente de novo em instantes." };
+  } finally {
+    // No finally de proposito: busca que FALHA no meio tambem gastou web
+    // searches cobradas — precisa entrar no custo E no marcador do limite
+    // diario (a linha 'anthropic-web-search' e o que o contador le).
+    if (totalIn + totalOut > 0 || totalBuscas > 0) {
+      logCost(model, totalIn, totalOut);
+    }
+    logApiCost("anthropic-web-search", "web_search", totalBuscas * 0.01, {
+      unit: "search",
+      quantity: totalBuscas,
+    });
   }
 }
 
