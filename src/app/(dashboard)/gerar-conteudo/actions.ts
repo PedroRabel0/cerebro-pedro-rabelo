@@ -584,7 +584,17 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
         },
         { timeout: Math.min(100_000, restante) }
       );
-      const msg = await stream.finalMessage();
+      // O timeout do SDK so limita o INICIO da resposta (e limpo quando os
+      // headers chegam); a DURACAO do stream e limitada aqui: aborta no fim
+      // do orcamento pra plataforma nunca matar a funcao (o abort cai no
+      // catch e o finally loga o custo das buscas ja feitas).
+      const aborta = setTimeout(() => stream.abort(), restante);
+      let msg: Anthropic.Message;
+      try {
+        msg = await stream.finalMessage();
+      } finally {
+        clearTimeout(aborta);
+      }
       totalIn += msg.usage.input_tokens;
       totalOut += msg.usage.output_tokens;
       totalBuscas +=

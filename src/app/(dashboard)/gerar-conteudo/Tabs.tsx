@@ -111,12 +111,14 @@ function AtualidadesCard({
   onToggle,
   onGerar,
   onVerSalvos,
+  onVoltarLista,
 }: {
   estado: AtualidadesEstado;
   onBuscar: () => void;
   onToggle: (id: string) => void;
   onGerar: () => void;
   onVerSalvos: () => void;
+  onVoltarLista: () => void;
 }) {
   const { fase, noticias, selecionadas, progresso, criadas, falhas, erro } = estado;
   const ocupado = fase === "buscando" || fase === "gerando";
@@ -259,12 +261,22 @@ function AtualidadesCard({
               <Check className="h-3 w-3 shrink-0 text-green" /> {m}
             </p>
           ))}
-          <button
-            onClick={onVerSalvos}
-            className="mt-1 rounded-xl bg-accent/10 px-3 py-1.5 font-mono text-[11px] font-medium text-accent transition hover:bg-accent/20"
-          >
-            Ver na aba Salvos →
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onVerSalvos}
+              className="mt-1 rounded-xl bg-accent/10 px-3 py-1.5 font-mono text-[11px] font-medium text-accent transition hover:bg-accent/20"
+            >
+              Ver na aba Salvos →
+            </button>
+            {noticias.length > 0 && (
+              <button
+                onClick={onVoltarLista}
+                className="mt-1 rounded-xl border border-border px-3 py-1.5 font-mono text-[11px] text-text-muted transition hover:border-accent/40 hover:text-text"
+              >
+                Escolher mais notícias desta busca
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -293,6 +305,14 @@ function AtualidadesCard({
                 Ver na aba Salvos →
               </button>
             </>
+          )}
+          {noticias.length > 0 && (
+            <button
+              onClick={onVoltarLista}
+              className="mt-1 rounded-xl border border-border px-3 py-1.5 font-mono text-[11px] text-text-muted transition hover:border-accent/40 hover:text-text"
+            >
+              Voltar pra lista de notícias
+            </button>
           )}
         </div>
       )}
@@ -363,6 +383,23 @@ export default function Tabs({
         selecionadas: ja
           ? prev.selecionadas.filter((s) => s !== id)
           : [...prev.selecionadas, id],
+      };
+    });
+  }
+
+  function handleVoltarLista() {
+    // Volta pra MESMA lista da busca (sem gastar outra das 10 buscas/dia)
+    // pra gerar mais uma rodada com as noticias que sobraram.
+    setAtualidades((prev) => {
+      if (prev.noticias.length === 0) return prev;
+      if (prev.fase !== "pronto" && prev.fase !== "erro") return prev;
+      return {
+        ...prev,
+        fase: "escolhendo",
+        selecionadas: [],
+        criadas: [],
+        falhas: 0,
+        erro: null,
       };
     });
   }
@@ -439,6 +476,7 @@ export default function Tabs({
             onToggle={handleToggleNoticia}
             onGerar={handleGerarPosts}
             onVerSalvos={() => setTab("salvos")}
+            onVoltarLista={handleVoltarLista}
           />
           <GenerationWizard playbooks={playbooks} stories={stories} themes={themes} />
         </>
