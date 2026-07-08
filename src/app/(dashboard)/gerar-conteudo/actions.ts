@@ -649,7 +649,11 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
     log.error("[Atualidades] busca falhou: " + message);
-    return { error: "Falha ao buscar as notícias. Tente de novo em instantes." };
+    // App interno (so equipe): expor o detalhe tecnico na tela e o unico
+    // jeito de diagnosticar sem acesso aos logs da Vercel.
+    return {
+      error: `Falha ao buscar as notícias. Detalhe técnico: ${message.slice(0, 200)}`,
+    };
   } finally {
     // No finally de proposito: busca que FALHA no meio tambem gastou web
     // searches cobradas — precisa entrar no custo E no marcador do limite
