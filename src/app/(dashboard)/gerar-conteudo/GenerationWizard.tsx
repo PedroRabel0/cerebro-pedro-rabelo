@@ -1871,6 +1871,7 @@ export default function GenerationWizard({
                   contentType: "instagram_carousel",
                   content: p.content,
                   sourceMap: null,
+                  imagePrompt: p.imagePrompt,
                   atualidades: true,
                   labelOverride: `${mancheteCurta} · ${
                     p.opcao === "contraria" ? "Leitura contrária" : "O que fazer"

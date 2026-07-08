@@ -5,7 +5,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { log } from '@/lib/logger';
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { generateContent } from "@/lib/ai";
 import { getClient, logCost, logApiCost, parseJSON } from "@/lib/ai/client";
 import type { Noticia } from "./atualidades-types";
@@ -714,7 +713,10 @@ const ANGULOS_ATUALIDADES = [
 export async function generateNewsPosts(
   noticia: Noticia
 ): Promise<
-  | { posts: { id: string; content: string; opcao: string }[]; manchete: string }
+  | {
+      posts: { id: string; content: string; opcao: string; imagePrompt: string }[];
+      manchete: string;
+    }
   | { error: string }
 > {
   await requireStaff();
@@ -803,6 +805,50 @@ E entao a LEGENDA, que ABRE com a fala de ancora do quadro (nesse espirito: "E a
       // no card vem depois de ---LEGENDA---, entao ela nao vaza pro post.
       const contentText = `FONTE: ${fonteVeiculo}${fonteUrl ? ` — ${fonteUrl}` : ""}\n\n${result.content_text}`;
 
+      // Prompt de design DETERMINISTICO (vai pro "Ver Prompt"): descreve o
+      // template do DIARIO DO INVESTIDOR em detalhe + o conteudo dos slides,
+      // pronto pra colar no Claude Design e sair IGUAL ao design do app.
+      // (O gerador generico de image prompt nao conhece o quadro e o design
+      // externo saia diferente da plataforma.)
+      const slidesSemLegenda = result.content_text.split(/-{2,}\s*LEGENDA\s*-{2,}/i)[0].trim();
+      const dataEdicao = new Intl.DateTimeFormat("pt-BR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+        .format(new Date())
+        .toUpperCase();
+      const designPrompt = `Crie um carrossel de Instagram 1080x1080 — uma EDICAO DO JORNAL "DIÁRIO DO INVESTIDOR" (o quadro de noticias do Pedro Rabelo). Siga o design system A RISCA, sem inventar outro estilo:
+
+FUNDO: papel-jornal claro #F7F2E5 em TODOS os slides (nunca escuro). Tinta preta #151310. VERMELHO #FF0000 SOMENTE em: tarja URGENTE, carimbo OPINIÃO, grifos de palavras-chave, "continua →" e o bordão final.
+
+TIPOGRAFIA (nada de sans-serif):
+- Logotipo do jornal: letra GÓTICA de jornalão (estilo do masthead do New York Times): "Diário do Investidor".
+- Manchetes: serif editorial pesada (Playfair Display ou similar).
+- Texto corrido: serif de leitura (Lora ou similar).
+
+CAPA (slide 1 = primeira página):
+- Filete fino; logotipo gótico "Diário do Investidor" GRANDE centralizado; filete fino.
+- Linha de expediente em maiúsculas pequenas espaçadas: "${dataEdicao}" à esquerda, "POR PEDRO RABELO" no centro, "R$ 0,00 · GRÁTIS PRA QUEM CONSTRÓI" à direita; abaixo, filete DUPLO (grosso + fino).
+- Tarja vermelha "URGENTE" + caixinha de borda preta com a editoria "${temaLabel.toUpperCase()}".
+- MANCHETE gigante em serif (as palavras entre **asteriscos** ficam em vermelho); sublead em itálico abaixo.
+- Se o conteúdo pedir foto: moldura fina preta e fotolegenda em itálico embaixo.
+
+PÁGINAS INTERNAS: cabeçalho compacto (logotipo gótico menor à esquerda + data à direita, filete duplo, e a SEÇÃO centralizada em maiúsculas espaçadas):
+- Seção "O FATO": título serif + texto corrido + "Fonte: ${fonteVeiculo}" em itálico pequeno no fim.
+- Seção "OPINIÃO": carimbo vermelho vazado "OPINIÃO" + "por Pedro Rabelo" em itálico; título serif em ITÁLICO; aspas gigantes vermelho-claro ao fundo.
+- Seção "E O SEU NEGÓCIO?": o conteúdo dentro de uma CAIXA de borda dupla preta.
+- Seção "EXPEDIENTE" (último slide): texto do fecho + filete duplo + o BORDÃO em letra gótica VERMELHA grande: "Você leu aqui primeiro." + linha "PEDRO RABELO · @PEDRORABELO" em maiúsculas espaçadas.
+
+RODAPÉ (todos os slides): filete fino; "Diário do Investidor" gótico pequeno à esquerda; "PÁG. 0X/0N" ao centro; "continua →" em itálico vermelho à direita (no último slide: "@pedrorabelo ■").
+
+PROIBIDO: fundo escuro, sans-serif, cores além de papel/preto/vermelho, foto do rosto do Pedro, emojis, ícones de app.
+
+CONTEÚDO DE CADA SLIDE (use exatamente este texto; **trechos entre asteriscos** = vermelho; os marcadores [TIPO: ...] indicam a seção de cada slide):
+
+${slidesSemLegenda}`;
+
       const { data: inserted, error: insertError } = await supabase
         .from("generated_contents")
         .insert({
@@ -813,6 +859,8 @@ E entao a LEGENDA, que ABRE com a fala de ancora do quadro (nesse espirito: "E a
           content_type: "instagram_carousel",
           format_id: null,
           content_text: contentText,
+          image_prompt: designPrompt,
+          image_model: "prompt-only",
           source_map: result.source_map,
           generation_params: {
             atualidades: true,
@@ -827,31 +875,18 @@ E entao a LEGENDA, que ABRE com a fala de ancora do quadro (nesse espirito: "E a
         .single();
       if (insertError) throw insertError;
 
-      // Image prompt FORA do orcamento da request (after() roda pos-resposta):
-      // a cadeia gemini -> fallback GPT-4o pode passar de 60s e, somada ao
-      // generateContent, estourava o teto de 120s. Admin client dispensa sessao.
-      const contentId = inserted.id as string;
-      after(async () => {
-        try {
-          const promptResult = await generateImagePrompt(result.content_text, "instagram_carousel");
-          if (!("error" in promptResult)) {
-            const adminPos = await createAdminClient();
-            await adminPos
-              .from("generated_contents")
-              .update({ image_prompt: promptResult.image_prompt, image_model: "prompt-only" })
-              .eq("id", contentId);
-          }
-        } catch (e) {
-          log.error("[Atualidades] Image prompt error: " + String(e));
-        }
-      });
-      return { id: contentId, content: contentText, opcao: angulo.chave };
+      return {
+        id: inserted.id as string,
+        content: contentText,
+        opcao: angulo.chave,
+        imagePrompt: designPrompt,
+      };
     };
 
     // As 2 opcoes EM PARALELO: ~1 tempo de geracao por noticia, bem dentro
     // do teto de 120s. allSettled: uma opcao falhar nao derruba a outra.
     const settled = await Promise.allSettled(ANGULOS_ATUALIDADES.map((a) => gerarOpcao(a)));
-    const posts: { id: string; content: string; opcao: string }[] = [];
+    const posts: { id: string; content: string; opcao: string; imagePrompt: string }[] = [];
     for (const s of settled) {
       if (s.status === "fulfilled") posts.push(s.value);
     }
