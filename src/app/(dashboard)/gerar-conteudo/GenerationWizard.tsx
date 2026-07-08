@@ -50,7 +50,7 @@ const SOURCE_OPTIONS = [
 
 // Pseudo-tipo do wizard: "atualidades" NAO e um ContentType do banco (os
 // posts sao salvos como instagram_carousel) — e um fluxo proprio do wizard,
-// igual ao case_empresa: escolher noticias no passo 2 e gerar 2 opcoes cada.
+// igual ao case_empresa: escolher noticias no passo 2 e gerar 1 edicao cada.
 type WizardType = ContentType | "atualidades";
 
 // Labels completos (usados nos resultados / lookup por valor)
@@ -939,9 +939,8 @@ function AtualidadesFields() {
       <p className="font-semibold text-accent">Sem campos extras</p>
       <p className="mt-1 leading-relaxed">
         Nada a preencher: você já escolheu as notícias na etapa anterior. Cada
-        notícia vira 2 edições do <strong>DIÁRIO DO INVESTIDOR</strong> (a
-        leitura contrária e o &quot;o que fazer com isso&quot;), no template de
-        jornal, direto na aba Salvos.
+        notícia vira 1 edição do <strong>DIÁRIO DO INVESTIDOR</strong> no
+        template de jornal, direto na aba Salvos.
       </p>
     </div>
   );
@@ -1656,7 +1655,7 @@ export default function GenerationWizard({
   const [suggestionsError, setSuggestionsError] = useState("");
   const [seenSuggestions, setSeenSuggestions] = useState<string[]>([]);
   // Atualidades ("O que esta rolando"): a IA busca as noticias na web, o
-  // usuario SELECIONA as que quer (max 4) e cada uma vira 2 opcoes de post
+  // usuario SELECIONA as que quer (max 4) e cada uma vira 1 edicao do jornal
   const [noticias, setNoticias] = useState<Noticia[]>([]);
   const [loadingNoticias, setLoadingNoticias] = useState(false);
   const [noticiasError, setNoticiasError] = useState("");
@@ -1873,9 +1872,7 @@ export default function GenerationWizard({
                   sourceMap: null,
                   imagePrompt: p.imagePrompt,
                   atualidades: true,
-                  labelOverride: `${mancheteCurta} · ${
-                    p.opcao === "contraria" ? "Leitura contrária" : "O que fazer"
-                  }`,
+                  labelOverride: mancheteCurta,
                 });
               }
             } catch {
@@ -2068,9 +2065,9 @@ export default function GenerationWizard({
             )}
 
             <p className="mt-2 text-[11px] text-text-muted">
-              Cada notícia marcada vira 2 opções de post na voz do Pedro (a
-              leitura contrária e o &quot;o que fazer com isso&quot;). O limite é
-              de 10 buscas por dia — aproveite a lista antes de buscar de novo.
+              Cada notícia marcada vira 1 edição do DIÁRIO DO INVESTIDOR na
+              voz do Pedro. O limite é de 10 buscas por dia — aproveite a
+              lista antes de buscar de novo.
             </p>
           </div>
         ) : caseOnly ? (

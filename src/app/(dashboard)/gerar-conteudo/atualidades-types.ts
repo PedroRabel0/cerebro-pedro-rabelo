@@ -4,7 +4,7 @@
  * porque o actions.ts é "use server" e só pode exportar funções async.
  */
 
-export type TemaNoticia = "startups" | "ia" | "brasil" | "negocios";
+export type TemaNoticia = "empresas" | "marketing" | "vendas";
 
 export interface Noticia {
   id: string;

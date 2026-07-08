@@ -491,6 +491,10 @@ export async function deleteContent(id: string) {
 const ATUALIDADES_LIMITE_DIA = 10;
 
 const TEMA_LABEL: Record<string, string> = {
+  empresas: "Empresas BR",
+  marketing: "Marketing",
+  vendas: "Vendas",
+  // valores da versao anterior (posts antigos) — seguem renderizando
   startups: "Startups",
   ia: "IA",
   brasil: "Brasil",
@@ -542,18 +546,19 @@ export async function searchTrendingNews(): Promise<
   const model = "claude-sonnet-4-6";
   const inicio = Date.now();
 
-  const promptBusca = `Busque na web as noticias MAIS RELEVANTES e MAIS RECENTES do mundo dos negocios. Priorize as ultimas 24-72 horas; algo de poucos dias atras so entra se for grande demais pra ignorar (voce decide).
+  const promptBusca = `Busque na web as noticias MAIS RELEVANTES e MAIS RECENTES sobre estes 3 temas (e SOMENTE estes 3 — nada fora deles). Priorize as ultimas 24-72 horas; algo de poucos dias atras so entra se for grande demais pra ignorar.
 
-TEMAS QUE INTERESSAM:
-- startups: startups & venture capital (rodada relevante, IPO, venda de empresa, unicornio novo).
-- ia: inteligencia artificial (modelos novos, movimentos das big techs, IA aplicada a negocio).
-- brasil: Brasil (regulacao, banimento, big tech no pais, economia real).
-- negocios: negocios e lideranca em geral.
+OS 3 TEMAS (obrigatorio se ater a eles):
+- empresas: EMPRESAS DO BRASIL — movimentos de empresas brasileiras (expansao, aquisicao, resultado forte, virada, crise, lancamento relevante). Empresa estrangeira SO se o movimento for NO Brasil.
+- marketing: TENDENCIAS DE MARKETING — mudancas em plataformas (Instagram/TikTok/Meta/Google), campanhas que viraram assunto, dados novos de comportamento e midia, o que esta funcionando agora.
+- vendas: TENDENCIAS DE VENDAS — dados e movimentos de consumo/varejo/e-commerce, tecnicas e canais em alta, datas comerciais, o que muda na forma de vender.
 
-SEJA RAPIDO: use NO MAXIMO 3 buscas na web (uma varredura ampla + 1-2 complementares ja bastam; nao refine demais). LISTE de 8 a 10 noticias — descarte noticia morna e politica sem gancho de negocio. O filtro e: "o Pedro Rabelo (empresario, conteudo de negocios no Instagram) conseguiria dar uma opiniao forte em cima disso pra quem esta construindo empresa?"
+FORA DE ESCOPO (descarte sem do): politica, macroeconomia sem gancho pratico, guerra de big techs la fora, rodada de startup gringa, fofoca corporativa. O filtro final e: "um EMPRESARIO BRASILEIRO que vende todo dia consegue USAR essa informacao?"
+
+SEJA RAPIDO: use NO MAXIMO 3 buscas na web (uma por tema ja resolve; nao refine demais). LISTE de 8 a 10 noticias, misturando os 3 temas.
 
 RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
-{"noticias":[{"id":"1","manchete":"a manchete em PT-BR","resumo":"1-2 frases objetivas do fato, com numeros concretos","tema":"startups|ia|brasil|negocios","fonte_veiculo":"nome do veiculo","fonte_url":"https://..."}]}`;
+{"noticias":[{"id":"1","manchete":"a manchete em PT-BR","resumo":"1-2 frases objetivas do fato, com numeros concretos","tema":"empresas|marketing|vendas","fonte_veiculo":"nome do veiculo","fonte_url":"https://..."}]}`;
 
   let totalIn = 0;
   let totalOut = 0;
@@ -657,9 +662,9 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
         id: String(i + 1),
         manchete: n.manchete.trim().slice(0, 300),
         resumo: n.resumo.trim().slice(0, 600),
-        tema: (["startups", "ia", "brasil", "negocios"].includes(n.tema)
+        tema: (["empresas", "marketing", "vendas"].includes(n.tema)
           ? n.tema
-          : "negocios") as Noticia["tema"],
+          : "empresas") as Noticia["tema"],
         fonte_veiculo: (n.fonte_veiculo || "").trim().slice(0, 120),
         fonte_url: (n.fonte_url || "").trim().slice(0, 500),
       }));
@@ -690,25 +695,10 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
   }
 }
 
-// Cada noticia selecionada vira 2 OPCOES de post com angulos diferentes —
-// o Pedro escolhe a melhor na aba Salvos.
-const ANGULOS_ATUALIDADES = [
-  {
-    chave: "contraria",
-    instrucao:
-      "A LEITURA CONTRARIA: o angulo que ninguem esta dando. Onde todo mundo ve uma coisa, o Pedro ve outra. Provocativo, contra-intuitivo, desconfortavel na medida certa.",
-  },
-  {
-    chave: "pratica",
-    instrucao:
-      "O QUE FAZER COM ISSO: o angulo pratico. O que essa noticia muda AMANHA pra quem esta construindo empresa: a decisao, o ajuste, a oportunidade concreta que ela abre.",
-  },
-] as const;
-
 /**
- * PASSO 2 — gera as opcoes de post (2 angulos em paralelo) para UMA noticia
- * selecionada. A UI chama em loop, uma noticia por vez, e recebe os posts
- * completos pra renderizar no passo RESULTADO do wizard.
+ * PASSO 2 — gera UMA edicao do DIARIO DO INVESTIDOR para UMA noticia
+ * selecionada. A UI chama em loop, uma noticia por vez, e recebe o post
+ * completo pra renderizar no passo RESULTADO do wizard.
  */
 export async function generateNewsPosts(
   noticia: Noticia
@@ -728,7 +718,7 @@ export async function generateNewsPosts(
   // hasOwnProperty: lookup direto aceitaria chaves do prototype ("toString")
   const tema = Object.prototype.hasOwnProperty.call(TEMA_LABEL, noticia?.tema)
     ? noticia.tema
-    : "negocios";
+    : "empresas";
   const temaLabel = TEMA_LABEL[tema];
   const fonteVeiculo = (noticia?.fonte_veiculo || "").trim().slice(0, 120) || "fonte não informada";
   const fonteUrl = (noticia?.fonte_url || "").trim().slice(0, 500);
@@ -747,17 +737,14 @@ export async function generateNewsPosts(
     ]);
     if (!identityRes.data) return { error: "Identidade do Pedro não configurada." };
 
-    const gerarOpcao = async (angulo: (typeof ANGULOS_ATUALIDADES)[number]) => {
-      const freeText = `REGRA ABSOLUTA: TODA A RESPOSTA EM PORTUGUES BRASILEIRO (PT-BR).
+    const freeText = `REGRA ABSOLUTA: TODA A RESPOSTA EM PORTUGUES BRASILEIRO (PT-BR).
 
-VOCE NAO E UM JORNAL. Pegue a noticia abaixo e de A LEITURA DO PEDRO em cima dela: o que isso significa pra quem esta construindo empresa. Nao e "aconteceu X" e sim "aconteceu X, e e por isso que Y importa pra voce". Tom direto, sem enrolacao, opiniao forte, de quem ja viveu isso na pele.
+VOCE NAO E UM JORNAL NEUTRO. Pegue a noticia abaixo e de A LEITURA DO PEDRO em cima dela: o que isso significa pra quem esta construindo empresa e vendendo todo dia. Nao e "aconteceu X" e sim "aconteceu X, e e por isso que Y importa pra voce". Tom direto, sem enrolacao, opiniao forte, de quem ja viveu isso na pele.
 
 A NOTICIA (fato real — use como materia-prima; NAO invente detalhes alem do que esta aqui):
 - MANCHETE: ${manchete}
 - O FATO: ${resumo}
 - FONTE: ${fonteVeiculo}${fonteUrl ? ` (${fonteUrl})` : ""}
-
-ANGULO OBRIGATORIO DESTA VERSAO — ${angulo.instrucao}
 
 FORMATO: o post e uma edicao do "DIARIO DO INVESTIDOR" — o quadro de JORNAL do Pedro no Instagram (carrossel, 6 a 8 slides). Pedro e o ancora-colunista: a redacao da O FATO (seco, com numeros) e o colunista assina a OPINIAO (a leitura dele). O design ja poe o cabecalho de jornal, a tarja URGENTE, o carimbo OPINIAO e o bordao final "Voce leu aqui primeiro." — voce so escreve o CONTEUDO.
 
@@ -767,9 +754,9 @@ PRIMEIRA LINHA DA RESPOSTA, exatamente assim: [MARCA: ${temaLabel} | #FF0000]
 
 **O FATO (1-2 slides) [TIPO: fato]:** o lide da noticia: quem, o que, quanto, quando. Concreto, com os numeros reais da noticia. Tom de redacao: direto, sem opiniao ainda. SEM foto.
 
-**OPINIAO (2-3 slides) [TIPO: opiniao]:** a coluna assinada do Pedro, em 1a pessoa ("na minha visao...", "o que pouca gente percebe..."). Provocador, com o conhecimento de quem constroi empresa. E o coracao do quadro. SEM foto.
+**OPINIAO (2-3 slides) [TIPO: opiniao]:** a coluna assinada do Pedro, em 1a pessoa ("na minha visao...", "o que pouca gente percebe..."). A LEITURA DELE COMPLETA: o angulo que ninguem esta dando E o que fazer com essa informacao. Provocador, com o conhecimento de quem constroi empresa. E o coracao do quadro. SEM foto.
 
-**E O SEU NEGOCIO? (1 slide) [TIPO: ponte]:** o que essa noticia muda AMANHA pra quem esta construindo empresa. Concreto. SEM foto.
+**E O SEU NEGOCIO? (1 slide) [TIPO: ponte]:** o que essa noticia muda AMANHA pra quem esta construindo empresa: a decisao, o ajuste, a oportunidade concreta. SEM foto.
 
 **ULTIMO SLIDE (expediente):** fecho forte do colunista + CTA com motivo concreto (salvar/comentar e POR QUE). NAO escreva bordao nem assinatura: o design assina "Voce leu aqui primeiro." sozinho.
 
@@ -780,132 +767,129 @@ LINGUAGEM SIMPLES: proibido jargao de MBA ("incumbente", "moat", "CAC", "market 
 FORMATO DE RESPOSTA: a linha [MARCA: ...], depois cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases, com os marcadores [TIPO: ...] nos slides do meio. Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
 E entao a LEGENDA, que ABRE com a fala de ancora do quadro (nesse espirito: "E ai! No DIARIO DO INVESTIDOR de hoje: ..."), segue com 3-4 paragrafos curtos complementando (nao repetindo) os slides, CTA e 5-8 hashtags no final. 100-130 palavras.`;
 
-      let result = await generateContent({
+    let result = await generateContent({
+      identity: identityRes.data,
+      contentType: "instagram_carousel",
+      freeText,
+      recentFeedbacks: feedbackRes.data ?? [],
+      rules: rulesRes.data ?? undefined,
+    });
+    // 529 Overloaded e transitorio: uma retentativa apos 3s salva o post
+    if ("error" in result && /overloaded|529|50[023]/i.test(result.error)) {
+      await new Promise((r) => setTimeout(r, 3_000));
+      result = await generateContent({
         identity: identityRes.data,
         contentType: "instagram_carousel",
         freeText,
         recentFeedbacks: feedbackRes.data ?? [],
         rules: rulesRes.data ?? undefined,
       });
-      // 529 Overloaded e transitorio: uma retentativa apos 3s salva a opcao
-      if ("error" in result && /overloaded|529|50[023]/i.test(result.error)) {
-        await new Promise((r) => setTimeout(r, 3_000));
-        result = await generateContent({
-          identity: identityRes.data,
-          contentType: "instagram_carousel",
-          freeText,
-          recentFeedbacks: feedbackRes.data ?? [],
-          rules: rulesRes.data ?? undefined,
-        });
-      }
-      if ("error" in result) throw new Error(result.error);
+    }
+    if ("error" in result) return { error: result.error };
 
-      // Linha FONTE no topo: o Pedro confere a noticia antes de postar. O
-      // parser do carrossel remove essa linha do design, e a legenda exibida
-      // no card vem depois de ---LEGENDA---, entao ela nao vaza pro post.
-      const contentText = `FONTE: ${fonteVeiculo}${fonteUrl ? ` — ${fonteUrl}` : ""}\n\n${result.content_text}`;
+    // Linha FONTE no topo: o Pedro confere a noticia antes de postar. O
+    // parser do carrossel remove essa linha do design, e a legenda exibida
+    // no card vem depois de ---LEGENDA---, entao ela nao vaza pro post.
+    const contentText = `FONTE: ${fonteVeiculo}${fonteUrl ? ` — ${fonteUrl}` : ""}\n\n${result.content_text}`;
 
-      // Prompt de design DETERMINISTICO (vai pro "Ver Prompt"): descreve o
-      // template do DIARIO DO INVESTIDOR em detalhe + o conteudo dos slides,
-      // pronto pra colar no Claude Design e sair IGUAL ao design do app.
-      // (O gerador generico de image prompt nao conhece o quadro e o design
-      // externo saia diferente da plataforma.)
-      const slidesSemLegenda = result.content_text.split(/-{2,}\s*LEGENDA\s*-{2,}/i)[0].trim();
-      const dataEdicao = new Intl.DateTimeFormat("pt-BR", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-        .format(new Date())
-        .toUpperCase();
-      const designPrompt = `Crie um carrossel de Instagram 1080x1080 — uma EDICAO DO JORNAL "DIÁRIO DO INVESTIDOR" (o quadro de noticias do Pedro Rabelo). Siga o design system A RISCA, sem inventar outro estilo:
+    // Prompt de design DETERMINISTICO (vai pro "Ver Prompt"): a especificacao
+    // COMPLETA do template — fontes nomeadas, cores por elemento e MEDIDAS de
+    // cada coisa no canvas de 1080px — + o conteudo dos slides. Pronto pra
+    // colar no Claude Design e sair IGUAL ao design do app.
+    const slidesSemLegenda = result.content_text.split(/-{2,}\s*LEGENDA\s*-{2,}/i)[0].trim();
+    const dataEdicao = new Intl.DateTimeFormat("pt-BR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+      .format(new Date())
+      .toUpperCase();
+    const designPrompt = `Crie um carrossel de Instagram — uma EDICAO DO JORNAL "DIÁRIO DO INVESTIDOR" (o quadro de noticias do Pedro Rabelo). REPRODUZA EXATAMENTE a especificacao abaixo; nao invente outro estilo, nao mude fontes nem cores.
 
-FUNDO: papel-jornal claro #F7F2E5 em TODOS os slides (nunca escuro). Tinta preta #151310. VERMELHO #FF0000 SOMENTE em: tarja URGENTE, carimbo OPINIÃO, grifos de palavras-chave, "continua →" e o bordão final.
+== CANVAS ==
+1080x1080px por slide. Margens: 84px nas laterais, 56px no topo, 140px embaixo (area do rodape).
 
-TIPOGRAFIA (nada de sans-serif):
-- Logotipo do jornal: letra GÓTICA de jornalão (estilo do masthead do New York Times): "Diário do Investidor".
-- Manchetes: serif editorial pesada (Playfair Display ou similar).
-- Texto corrido: serif de leitura (Lora ou similar).
+== CORES (exatas) ==
+- Fundo de TODOS os slides: papel-jornal #F7F2E5 (nunca escuro).
+- Tinta do texto: #151310. Texto secundario/expediente: #5C5648.
+- VERMELHO #FF0000 SOMENTE em: tarja URGENTE, borda e texto do carimbo OPINIÃO, palavras grifadas, "continua →" e o bordão final.
 
-CAPA (slide 1 = primeira página):
-- Filete fino; logotipo gótico "Diário do Investidor" GRANDE centralizado; filete fino.
-- Linha de expediente em maiúsculas pequenas espaçadas: "${dataEdicao}" à esquerda, "POR PEDRO RABELO" no centro, "R$ 0,00 · GRÁTIS PRA QUEM CONSTRÓI" à direita; abaixo, filete DUPLO (grosso + fino).
-- Tarja vermelha "URGENTE" + caixinha de borda preta com a editoria "${temaLabel.toUpperCase()}".
-- MANCHETE gigante em serif (as palavras entre **asteriscos** ficam em vermelho); sublead em itálico abaixo.
-- Se o conteúdo pedir foto: moldura fina preta e fotolegenda em itálico embaixo.
+== FONTES (exatas; se nao tiver, use a mais proxima e avise) ==
+- Logotipo do jornal: "Pirata One" (gotica de jornalao, estilo masthead do New York Times). SEMPRE para "Diário do Investidor" e para o bordão.
+- Manchetes e titulos: "Playfair Display" (pesos 800-900).
+- Texto corrido, expediente e legendas: "Lora" (400-600, italico onde indicado).
+- PROIBIDO sans-serif em qualquer lugar.
 
-PÁGINAS INTERNAS: cabeçalho compacto (logotipo gótico menor à esquerda + data à direita, filete duplo, e a SEÇÃO centralizada em maiúsculas espaçadas):
-- Seção "O FATO": título serif + texto corrido + "Fonte: ${fonteVeiculo}" em itálico pequeno no fim.
-- Seção "OPINIÃO": carimbo vermelho vazado "OPINIÃO" + "por Pedro Rabelo" em itálico; título serif em ITÁLICO; aspas gigantes vermelho-claro ao fundo.
-- Seção "E O SEU NEGÓCIO?": o conteúdo dentro de uma CAIXA de borda dupla preta.
-- Seção "EXPEDIENTE" (último slide): texto do fecho + filete duplo + o BORDÃO em letra gótica VERMELHA grande: "Você leu aqui primeiro." + linha "PEDRO RABELO · @PEDRORABELO" em maiúsculas espaçadas.
+== SLIDE 1 (CAPA = primeira pagina) ==
+1. Filete fino preto (1.5px), largura total util.
+2. "Diário do Investidor" em Pirata One 92px, preto, CENTRALIZADO.
+3. Filete fino preto (1.5px).
+4. Linha de expediente em Lora 18px MAIUSCULAS espacadas (cor #5C5648), justificada nas pontas: "${dataEdicao}" a esquerda | "POR PEDRO RABELO" no centro | "R$ 0,00 · GRÁTIS PRA QUEM CONSTRÓI" a direita.
+5. FILETE DUPLO: barra preta 5px + linha 1.5px logo abaixo (5px de vao).
+6. Linha com: tarja vermelha #FF0000 com "URGENTE" em branco (Lora 21px, espacamento 0.24em, padding 7x18px) + caixinha de borda preta 2px com a editoria "${temaLabel.toUpperCase()}" (Lora 20px espacada).
+7. MANCHETE em Playfair Display 900, 78px, entrelinha 1.04, preto #151310 — palavras entre **asteriscos** em #FF0000.
+8. Sublead em Lora ITALICO 28px, cor #3E382C.
+9. Se houver [FOTO: ...]: retangulo com moldura preta 3px, ~300px de altura; abaixo, a fotolegenda em Lora italico 19px #5C5648 com linha fina embaixo.
 
-RODAPÉ (todos os slides): filete fino; "Diário do Investidor" gótico pequeno à esquerda; "PÁG. 0X/0N" ao centro; "continua →" em itálico vermelho à direita (no último slide: "@pedrorabelo ■").
+== SLIDES INTERNOS (cabecalho compacto em todos) ==
+Topo: "Diário do Investidor" em Pirata One 42px a esquerda + data em Lora 19px espacada a direita; FILETE DUPLO; abaixo, o NOME DA SEÇÃO centralizado em Lora 22px, MAIUSCULAS, espacamento 0.32em, com linha fina embaixo.
+- Seção "O FATO": titulo Playfair 800 52px + texto Lora 29px entrelinha 1.62 (#2A251B) + "Fonte: ${fonteVeiculo}" em Lora italico 20px #5C5648 no fim.
+- Seção "OPINIÃO": carimbo vazado (borda #FF0000 3px, texto "OPINIÃO" vermelho 20px espacado) + "por Pedro Rabelo" em Lora italico 23px; titulo Playfair 800 ITALICO 50px; aspas gigantes decorativas (~260px) em vermelho 10% de opacidade no canto superior direito; texto Lora 29px.
+- Seção "E O SEU NEGÓCIO?": todo o conteudo dentro de uma CAIXA de borda preta 3px com segunda borda fina 1.5px afastada 6px (borda dupla de jornal); titulo Playfair 800 50px + texto Lora 29px.
+- Seção "EXPEDIENTE" (ultimo slide): texto do fecho (Playfair 48px + Lora 29px); depois FILETE DUPLO centralizado e o BORDÃO em Pirata One 58px VERMELHO #FF0000: "Você leu aqui primeiro."; abaixo, "PEDRO RABELO · @PEDRORABELO" em Lora 21px maiusculas espacadas.
 
-PROIBIDO: fundo escuro, sans-serif, cores além de papel/preto/vermelho, foto do rosto do Pedro, emojis, ícones de app.
+== RODAPE (todos os slides, dentro dos 140px de baixo) ==
+Linha fina preta; abaixo, em uma linha: "Diário do Investidor" em Pirata One 26px a esquerda | "PÁG. 0X/0N" em Lora 19px espacada ao centro | "continua →" em Lora ITALICO 20px VERMELHO a direita (no ULTIMO slide, troque por "@pedrorabelo ■" em #5C5648).
 
-CONTEÚDO DE CADA SLIDE (use exatamente este texto; **trechos entre asteriscos** = vermelho; os marcadores [TIPO: ...] indicam a seção de cada slide):
+== PROIBIDO ==
+Fundo escuro; sans-serif; cores fora de papel/preto/vermelho; foto do rosto do Pedro; emojis; icones de app; sombras e gradientes.
+
+== CONTEUDO DOS SLIDES (use exatamente este texto; **trechos entre asteriscos** = vermelho; [TIPO: ...] indica a seção do slide) ==
 
 ${slidesSemLegenda}`;
 
-      const { data: inserted, error: insertError } = await supabase
-        .from("generated_contents")
-        .insert({
-          source_type: "free_text" as const,
-          playbook_id: null,
-          story_id: null,
-          free_text_input: manchete,
-          content_type: "instagram_carousel",
-          format_id: null,
-          content_text: contentText,
-          image_prompt: designPrompt,
-          image_model: "prompt-only",
-          source_map: result.source_map,
-          generation_params: {
-            atualidades: true,
-            opcao: angulo.chave,
-            tema,
-            fonte_veiculo: fonteVeiculo,
-            fonte_url: fonteUrl,
-          },
-          status: "draft",
-        })
-        .select("id")
-        .single();
-      if (insertError) throw insertError;
-
-      return {
-        id: inserted.id as string,
-        content: contentText,
-        opcao: angulo.chave,
-        imagePrompt: designPrompt,
-      };
-    };
-
-    // As 2 opcoes EM PARALELO: ~1 tempo de geracao por noticia, bem dentro
-    // do teto de 120s. allSettled: uma opcao falhar nao derruba a outra.
-    const settled = await Promise.allSettled(ANGULOS_ATUALIDADES.map((a) => gerarOpcao(a)));
-    const posts: { id: string; content: string; opcao: string; imagePrompt: string }[] = [];
-    for (const s of settled) {
-      if (s.status === "fulfilled") posts.push(s.value);
-    }
+    const { data: inserted, error: insertError } = await supabase
+      .from("generated_contents")
+      .insert({
+        source_type: "free_text" as const,
+        playbook_id: null,
+        story_id: null,
+        free_text_input: manchete,
+        content_type: "instagram_carousel",
+        format_id: null,
+        content_text: contentText,
+        image_prompt: designPrompt,
+        image_model: "prompt-only",
+        source_map: result.source_map,
+        generation_params: {
+          atualidades: true,
+          tema,
+          fonte_veiculo: fonteVeiculo,
+          fonte_url: fonteUrl,
+        },
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (insertError) throw insertError;
 
     revalidatePath(PATH);
-    if (posts.length === 0) {
-      const primeiroErro = settled.find(
-        (s): s is PromiseRejectedResult => s.status === "rejected"
-      );
-      const detalhe =
-        primeiroErro?.reason instanceof Error ? primeiroErro.reason.message : "";
-      log.error("[Atualidades] nenhuma opcao gerada: " + detalhe);
-      return { error: `Falha ao gerar os posts de "${manchete.slice(0, 60)}...".` };
-    }
-    return { posts, manchete };
+    return {
+      posts: [
+        {
+          id: inserted.id as string,
+          content: contentText,
+          opcao: "edicao",
+          imagePrompt: designPrompt,
+        },
+      ],
+      manchete,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "erro desconhecido";
     log.error("[Atualidades] geracao falhou: " + message);
-    return { error: `Falha ao gerar os posts de "${manchete.slice(0, 60)}...".` };
+    return { error: `Falha ao gerar o post de "${manchete.slice(0, 60)}...".` };
   }
 }
 
