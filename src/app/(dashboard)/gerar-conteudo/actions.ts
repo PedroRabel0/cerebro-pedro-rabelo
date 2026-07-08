@@ -574,29 +574,50 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
       turno < 4 && ORCAMENTO_MS - (Date.now() - inicio) >= 30_000;
       turno++
     ) {
-      const restante = ORCAMENTO_MS - (Date.now() - inicio);
-      const stream = anthropic.messages.stream(
-        {
-          model,
-          max_tokens: 4000,
-          system:
-            "Voce e o radar de noticias do Pedro Rabelo (empresario brasileiro, conteudo de negocios no Instagram). Voce busca na web RAPIDO (poucas buscas), escolhe as noticias com gancho de negocio e responde SEMPRE e SOMENTE com o JSON pedido, em PT-BR.",
-          messages: mensagens,
-          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
-        },
-        { timeout: Math.min(150_000, restante) }
-      );
-      // O timeout do SDK so limita o INICIO da resposta (e limpo quando os
-      // headers chegam); a DURACAO do stream e limitada aqui: aborta no fim
-      // do orcamento pra plataforma nunca matar a funcao (o abort cai no
-      // catch e o finally loga o custo das buscas ja feitas).
-      const aborta = setTimeout(() => stream.abort(), restante);
-      let msg: Anthropic.Message;
-      try {
-        msg = await stream.finalMessage();
-      } finally {
-        clearTimeout(aborta);
+      // Retry proprio para falha TRANSITORIA e RAPIDA (529 Overloaded, 5xx):
+      // o maxRetries 0 do client e de proposito (nao dobrar chamada longa),
+      // mas um "Overloaded" chega em ~1s e derrubava a busca inteira — em
+      // producao foi exatamente o que aconteceu. So retenta quando a falha
+      // foi imediata (<10s) e o orcamento ainda comporta.
+      let msg: Anthropic.Message | null = null;
+      for (let tentativa = 1; msg === null && tentativa <= 3; tentativa++) {
+        const restante = ORCAMENTO_MS - (Date.now() - inicio);
+        if (restante < 20_000) break;
+        const stream = anthropic.messages.stream(
+          {
+            model,
+            max_tokens: 4000,
+            system:
+              "Voce e o radar de noticias do Pedro Rabelo (empresario brasileiro, conteudo de negocios no Instagram). Voce busca na web RAPIDO (poucas buscas), escolhe as noticias com gancho de negocio e responde SEMPRE e SOMENTE com o JSON pedido, em PT-BR.",
+            messages: mensagens,
+            tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
+          },
+          { timeout: Math.min(150_000, restante) }
+        );
+        // O timeout do SDK so limita o INICIO da resposta (e limpo quando os
+        // headers chegam); a DURACAO do stream e limitada aqui: aborta no fim
+        // do orcamento pra plataforma nunca matar a funcao (o abort cai no
+        // catch e o finally loga o custo das buscas ja feitas).
+        const aborta = setTimeout(() => stream.abort(), restante);
+        const inicioTentativa = Date.now();
+        try {
+          msg = await stream.finalMessage();
+        } catch (err) {
+          const falhaRapida = Date.now() - inicioTentativa < 10_000;
+          const transitoria =
+            err instanceof Error && /overloaded|529|50[023]/i.test(err.message);
+          if (tentativa < 3 && falhaRapida && transitoria) {
+            log.info(`[Atualidades] API sobrecarregada (tentativa ${tentativa}) — retentando...`);
+            await new Promise((r) => setTimeout(r, 3_000 * tentativa));
+            continue;
+          }
+          throw err;
+        } finally {
+          clearTimeout(aborta);
+        }
       }
+      if (msg === null) break; // orcamento esgotado retentando
+
       totalIn += msg.usage.input_tokens;
       totalOut += msg.usage.output_tokens;
       totalBuscas +=
@@ -757,13 +778,24 @@ LINGUAGEM SIMPLES: proibido jargao de MBA ("incumbente", "moat", "CAC", "market 
 FORMATO DE RESPOSTA: a linha [MARCA: ...], depois cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases, com os marcadores [TIPO: ...] nos slides do meio. Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
 E entao a LEGENDA: hook forte na primeira linha, 100-120 palavras, CTA e 5-8 hashtags no final.`;
 
-      const result = await generateContent({
+      let result = await generateContent({
         identity: identityRes.data,
         contentType: "instagram_carousel",
         freeText,
         recentFeedbacks: feedbackRes.data ?? [],
         rules: rulesRes.data ?? undefined,
       });
+      // 529 Overloaded e transitorio: uma retentativa apos 3s salva a opcao
+      if ("error" in result && /overloaded|529|50[023]/i.test(result.error)) {
+        await new Promise((r) => setTimeout(r, 3_000));
+        result = await generateContent({
+          identity: identityRes.data,
+          contentType: "instagram_carousel",
+          freeText,
+          recentFeedbacks: feedbackRes.data ?? [],
+          rules: rulesRes.data ?? undefined,
+        });
+      }
       if ("error" in result) throw new Error(result.error);
 
       // Linha FONTE no topo: o Pedro confere a noticia antes de postar. O
