@@ -1991,7 +1991,7 @@ export default function GenerationWizard({
             {loadingNoticias && (
               <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-6 text-sm text-text-muted">
                 <Loader2 className="h-4 w-4 animate-spin text-accent" />
-                Buscando o que rolou no mundo… (leva alguns segundos)
+                Buscando o que rolou no mundo… (normalmente ~1 minuto; em dia lento pode passar de 2)
               </div>
             )}
 
