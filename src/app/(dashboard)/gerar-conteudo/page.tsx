@@ -1,9 +1,9 @@
 export const dynamic = "force-dynamic";
-// 120s: as server actions desta pagina herdam este teto. A busca de
-// Atualidades (web search + pause_turn) passa de 60s com frequencia; com
-// Fluid Compute o plano Hobby permite ate 300s. As demais actions seguem
-// terminando bem antes.
-export const maxDuration = 120;
+// 300s (maximo do Hobby com Fluid Compute): as server actions desta pagina
+// herdam este teto. A busca de Atualidades (web search + pause_turn) chegou
+// a passar de 115s em producao — 120s abortava a busca no meio. As demais
+// actions seguem terminando em segundos.
+export const maxDuration = 300;
 
 import {
   getFormats,

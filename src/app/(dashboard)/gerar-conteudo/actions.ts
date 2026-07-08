@@ -530,12 +530,14 @@ export async function searchTrendingNews(): Promise<
 
   // Client dedicado: o getClient() tem timeout de 50s, que estoura com web
   // search. Streaming mantem a conexao viva; maxRetries 0 pra nao dobrar.
-  // O teto REAL e o maxDuration=120 da pagina de gerar-conteudo: o orcamento
-  // abaixo (turno novo so ate 80s decorridos + timeout de 100s por chamada)
-  // cabe nele com folga pro parse/retorno.
+  // O teto REAL e o maxDuration=300 da pagina de gerar-conteudo; o orcamento
+  // interno fecha em 280s pra sobrar folga pro parse/retorno. Em producao a
+  // busca chegou a passar de 115s — por isso o teto folgado + busca enxuta
+  // (max 3 web searches por instrucao e max_uses).
+  const ORCAMENTO_MS = 280_000;
   const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
-    timeout: 100_000,
+    timeout: 150_000,
     maxRetries: 0,
   });
   const model = "claude-sonnet-4-6";
@@ -549,7 +551,7 @@ TEMAS QUE INTERESSAM:
 - brasil: Brasil (regulacao, banimento, big tech no pais, economia real).
 - negocios: negocios e lideranca em geral.
 
-LISTE de 8 a 12 noticias — descarte noticia morna e politica sem gancho de negocio. O filtro e: "o Pedro Rabelo (empresario, conteudo de negocios no Instagram) conseguiria dar uma opiniao forte em cima disso pra quem esta construindo empresa?"
+SEJA RAPIDO: use NO MAXIMO 3 buscas na web (uma varredura ampla + 1-2 complementares ja bastam; nao refine demais). LISTE de 8 a 10 noticias — descarte noticia morna e politica sem gancho de negocio. O filtro e: "o Pedro Rabelo (empresario, conteudo de negocios no Instagram) conseguiria dar uma opiniao forte em cima disso pra quem esta construindo empresa?"
 
 RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
 {"noticias":[{"id":"1","manchete":"a manchete em PT-BR","resumo":"1-2 frases objetivas do fato, com numeros concretos","tema":"startups|ia|brasil|negocios","fonte_veiculo":"nome do veiculo","fonte_url":"https://..."}]}`;
@@ -565,24 +567,24 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
 
     // stop_reason "pause_turn": a API pausou um turno longo de web search —
     // reenvia com o conteudo acumulado ate terminar de verdade. Orcamento
-    // FECHADO no teto de 120s da pagina: cada chamada recebe so o tempo que
-    // resta (115s - decorrido) e turno novo so abre com >=20s de sobra.
+    // FECHADO: cada chamada recebe so o tempo que resta e turno novo so
+    // abre com >=30s de sobra.
     for (
       let turno = 0;
-      turno < 4 && 115_000 - (Date.now() - inicio) >= 20_000;
+      turno < 4 && ORCAMENTO_MS - (Date.now() - inicio) >= 30_000;
       turno++
     ) {
-      const restante = 115_000 - (Date.now() - inicio);
+      const restante = ORCAMENTO_MS - (Date.now() - inicio);
       const stream = anthropic.messages.stream(
         {
           model,
           max_tokens: 4000,
           system:
-            "Voce e o radar de noticias do Pedro Rabelo (empresario brasileiro, conteudo de negocios no Instagram). Voce busca na web, escolhe as noticias com gancho de negocio e responde SEMPRE e SOMENTE com o JSON pedido, em PT-BR.",
+            "Voce e o radar de noticias do Pedro Rabelo (empresario brasileiro, conteudo de negocios no Instagram). Voce busca na web RAPIDO (poucas buscas), escolhe as noticias com gancho de negocio e responde SEMPRE e SOMENTE com o JSON pedido, em PT-BR.",
           messages: mensagens,
-          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
+          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
         },
-        { timeout: Math.min(100_000, restante) }
+        { timeout: Math.min(150_000, restante) }
       );
       // O timeout do SDK so limita o INICIO da resposta (e limpo quando os
       // headers chegam); a DURACAO do stream e limitada aqui: aborta no fim
