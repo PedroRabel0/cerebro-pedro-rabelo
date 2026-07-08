@@ -757,26 +757,26 @@ A NOTICIA (fato real — use como materia-prima; NAO invente detalhes alem do qu
 
 ANGULO OBRIGATORIO DESTA VERSAO — ${angulo.instrucao}
 
-FORMATO: carrossel editorial (6 a 8 slides), mesmo modelo do "case analisado pelo Pedro":
+FORMATO: o post e uma edicao do "DIARIO DO INVESTIDOR" — o quadro de JORNAL do Pedro no Instagram (carrossel, 6 a 8 slides). Pedro e o ancora-colunista: a redacao da O FATO (seco, com numeros) e o colunista assina a OPINIAO (a leitura dele). O design ja poe o cabecalho de jornal, a tarja URGENTE, o carimbo OPINIAO e o bordao final "Voce leu aqui primeiro." — voce so escreve o CONTEUDO.
 
 PRIMEIRA LINHA DA RESPOSTA, exatamente assim: [MARCA: ${temaLabel} | #FF0000]
 
-**SLIDE 1 — CAPA:** manchete curta DO PEDRO sobre o fato (nao a manchete do jornal), maximo 12 palavras, + 1 linha de isca ("Isso muda mais coisa do que parece. Te explico."). SEM foto na capa (nao inclua [FOTO:]).
+**SLIDE 1 — CAPA (primeira pagina):** MANCHETE de jornal na voz do Pedro (nao a manchete do veiculo: a versao dele, com opiniao embutida), maximo 10 palavras. Na linha seguinte, 1 frase de sublead (o resumo-isca que faz querer virar a pagina). FOTO: pode incluir UM [FOTO: instrucao detalhada] na capa (print da noticia, grafico, foto do protagonista) — opcional.
 
-**O FATO (1-2 slides) [TIPO: historia]:** o que aconteceu, concreto, com os numeros da noticia. Se UMA imagem real agregar muito (print do anuncio, grafico da noticia), pode incluir NO MAXIMO UM marcador [FOTO: instrucao detalhada] em UM unico slide de fato — e opcional, prefira nenhum.
+**O FATO (1-2 slides) [TIPO: fato]:** o lide da noticia: quem, o que, quanto, quando. Concreto, com os numeros reais da noticia. Tom de redacao: direto, sem opiniao ainda. SEM foto.
 
-**A ANALISE DO PEDRO (2-3 slides) [TIPO: analise]:** a leitura DELE em 1a pessoa ("na minha visao...", "o que pouca gente percebe..."). Opiniao explicita, provocadora. SEM foto.
+**OPINIAO (2-3 slides) [TIPO: opiniao]:** a coluna assinada do Pedro, em 1a pessoa ("na minha visao...", "o que pouca gente percebe..."). Provocador, com o conhecimento de quem constroi empresa. E o coracao do quadro. SEM foto.
 
-**E A SUA EMPRESA? (1 slide) [TIPO: ponte]:** o que isso muda pra quem esta construindo empresa. SEM foto.
+**E O SEU NEGOCIO? (1 slide) [TIPO: ponte]:** o que essa noticia muda AMANHA pra quem esta construindo empresa. Concreto. SEM foto.
 
-**ULTIMO SLIDE:** fecho forte + CTA com motivo concreto (salvar/comentar e POR QUE).
+**ULTIMO SLIDE (expediente):** fecho forte do colunista + CTA com motivo concreto (salvar/comentar e POR QUE). NAO escreva bordao nem assinatura: o design assina "Voce leu aqui primeiro." sozinho.
 
-DESTAQUE EM VERMELHO: em cada slide, marque 1-3 palavras de MAIOR impacto entre **asteriscos duplos** (viram vermelho no design). Com parcimonia.
+DESTAQUE EM VERMELHO: em cada slide, marque 1-3 palavras de MAIOR impacto entre **asteriscos duplos** (viram o grifo vermelho do jornal). Com parcimonia.
 PONTUACAO: NUNCA use travessao (—) nem meia-risca (–) nos slides ou na legenda. Ponto, virgula ou dois-pontos.
 LINGUAGEM SIMPLES: proibido jargao de MBA ("incumbente", "moat", "CAC", "market share"). Palavra facil vale mais que palavra bonita. Numeros concretos.
 
 FORMATO DE RESPOSTA: a linha [MARCA: ...], depois cada slide numerado (SLIDE 1:, SLIDE 2:, ...) com titulo curto na primeira linha e 1-3 frases, com os marcadores [TIPO: ...] nos slides do meio. Depois de TODOS os slides, uma linha exatamente assim: ---LEGENDA---
-E entao a LEGENDA: hook forte na primeira linha, 100-120 palavras, CTA e 5-8 hashtags no final.`;
+E entao a LEGENDA, que ABRE com a fala de ancora do quadro (nesse espirito: "E ai! No DIARIO DO INVESTIDOR de hoje: ..."), segue com 3-4 paragrafos curtos complementando (nao repetindo) os slides, CTA e 5-8 hashtags no final. 100-130 palavras.`;
 
       let result = await generateContent({
         identity: identityRes.data,

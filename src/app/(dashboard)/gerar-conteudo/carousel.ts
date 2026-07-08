@@ -47,6 +47,12 @@ export interface ParsedCarousel {
    * dossie do case escolhe o LAYOUT pelo papel. null = sem papel declarado.
    */
   slideRoles: (string | null)[];
+  /**
+   * Credito da noticia (posts de Atualidades): conteudo da linha
+   * "FONTE: veiculo — url" do topo do content_text. O template de jornal
+   * exibe como credito; null nos demais formatos.
+   */
+  fonte: string | null;
 }
 
 const FOTO_RE = /\[\s*FOTO:\s*([^\]]+)\]/i;
@@ -76,7 +82,8 @@ function withPhotos(
   hook: string,
   slides: string[],
   cta: string,
-  brand: CompanyBrand | null = null
+  brand: CompanyBrand | null = null,
+  fonte: string | null = null
 ): ParsedCarousel {
   const h = extractPhoto(hook);
   const s = slides.map(extractPhoto);
@@ -88,6 +95,7 @@ function withPhotos(
     photoHints: [h.hint, ...s.map((x) => x.hint), c.hint],
     companyBrand: brand,
     slideRoles: [h.role ?? "capa", ...s.map((x) => x.role), c.role ?? "licao"],
+    fonte,
   };
 }
 
@@ -144,12 +152,15 @@ export function extractLegacyDesignPrompt(contentText: string | null): string | 
 /**
  * Linha "FONTE: veiculo — url" no topo do content_text (posts de
  * Atualidades): e metadado pro Pedro conferir a noticia, nao slide —
- * sem remover, ela viraria a capa do design.
+ * sem remover, ela viraria a capa do design. O conteudo capturado vira o
+ * credito de fonte no template de jornal.
  */
-const FONTE_LINE_RE = /^\s*FONTE:[^\n]*\n+/i;
+const FONTE_LINE_RE = /^\s*FONTE:\s*([^\n]*)\n+/i;
 
 export function parseCarouselSlides(rawContent: string): ParsedCarousel {
-  // 0) Identidade da empresa (case_empresa) — marcador na primeira linha
+  // 0) Credito da noticia (Atualidades) + identidade da empresa (case)
+  const mFonte = rawContent.match(FONTE_LINE_RE);
+  const fonte = mFonte?.[1]?.trim() || null;
   const { content, brand } = extractCompanyBrand(rawContent.replace(FONTE_LINE_RE, ""));
 
   // 1) Separa a legenda — ela e a descricao do post, NAO um slide.
@@ -167,7 +178,8 @@ export function parseCarouselSlides(rawContent: string): ParsedCarousel {
       slideParts[0],
       slideParts.slice(1, -1),
       slideParts[slideParts.length - 1],
-      brand
+      brand,
+      fonte
     );
   }
 
@@ -177,7 +189,7 @@ export function parseCarouselSlides(rawContent: string): ParsedCarousel {
     .map((s) => s.trim())
     .filter(Boolean);
   if (parts.length >= 3) {
-    return withPhotos(parts[0], parts.slice(1, -1), parts[parts.length - 1], brand);
+    return withPhotos(parts[0], parts.slice(1, -1), parts[parts.length - 1], brand, fonte);
   }
 
   // 4) Ultimo recurso: paragrafos.
@@ -186,6 +198,7 @@ export function parseCarouselSlides(rawContent: string): ParsedCarousel {
     (lines[0] || "").trim(),
     lines.slice(1, -1).map((s) => s.trim()),
     (lines[lines.length - 1] || "").trim(),
-    brand
+    brand,
+    fonte
   );
 }

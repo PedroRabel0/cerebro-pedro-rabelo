@@ -16,6 +16,7 @@ import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
 import CaseSlideDesigner from "@/components/CaseSlideDesigner";
+import JornalSlideDesigner from "@/components/JornalSlideDesigner";
 import {
   parseCarouselSlides,
   extractCaption,
@@ -1155,12 +1156,24 @@ export default function ContentList({
                         const parsed = parseCarouselSlides(c.content_text);
                         const designTitle =
                           c.free_text_input || c.playbook?.title || "Carousel";
-                        // Atualidades reusa o template editorial branco do
-                        // Cases (rotulo "Agora"), roteado por generation_params.
+                        // Atualidades = quadro de jornal DIARIO DO INVESTIDOR,
+                        // roteado por generation_params.
                         const isAtualidades = !!(
                           c.generation_params as { atualidades?: boolean } | null
                         )?.atualidades;
-                        return c.content_type === "case_empresa" || isAtualidades ? (
+                        return isAtualidades ? (
+                          <JornalSlideDesigner
+                            slides={parsed.slides}
+                            hook={parsed.hook}
+                            cta={parsed.cta}
+                            title={designTitle}
+                            photoHints={parsed.photoHints}
+                            slideRoles={parsed.slideRoles}
+                            fonte={parsed.fonte}
+                            dataPost={c.created_at}
+                            tema={parsed.companyBrand?.name ?? null}
+                          />
+                        ) : c.content_type === "case_empresa" ? (
                           <CaseSlideDesigner
                             slides={parsed.slides}
                             hook={parsed.hook}
@@ -1169,7 +1182,6 @@ export default function ContentList({
                             photoHints={parsed.photoHints}
                             slideRoles={parsed.slideRoles}
                             companyBrand={parsed.companyBrand}
-                            rotulo={isAtualidades ? "Agora" : undefined}
                           />
                         ) : (
                           <SlideDesigner

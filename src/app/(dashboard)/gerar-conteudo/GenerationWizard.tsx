@@ -8,6 +8,7 @@ import type { Noticia } from "./atualidades-types";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
 import CaseSlideDesigner from "@/components/CaseSlideDesigner";
+import JornalSlideDesigner from "@/components/JornalSlideDesigner";
 import { parseCarouselSlides } from "./carousel";
 import {
   Sparkles,
@@ -938,8 +939,9 @@ function AtualidadesFields() {
       <p className="font-semibold text-accent">Sem campos extras</p>
       <p className="mt-1 leading-relaxed">
         Nada a preencher: você já escolheu as notícias na etapa anterior. Cada
-        notícia vira 2 opções de post (a leitura contrária e o &quot;o que fazer
-        com isso&quot;), no carrossel editorial branco, direto na aba Salvos.
+        notícia vira 2 edições do <strong>DIÁRIO DO INVESTIDOR</strong> (a
+        leitura contrária e o &quot;o que fazer com isso&quot;), no template de
+        jornal, direto na aba Salvos.
       </p>
     </div>
   );
@@ -1007,7 +1009,19 @@ function CarouselDesignPreview({
     "Carousel";
 
   return (
-    contentType === "case_empresa" || atualidades ? (
+    atualidades ? (
+      // Atualidades = quadro de jornal DIARIO DO INVESTIDOR
+      <JornalSlideDesigner
+        slides={parsed.slides}
+        hook={parsed.hook}
+        cta={parsed.cta}
+        title={title}
+        photoHints={parsed.photoHints}
+        slideRoles={parsed.slideRoles}
+        fonte={parsed.fonte}
+        tema={parsed.companyBrand?.name ?? null}
+      />
+    ) : contentType === "case_empresa" ? (
       <CaseSlideDesigner
         slides={parsed.slides}
         hook={details.gancho || parsed.hook}
@@ -1016,7 +1030,6 @@ function CarouselDesignPreview({
         photoHints={parsed.photoHints}
         slideRoles={parsed.slideRoles}
         companyBrand={parsed.companyBrand}
-        rotulo={atualidades ? "Agora" : undefined}
       />
     ) : (
       <SlideDesigner
