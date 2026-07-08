@@ -8,7 +8,6 @@ import type { Noticia } from "./atualidades-types";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
 import CaseSlideDesigner from "@/components/CaseSlideDesigner";
-import JornalSlideDesigner from "@/components/JornalSlideDesigner";
 import { parseCarouselSlides } from "./carousel";
 import {
   Sparkles,
@@ -993,12 +992,10 @@ function CarouselDesignPreview({
   content,
   wizardState,
   contentType = "instagram_carousel",
-  atualidades = false,
 }: {
   content: string;
   wizardState: WizardState;
   contentType?: ContentType;
-  atualidades?: boolean;
 }) {
   const parsed = parseCarouselSlides(content);
   const details = wizardState.typeDetails[contentType] || {};
@@ -1008,19 +1005,7 @@ function CarouselDesignPreview({
     "Carousel";
 
   return (
-    atualidades ? (
-      // Atualidades = quadro de jornal DIARIO DO INVESTIDOR
-      <JornalSlideDesigner
-        slides={parsed.slides}
-        hook={parsed.hook}
-        cta={parsed.cta}
-        title={title}
-        photoHints={parsed.photoHints}
-        slideRoles={parsed.slideRoles}
-        fonte={parsed.fonte}
-        tema={parsed.companyBrand?.name ?? null}
-      />
-    ) : contentType === "case_empresa" ? (
+    contentType === "case_empresa" ? (
       <CaseSlideDesigner
         slides={parsed.slides}
         hook={details.gancho || parsed.hook}
@@ -1481,14 +1466,15 @@ function ResultCard({
       </div>
 
       {/* SlideDesigner for carousels (case_empresa: com slots de foto real) */}
-      {(result.contentType === "instagram_carousel" ||
-        result.contentType === "case_empresa") && (
+      {/* atualidades: o design e feito FORA (Claude Design, via Ver Prompt) */}
+      {!result.atualidades &&
+        (result.contentType === "instagram_carousel" ||
+          result.contentType === "case_empresa") && (
         <div className="mt-4">
           <CarouselDesignPreview
             content={text}
             wizardState={wizardState}
             contentType={result.contentType}
-            atualidades={result.atualidades}
           />
         </div>
       )}

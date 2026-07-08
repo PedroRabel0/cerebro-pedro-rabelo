@@ -1,12 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import {
-  Inter,
-  JetBrains_Mono,
-  Bebas_Neue,
-  Pirata_One,
-  Playfair_Display,
-  Lora,
-} from "next/font/google";
+import { Inter, JetBrains_Mono, Bebas_Neue } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
@@ -25,27 +18,6 @@ const bebasNeue = Bebas_Neue({
   variable: "--font-bebas",
   subsets: ["latin"],
   weight: "400",
-});
-
-// Fontes do quadro DIÁRIO DO INVESTIDOR (template de jornal do Atualidades):
-// gótica de masthead (logotipo do jornal), serif de manchete e serif de texto
-const pirataOne = Pirata_One({
-  variable: "--font-jornal-masthead",
-  subsets: ["latin", "latin-ext"],
-  weight: "400",
-});
-
-const playfair = Playfair_Display({
-  variable: "--font-jornal-manchete",
-  subsets: ["latin", "latin-ext"],
-  weight: ["700", "800", "900"],
-});
-
-const lora = Lora({
-  variable: "--font-jornal-texto",
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
 });
 
 export const viewport: Viewport = {
@@ -77,7 +49,7 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${inter.variable} ${jetbrainsMono.variable} ${bebasNeue.variable} ${pirataOne.variable} ${playfair.variable} ${lora.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${bebasNeue.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans bg-bg text-text">
         {children}

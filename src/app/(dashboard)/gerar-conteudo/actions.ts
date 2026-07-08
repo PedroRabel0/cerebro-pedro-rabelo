@@ -481,12 +481,12 @@ export async function deleteContent(id: string) {
 }
 
 // --- "O que esta rolando" (Atualidades) ---
-// Fluxo em 2 passos COM ESCOLHA DO USUARIO: searchTrendingNews busca na web
-// e devolve uma LISTA de 8-12 noticias (nao gera post nenhum); o Pedro marca
-// as que quer e a UI chama generateNewsPosts UMA VEZ POR NOTICIA (loop no
-// cliente) — cada chamada gera 2 opcoes de post EM PARALELO e fica dentro do
-// teto de 120s da pagina. Visual: o mesmo carrossel editorial fundo branco
-// do Cases de Empresas (roteado por generation_params.atualidades).
+// Fluxo em 2 passos COM ESCOLHA DO USUARIO: searchTrendingNews puxa as
+// manchetes do RSS do Google Noticias (gratis) e o Haiku filtra/resume em
+// uma LISTA de 8-10; o Pedro marca as que quer e a UI chama
+// generateNewsPosts UMA VEZ POR NOTICIA (loop no cliente), gerando 1 edicao
+// do DIARIO DO INVESTIDOR cada. O design NAO e renderizado na plataforma:
+// o Ver Prompt carrega a especificacao completa pro Claude Design.
 
 const ATUALIDADES_LIMITE_DIA = 10;
 
@@ -502,8 +502,10 @@ const TEMA_LABEL: Record<string, string> = {
 };
 
 /**
- * PASSO 1 — busca na web as noticias mais quentes de negocios e devolve a
- * LISTA pro Pedro escolher. Nao gera nem salva post nenhum.
+ * PASSO 1 — busca as noticias e devolve a LISTA pro Pedro escolher.
+ * BARATO de proposito: as manchetes vem do RSS do Google Noticias (gratis,
+ * ~2s) e a IA entra so pra FILTRAR/RESUMIR com o Haiku (centavos) — nada de
+ * web search pago. Custo por busca: ~US$ 0,005 (era ~US$ 0,05-0,08).
  */
 export async function searchTrendingNews(): Promise<
   { noticias: Noticia[] } | { error: string }
@@ -511,8 +513,8 @@ export async function searchTrendingNews(): Promise<
   await requireStaff();
 
   // Limite diario (10 buscas/dia): cada busca loga exatamente 1 linha com
-  // provider 'anthropic-web-search' no api_cost_log — contar essas linhas
-  // nas ultimas 24h e o marcador mais limpo sem criar coluna/migration.
+  // provider 'anthropic-web-search' no api_cost_log (o nome ficou como
+  // marcador do contador; a busca em si agora e RSS + Haiku).
   const admin = await createAdminClient();
   const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count, error: countError } = await admin
@@ -521,7 +523,7 @@ export async function searchTrendingNews(): Promise<
     .eq("provider", "anthropic-web-search")
     .gte("created_at", desde);
   if (countError) {
-    // Fail-CLOSED: sem conseguir checar o limite, nao gastamos busca paga.
+    // Fail-CLOSED: sem conseguir checar o limite, nao gastamos chamada de IA.
     log.error("[Atualidades] falha ao checar limite diario: " + countError.message);
     return {
       error: "Não consegui verificar o limite diário de Atualidades. Tente de novo em instantes.",
@@ -531,119 +533,135 @@ export async function searchTrendingNews(): Promise<
     return { error: "Limite diário atingido (10/dia). Tente amanhã." };
   }
 
-  // Client dedicado: o getClient() tem timeout de 50s, que estoura com web
-  // search. Streaming mantem a conexao viva; maxRetries 0 pra nao dobrar.
-  // O teto REAL e o maxDuration=300 da pagina de gerar-conteudo; o orcamento
-  // interno fecha em 280s pra sobrar folga pro parse/retorno. Em producao a
-  // busca chegou a passar de 115s — por isso o teto folgado + busca enxuta
-  // (max 3 web searches por instrucao e max_uses).
-  const ORCAMENTO_MS = 280_000;
-  const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    timeout: 150_000,
-    maxRetries: 0,
-  });
-  const model = "claude-sonnet-4-6";
-  const inicio = Date.now();
+  // 1) RSS do Google Noticias — 1 feed por tema, em paralelo, timeout 8s.
+  const FEEDS: { tema: Noticia["tema"]; url: string }[] = [
+    {
+      tema: "empresas",
+      url: "https://news.google.com/rss/search?q=" +
+        encodeURIComponent('empresa brasileira (aquisição OR expansão OR investimento OR resultado OR lançamento) when:3d') +
+        "&hl=pt-BR&gl=BR&ceid=BR:pt-419",
+    },
+    {
+      tema: "marketing",
+      url: "https://news.google.com/rss/search?q=" +
+        encodeURIComponent('marketing (Instagram OR TikTok OR "redes sociais" OR publicidade OR campanha) when:3d') +
+        "&hl=pt-BR&gl=BR&ceid=BR:pt-419",
+    },
+    {
+      tema: "vendas",
+      url: "https://news.google.com/rss/search?q=" +
+        encodeURIComponent('(vendas OR varejo OR "e-commerce" OR consumo) Brasil when:3d') +
+        "&hl=pt-BR&gl=BR&ceid=BR:pt-419",
+    },
+  ];
 
-  const promptBusca = `Busque na web as noticias MAIS RELEVANTES e MAIS RECENTES sobre estes 3 temas (e SOMENTE estes 3 — nada fora deles). Priorize as ultimas 24-72 horas; algo de poucos dias atras so entra se for grande demais pra ignorar.
+  interface ItemRss {
+    tema: Noticia["tema"];
+    titulo: string;
+    link: string;
+    veiculo: string;
+    data: string;
+  }
 
-OS 3 TEMAS (obrigatorio se ater a eles):
-- empresas: EMPRESAS DO BRASIL — movimentos de empresas brasileiras (expansao, aquisicao, resultado forte, virada, crise, lancamento relevante). Empresa estrangeira SO se o movimento for NO Brasil.
-- marketing: TENDENCIAS DE MARKETING — mudancas em plataformas (Instagram/TikTok/Meta/Google), campanhas que viraram assunto, dados novos de comportamento e midia, o que esta funcionando agora.
-- vendas: TENDENCIAS DE VENDAS — dados e movimentos de consumo/varejo/e-commerce, tecnicas e canais em alta, datas comerciais, o que muda na forma de vender.
+  function parseRss(xml: string, tema: Noticia["tema"]): ItemRss[] {
+    const itens: ItemRss[] = [];
+    const blocos = xml.split("<item>").slice(1);
+    for (const bloco of blocos.slice(0, 15)) {
+      const pega = (tag: string) => {
+        const m = bloco.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"));
+        return (m?.[1] || "")
+          .replace(/<!\[CDATA\[|\]\]>/g, "")
+          .replace(/&amp;/g, "&")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;|&apos;/g, "'")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .trim();
+      };
+      const titulo = pega("title");
+      const link = pega("link");
+      if (!titulo || !link) continue;
+      itens.push({
+        tema,
+        titulo: titulo.slice(0, 220),
+        link: link.slice(0, 500),
+        veiculo: pega("source").slice(0, 100),
+        data: pega("pubDate").slice(0, 40),
+      });
+    }
+    return itens;
+  }
 
-FORA DE ESCOPO (descarte sem do): politica, macroeconomia sem gancho pratico, guerra de big techs la fora, rodada de startup gringa, fofoca corporativa. O filtro final e: "um EMPRESARIO BRASILEIRO que vende todo dia consegue USAR essa informacao?"
+  try {
+    const respostas = await Promise.allSettled(
+      FEEDS.map(async (f) => {
+        const res = await fetch(f.url, {
+          signal: AbortSignal.timeout(8_000),
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; SegundoCerebro/1.0)" },
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(`RSS ${f.tema}: HTTP ${res.status}`);
+        return parseRss(await res.text(), f.tema);
+      })
+    );
+    const itens: ItemRss[] = [];
+    for (const r of respostas) {
+      if (r.status === "fulfilled") itens.push(...r.value);
+    }
+    if (itens.length === 0) {
+      return { error: "Não consegui puxar as manchetes agora (feeds fora do ar). Tente de novo em instantes." };
+    }
 
-SEJA RAPIDO: use NO MAXIMO 3 buscas na web (uma por tema ja resolve; nao refine demais). LISTE de 8 a 10 noticias, misturando os 3 temas.
+    // 2) Haiku FILTRA e RESUME (sem web search — centavos). O titulo do
+    //    Google News costuma vir como "Manchete - Veiculo".
+    const lista = itens
+      .map((i, idx) => `${idx + 1}. [${i.tema}] ${i.titulo}${i.veiculo ? ` | veiculo: ${i.veiculo}` : ""} | ${i.data} | ${i.link}`)
+      .join("\n");
+
+    const model = "claude-haiku-4-5-20251001";
+    const promptFiltro = `Voce e o radar de noticias do Pedro Rabelo (empresario brasileiro, conteudo de negocios no Instagram). Abaixo estao manchetes REAIS puxadas agora do Google Noticias, nos 3 temas do quadro dele: empresas (movimentos de empresas no Brasil), marketing (tendencias de marketing) e vendas (tendencias de vendas/consumo).
+
+ESCOLHA as 8 a 10 mais fortes. Filtro: "um empresario brasileiro que vende todo dia consegue USAR essa informacao?" DESCARTE: politica, macroeconomia sem gancho pratico, fofoca, noticia repetida (mesmo assunto = escolha 1), coluna de opiniao de terceiro.
+
+REGRAS:
+- manchete: reescreva LIMPA em PT-BR (sem o nome do veiculo no fim).
+- resumo: 1-2 frases objetivas com o que da pra afirmar PELO TITULO. NAO invente numeros nem detalhes que nao estao na manchete.
+- fonte_veiculo: o veiculo da manchete. fonte_url: o link EXATO da lista.
+- tema: o tema entre colchetes do item escolhido.
+
+MANCHETES:
+${lista}
 
 RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
-{"noticias":[{"id":"1","manchete":"a manchete em PT-BR","resumo":"1-2 frases objetivas do fato, com numeros concretos","tema":"empresas|marketing|vendas","fonte_veiculo":"nome do veiculo","fonte_url":"https://..."}]}`;
+{"noticias":[{"id":"1","manchete":"...","resumo":"...","tema":"empresas|marketing|vendas","fonte_veiculo":"...","fonte_url":"https://..."}]}`;
 
-  let totalIn = 0;
-  let totalOut = 0;
-  let totalBuscas = 0;
-  try {
-    let mensagens: Anthropic.MessageParam[] = [
-      { role: "user", content: promptBusca },
-    ];
-    let final: Anthropic.Message | null = null;
-
-    // stop_reason "pause_turn": a API pausou um turno longo de web search —
-    // reenvia com o conteudo acumulado ate terminar de verdade. Orcamento
-    // FECHADO: cada chamada recebe so o tempo que resta e turno novo so
-    // abre com >=30s de sobra.
-    for (
-      let turno = 0;
-      turno < 4 && ORCAMENTO_MS - (Date.now() - inicio) >= 30_000;
-      turno++
-    ) {
-      // Retry proprio para falha TRANSITORIA e RAPIDA (529 Overloaded, 5xx):
-      // o maxRetries 0 do client e de proposito (nao dobrar chamada longa),
-      // mas um "Overloaded" chega em ~1s e derrubava a busca inteira — em
-      // producao foi exatamente o que aconteceu. So retenta quando a falha
-      // foi imediata (<10s) e o orcamento ainda comporta.
-      let msg: Anthropic.Message | null = null;
-      for (let tentativa = 1; msg === null && tentativa <= 3; tentativa++) {
-        const restante = ORCAMENTO_MS - (Date.now() - inicio);
-        if (restante < 20_000) break;
-        const stream = anthropic.messages.stream(
-          {
-            model,
-            max_tokens: 4000,
-            system:
-              "Voce e o radar de noticias do Pedro Rabelo (empresario brasileiro, conteudo de negocios no Instagram). Voce busca na web RAPIDO (poucas buscas), escolhe as noticias com gancho de negocio e responde SEMPRE e SOMENTE com o JSON pedido, em PT-BR.",
-            messages: mensagens,
-            tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
-          },
-          { timeout: Math.min(150_000, restante) }
-        );
-        // O timeout do SDK so limita o INICIO da resposta (e limpo quando os
-        // headers chegam); a DURACAO do stream e limitada aqui: aborta no fim
-        // do orcamento pra plataforma nunca matar a funcao (o abort cai no
-        // catch e o finally loga o custo das buscas ja feitas).
-        const aborta = setTimeout(() => stream.abort(), restante);
-        const inicioTentativa = Date.now();
-        try {
-          msg = await stream.finalMessage();
-        } catch (err) {
-          const falhaRapida = Date.now() - inicioTentativa < 10_000;
-          const transitoria =
-            err instanceof Error && /overloaded|529|50[023]/i.test(err.message);
-          if (tentativa < 3 && falhaRapida && transitoria) {
-            log.info(`[Atualidades] API sobrecarregada (tentativa ${tentativa}) — retentando...`);
-            await new Promise((r) => setTimeout(r, 3_000 * tentativa));
-            continue;
-          }
-          throw err;
-        } finally {
-          clearTimeout(aborta);
-        }
+    const anthropic = getClient();
+    let response;
+    try {
+      response = await anthropic.messages.create({
+        model,
+        max_tokens: 3000,
+        messages: [{ role: "user", content: promptFiltro }],
+      });
+    } catch (err) {
+      // 529 Overloaded e transitorio: uma retentativa rapida resolve
+      if (err instanceof Error && /overloaded|529|50[023]/i.test(err.message)) {
+        await new Promise((r) => setTimeout(r, 3_000));
+        response = await anthropic.messages.create({
+          model,
+          max_tokens: 3000,
+          messages: [{ role: "user", content: promptFiltro }],
+        });
+      } else {
+        throw err;
       }
-      if (msg === null) break; // orcamento esgotado retentando
-
-      totalIn += msg.usage.input_tokens;
-      totalOut += msg.usage.output_tokens;
-      totalBuscas +=
-        (msg.usage as { server_tool_use?: { web_search_requests?: number } })
-          .server_tool_use?.web_search_requests ?? 0;
-
-      if (msg.stop_reason === "pause_turn") {
-        mensagens = [...mensagens, { role: "assistant", content: msg.content }];
-        continue;
-      }
-      final = msg;
-      break;
     }
 
-    if (!final) {
-      return { error: "A busca de notícias não terminou a tempo. Tente de novo." };
-    }
+    logCost(model, response.usage.input_tokens, response.usage.output_tokens);
+    // Marcador do limite diario (custo do RSS = zero; o do Haiku ja foi logado acima)
+    logApiCost("anthropic-web-search", "google-news-rss", 0, { unit: "busca", quantity: 1 });
 
-    // join("") — com web search a resposta vem FATIADA em varios text blocks
-    // nas fronteiras de citacao (inclusive no MEIO de uma string do JSON);
-    // juntar com "\n" injetaria newline cru dentro da string e quebraria o parse.
-    const texto = final.content
+    const texto = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
       .join("");
@@ -681,17 +699,6 @@ RESPONDA SOMENTE com JSON neste formato exato (sem texto antes ou depois):
     return {
       error: `Falha ao buscar as notícias. Detalhe técnico: ${message.slice(0, 200)}`,
     };
-  } finally {
-    // No finally de proposito: busca que FALHA no meio tambem gastou web
-    // searches cobradas — precisa entrar no custo E no marcador do limite
-    // diario (a linha 'anthropic-web-search' e o que o contador le).
-    if (totalIn + totalOut > 0 || totalBuscas > 0) {
-      logCost(model, totalIn, totalOut);
-    }
-    logApiCost("anthropic-web-search", "web_search", totalBuscas * 0.01, {
-      unit: "search",
-      quantity: totalBuscas,
-    });
   }
 }
 

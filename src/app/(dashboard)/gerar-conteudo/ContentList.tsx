@@ -16,7 +16,6 @@ import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
 import CaseSlideDesigner from "@/components/CaseSlideDesigner";
-import JornalSlideDesigner from "@/components/JornalSlideDesigner";
 import {
   parseCarouselSlides,
   extractCaption,
@@ -751,10 +750,16 @@ export default function ContentList({
           const imageUrls = parseImageUrls(freshImages[c.id] || c.image_url);
           const hasImage = imageUrls.length > 0;
           const isCopied = copiedId === c.id;
+          // Atualidades: o design e feito FORA da plataforma (Claude Design,
+          // via Ver Prompt) — sem botao Ver Design pra esses posts.
+          const isAtualidades = !!(
+            c.generation_params as { atualidades?: boolean } | null
+          )?.atualidades;
           const isCarousel =
-            c.content_type === "instagram_carousel" ||
-            c.content_type === "instagram_carousel_educativo" ||
-            c.content_type === "case_empresa";
+            !isAtualidades &&
+            (c.content_type === "instagram_carousel" ||
+              c.content_type === "instagram_carousel_educativo" ||
+              c.content_type === "case_empresa");
           const displayText = refinedTexts[c.id] || c.content_text;
           // A area de legenda mostra SO a legenda — nunca slides nem o bloco
           // de design que registros antigos salvaram grudado no content_text.
@@ -1156,24 +1161,7 @@ export default function ContentList({
                         const parsed = parseCarouselSlides(c.content_text);
                         const designTitle =
                           c.free_text_input || c.playbook?.title || "Carousel";
-                        // Atualidades = quadro de jornal DIARIO DO INVESTIDOR,
-                        // roteado por generation_params.
-                        const isAtualidades = !!(
-                          c.generation_params as { atualidades?: boolean } | null
-                        )?.atualidades;
-                        return isAtualidades ? (
-                          <JornalSlideDesigner
-                            slides={parsed.slides}
-                            hook={parsed.hook}
-                            cta={parsed.cta}
-                            title={designTitle}
-                            photoHints={parsed.photoHints}
-                            slideRoles={parsed.slideRoles}
-                            fonte={parsed.fonte}
-                            dataPost={c.created_at}
-                            tema={parsed.companyBrand?.name ?? null}
-                          />
-                        ) : c.content_type === "case_empresa" ? (
+                        return c.content_type === "case_empresa" ? (
                           <CaseSlideDesigner
                             slides={parsed.slides}
                             hook={parsed.hook}
