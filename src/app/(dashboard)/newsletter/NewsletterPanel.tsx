@@ -34,6 +34,21 @@ const statusLabel: Record<NewsletterStatus, string> = {
   sent: "enviada",
 };
 
+/** Data local em "YYYY-MM-DD" (formato do input type=date). */
+function toDateInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Segunda-feira da semana da data (semana comeca na segunda). */
+function mondayOf(d: Date): Date {
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return monday;
+}
+
 export default function NewsletterPanel({
   newsletters,
 }: {
@@ -44,17 +59,44 @@ export default function NewsletterPanel({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
-  const [theme, setTheme] = useState("");
-  const [weekLabel, setWeekLabel] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [focus, setFocus] = useState("");
+  const [genError, setGenError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Atalhos de periodo (semana comecando na segunda)
+  function fillLastWeek() {
+    const thisMonday = mondayOf(new Date());
+    const lastMonday = new Date(thisMonday);
+    lastMonday.setDate(thisMonday.getDate() - 7);
+    const lastSunday = new Date(thisMonday);
+    lastSunday.setDate(thisMonday.getDate() - 1);
+    setFromDate(toDateInput(lastMonday));
+    setToDate(toDateInput(lastSunday));
+  }
+
+  function fillThisWeek() {
+    const now = new Date();
+    setFromDate(toDateInput(mondayOf(now)));
+    setToDate(toDateInput(now));
+  }
 
   function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
-    if (!theme.trim()) return;
+    if (!fromDate || !toDate) return;
+    setGenError(null);
     startTransition(async () => {
-      await generateNewsletter(theme.trim(), weekLabel.trim() || undefined);
-      setTheme("");
-      setWeekLabel("");
+      const result = await generateNewsletter(
+        fromDate,
+        toDate,
+        focus.trim() || undefined
+      );
+      if (result && "error" in result) {
+        setGenError(result.error);
+        return;
+      }
+      setFocus("");
     });
   }
 
@@ -100,32 +142,77 @@ export default function NewsletterPanel({
     <div className="space-y-6">
       {/* Generator form */}
       <div className="rounded-2xl border border-border bg-card p-5">
-        <h3 className="mb-4 font-mono text-xs uppercase tracking-wider text-text-secondary">
-          Gerar Nova Newsletter
+        <h3 className="mb-1 font-mono text-xs uppercase tracking-wider text-text-secondary">
+          Gerar Recap da Semana
         </h3>
+        <p className="mb-4 text-xs text-text-muted">
+          Escolha o período: o Claude lê tudo que passou pela semana (conteúdo,
+          ideias, reuniões anonimizadas) e escreve a análise geral.
+        </p>
         <form onSubmit={handleGenerate} className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={fillLastWeek}
+              className="rounded-xl border border-border px-3 py-1.5 font-mono text-xs text-text-muted transition hover:border-accent/50 hover:text-text"
+            >
+              Semana passada
+            </button>
+            <button
+              type="button"
+              onClick={fillThisWeek}
+              className="rounded-xl border border-border px-3 py-1.5 font-mono text-xs text-text-muted transition hover:border-accent/50 hover:text-text"
+            >
+              Esta semana
+            </button>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                De
+              </span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                required
+                aria-label="Início do período"
+                className="rounded-xl border border-border bg-card px-3 py-2 text-sm text-text focus:border-accent focus:outline-none [color-scheme:dark]"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                Até
+              </span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                required
+                aria-label="Fim do período"
+                className="rounded-xl border border-border bg-card px-3 py-2 text-sm text-text focus:border-accent focus:outline-none [color-scheme:dark]"
+              />
+            </label>
+          </div>
           <input
-            value={theme}
-            onChange={(e) => setTheme(e.target.value)}
-            required
-            aria-label="Tema da newsletter"
-            placeholder="Tema da newsletter (ex: lideranca esta semana)"
+            value={focus}
+            onChange={(e) => setFocus(e.target.value)}
+            aria-label="Foco da newsletter (opcional)"
+            placeholder="Foco (opcional, ex: lideranca)"
             className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
-          <input
-            value={weekLabel}
-            onChange={(e) => setWeekLabel(e.target.value)}
-            aria-label="Label da semana"
-            placeholder="Label da semana (opcional, ex: Semana 1 - Junho 2026)"
-            className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
-          />
+          {genError && (
+            <p className="text-xs text-red" role="alert">
+              {genError}
+            </p>
+          )}
           <button
             type="submit"
-            disabled={isPending || !theme.trim()}
+            disabled={isPending || !fromDate || !toDate}
             className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 font-mono text-xs font-bold text-white transition hover:bg-accent-hover disabled:opacity-50"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            {isPending ? "Gerando..." : "Gerar Newsletter"}
+            {isPending ? "Lendo a semana e escrevendo…" : "Gerar Newsletter"}
           </button>
         </form>
       </div>

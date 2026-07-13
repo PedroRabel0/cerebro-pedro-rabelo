@@ -20,7 +20,7 @@ export default async function NewsletterPage() {
               Newsletter
             </h1>
             <p className="mt-0.5 text-sm text-text-secondary">
-              Gere newsletters semanais com IA
+              O recap da semana: escolha o período e a IA escreve a análise
             </p>
           </div>
         </div>
