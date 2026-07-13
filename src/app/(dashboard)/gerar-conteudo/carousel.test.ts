@@ -3,6 +3,7 @@ import {
   parseCarouselSlides,
   extractCaption,
   extractLegacyDesignPrompt,
+  buildCaseDesignPrompt,
 } from "./carousel";
 
 describe("extractCaption — area de legenda mostra SO a legenda", () => {
@@ -264,5 +265,56 @@ Legenda aqui`
   it("sem marcador retorna companyBrand null", () => {
     const r = parseCarouselSlides(`Capa\n\nMeio\n\nFim`);
     expect(r.companyBrand).toBeNull();
+  });
+});
+
+describe("buildCaseDesignPrompt — prompt de design deterministico do case", () => {
+  const CASE_TEXT = `[MARCA: Nubank | #820AD1 | nubank.com.br]
+SLIDE 1:
+O banco que venceu **sem agencia**
+Isso muda mais coisa do que parece. Te explico.
+[FOTO: cartao roxo do Nubank em 2014]
+
+SLIDE 2:
+O ano em que ninguem queria ser banco
+[TIPO: historia]
+Em 2013, tres fundadores alugaram uma casinha em Sao Paulo.
+
+SLIDE 3:
+Salva esse case pra nao esquecer.
+
+---LEGENDA---
+Legenda do post aqui. #nubank`;
+
+  it("monta a especificacao com a empresa do [MARCA:] e os slides", () => {
+    const p = buildCaseDesignPrompt(CASE_TEXT);
+    expect(p).not.toBeNull();
+    expect(p).toContain("Nubank");
+    expect(p).toContain("CASE · NUBANK");
+    expect(p).toContain("#FDFCF9");
+    expect(p).toContain("Bebas Neue");
+    // conteudo dos slides vai junto, com os marcadores de layout/foto
+    expect(p).toContain("O banco que venceu **sem agencia**");
+    expect(p).toContain("[TIPO: historia]");
+    expect(p).toContain("[FOTO: cartao roxo do Nubank em 2014]");
+  });
+
+  it("nao vaza a legenda nem a linha [MARCA:] pro prompt", () => {
+    const p = buildCaseDesignPrompt(CASE_TEXT)!;
+    expect(p).not.toContain("Legenda do post aqui");
+    expect(p).not.toContain("[MARCA:");
+  });
+
+  it("sem estrutura de SLIDEs (registro antigo) devolve null", () => {
+    expect(buildCaseDesignPrompt("Legenda solta sem slides")).toBeNull();
+    expect(buildCaseDesignPrompt(null)).toBeNull();
+    expect(buildCaseDesignPrompt("")).toBeNull();
+  });
+
+  it("sem [MARCA:] usa o rotulo generico de empresa", () => {
+    const p = buildCaseDesignPrompt(
+      `SLIDE 1:\nCapa\n\nSLIDE 2:\nMeio\n\nSLIDE 3:\nFim\n\n---LEGENDA---\nLegenda`
+    );
+    expect(p).toContain("a empresa analisada");
   });
 });

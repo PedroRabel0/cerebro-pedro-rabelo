@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { generateContent } from "@/lib/ai";
 import { getClient, logCost, parseJSON } from "@/lib/ai/client";
 import type { Noticia } from "./atualidades-types";
+import { buildCaseDesignPrompt } from "./carousel";
 import { generateImagePrompt } from "@/lib/ai/gemini";
 import { generateImage } from "@/lib/ai/image-gen";
 import { uploadImageToStorage } from "@/lib/supabase/storage";
@@ -1770,6 +1771,13 @@ REGRAS:
 - Cada slide deve ser legivel sem zoom no celular`;
       }
 
+      // Case de Empresa: o design NAO e renderizado na plataforma — o
+      // "Ver Prompt" carrega a especificacao completa do card editorial
+      // claro pro Claude Design (mesmo fluxo do Atualidades).
+      if (contentType === "case_empresa") {
+        designPromptBlock = buildCaseDesignPrompt(result.content_text);
+      }
+
       // Save to DB
       const { data: inserted, error: insertError } = await supabase
         .from("generated_contents")
@@ -1800,10 +1808,10 @@ REGRAS:
       if (insertError) throw insertError;
 
       // Generate image prompt inline (skip para tipos que ja tem bloco de
-      // design proprio — frase/educativo — senao ele sobrescreveria o bloco)
+      // design proprio — frase/educativo/case — senao ele sobrescreveria o
+      // bloco). case_empresa: o bloco e deterministico (acima) e as fotos
+      // sao REAIS (caixas no design), nada e gerado por IA.
       let imagePrompt: string | null = designPromptBlock;
-      // case_empresa tambem fica FORA do gerador de prompt de imagem:
-      // as fotos sao REAIS (slots no design), nada e gerado por IA.
       if (
         contentType !== "instagram_carousel_educativo" &&
         contentType !== "instagram_frase" &&
@@ -2029,7 +2037,12 @@ export async function refineContent(
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 50_000, maxRetries: 0 });
 
-    const hasPrompt = !!currentPrompt;
+    // case_empresa: o prompt de design e DETERMINISTICO (especificacao fixa
+    // do card editorial + slides) — a IA ajusta SO o texto e o prompt e
+    // remontado do texto ajustado. Deixar a IA reescrever mandaria o prompt
+    // pro padrao dos outros posts (ingles, fundo preto).
+    const isCase = contentType === "case_empresa";
+    const hasPrompt = !!currentPrompt && !isCase;
 
     const systemPrompt = hasPrompt
       ? `Voce e um editor de conteudo E de prompts de imagem para redes sociais.
@@ -2099,6 +2112,10 @@ Responda APENAS com o JSON, nada antes ou depois.`;
     } catch {
       // JSON parse failed — use raw response as text
       refinedText = rawResponse;
+    }
+
+    if (isCase) {
+      refinedPrompt = buildCaseDesignPrompt(refinedText);
     }
 
     // Save to DB

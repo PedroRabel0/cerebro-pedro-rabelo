@@ -7,7 +7,6 @@ import type { StorySuggestion, CaseSuggestion } from "./actions";
 import type { Noticia } from "./atualidades-types";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
-import CaseSlideDesigner from "@/components/CaseSlideDesigner";
 import { parseCarouselSlides } from "./carousel";
 import {
   Sparkles,
@@ -1005,26 +1004,14 @@ function CarouselDesignPreview({
     "Carousel";
 
   return (
-    contentType === "case_empresa" ? (
-      <CaseSlideDesigner
-        slides={parsed.slides}
-        hook={details.gancho || parsed.hook}
-        cta={details.cta || parsed.cta}
-        title={title}
-        photoHints={parsed.photoHints}
-        slideRoles={parsed.slideRoles}
-        companyBrand={parsed.companyBrand}
-      />
-    ) : (
-      <SlideDesigner
-        slides={parsed.slides}
-        hook={details.gancho || parsed.hook}
-        cta={details.cta || parsed.cta}
-        title={title}
-        hashtags={[]}
-        photoHints={parsed.photoHints}
-      />
-    )
+    <SlideDesigner
+      slides={parsed.slides}
+      hook={details.gancho || parsed.hook}
+      cta={details.cta || parsed.cta}
+      title={title}
+      hashtags={[]}
+      photoHints={parsed.photoHints}
+    />
   );
 }
 
@@ -1465,11 +1452,10 @@ function ResultCard({
         </div>
       </div>
 
-      {/* SlideDesigner for carousels (case_empresa: com slots de foto real) */}
-      {/* atualidades: o design e feito FORA (Claude Design, via Ver Prompt) */}
-      {!result.atualidades &&
-        (result.contentType === "instagram_carousel" ||
-          result.contentType === "case_empresa") && (
+      {/* SlideDesigner for carousels */}
+      {/* atualidades e case_empresa: o design e feito FORA (Claude Design,
+          via o painel de prompt acima / Ver Prompt na aba Salvos) */}
+      {!result.atualidades && result.contentType === "instagram_carousel" && (
         <div className="mt-4">
           <CarouselDesignPreview
             content={text}

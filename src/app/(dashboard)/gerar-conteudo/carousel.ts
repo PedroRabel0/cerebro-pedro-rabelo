@@ -157,6 +157,69 @@ export function extractLegacyDesignPrompt(contentText: string | null): string | 
  */
 const FONTE_LINE_RE = /^\s*FONTE:\s*([^\n]*)\n+/i;
 
+/**
+ * Prompt de design DETERMINISTICO do "Case de Empresa" (vai pro "Ver
+ * Prompt"): a especificacao COMPLETA do card editorial claro — fontes
+ * nomeadas, cores por elemento e MEDIDAS no canvas de 1080px — + o conteudo
+ * dos slides. Pronto pra colar no Claude Design, igual ao fluxo do DIARIO
+ * DO INVESTIDOR (Atualidades). Fundo CLARO proposital: todos os outros
+ * posts do app sao pretos; o case destaca no feed.
+ *
+ * Puro e sem IA de proposito: roda no servidor (geracao/ajuste) E no
+ * cliente, dando "Ver Prompt" aos cases salvos ANTES desta funcao existir
+ * (sem image_prompt no banco). Devolve null se o texto nao tem a estrutura
+ * de SLIDEs (registros antigos fora do padrao).
+ */
+export function buildCaseDesignPrompt(contentText: string | null): string | null {
+  if (!contentText) return null;
+  const { content, brand } = extractCompanyBrand(
+    contentText.replace(FONTE_LINE_RE, "")
+  );
+  const slidesSection = content.split(LEGENDA_RE)[0].trim();
+  if (!slidesSection || !/SLIDE\s*\d/i.test(slidesSection)) return null;
+  const empresa = brand?.name || "a empresa analisada";
+
+  return `Crie um carrossel de Instagram — um CASE DE EMPRESA analisado pelo Pedro Rabelo (${empresa}), no template CARD EDITORIAL CLARO dele. REPRODUZA EXATAMENTE a especificacao abaixo; nao invente outro estilo, nao mude fontes nem cores.
+
+== CANVAS ==
+1080x1080px por slide. Padding: 72px no topo, 90px nas laterais, 150px embaixo (area do rodape).
+
+== CORES (exatas) ==
+- Fundo: off-white #FDFCF9 em TODOS os slides (nunca escuro), EXCETO o slide da ponte ("E A SUA EMPRESA?"), que usa creme #F6F1E7.
+- Titulos: #111111. Texto corrido: #3A3529. Detalhes/cinza: #A39B86. Filetes/linhas: #E4DFD3.
+- VERMELHO #FF0000 SOMENTE em: quadradinho do cabecalho, kickers indicados abaixo, palavras destacadas, barra lateral da analise, seta de swipe e traco da assinatura.
+
+== FONTES (exatas; se nao tiver, use a mais proxima e avise) ==
+- Titulos e manchetes: "Bebas Neue" (a fonte de titulos do site do Pedro) — SEMPRE MAIUSCULAS, entrelinha ~1.0, espacamento 0.015em.
+- Todo o resto (corpo, kickers, rodape): "Inter" (ou sans-serif geometrica proxima). Numeracao do rodape em fonte monoespacada.
+
+== CABECALHO (todos os slides) ==
+Quadradinho VERMELHO #FF0000 de 20x20px + "Pedro Rabelo" em Inter 800 27px preto + "@pedrorabelo" em Inter 500 25px cinza #A39B86, na mesma linha com 18px de vao. SO NA CAPA, o logotipo da empresa entra na ponta direita: caixinha branca de 58x58px, borda fina #E4DFD3, cantos 10px (se nao tiver o logo, omita a caixinha). Abaixo, filete de 2px na cor #E4DFD3, a 24px.
+
+== LAYOUT POR TIPO DE SLIDE (o marcador [TIPO: ...] define o layout; primeiro slide = capa, ultimo = fecho) ==
+- CAPA: kicker "CASE · ${empresa.toUpperCase()}" em VERMELHO (Inter 800 21px, MAIUSCULAS, espacamento 0.24em, a 46px do filete); MANCHETE em Bebas Neue 92px, entrelinha 0.98; isca em Inter 500 31px cor #4A4436 (largura maxima 820px); caixa de foto de 330px de altura.
+- [TIPO: historia]: kicker "O CASO · ${empresa.toUpperCase()}" em cinza #A39B86; titulo Bebas Neue 64px; corpo Inter 29px, entrelinha 1.62 (largura maxima 860px); caixa de foto de 280px quando o slide tiver [FOTO: ...].
+- [TIPO: analise]: kicker "A LEITURA DO PEDRO" em VERMELHO; todo o conteudo dentro de um bloco com BARRA VERMELHA #FF0000 de 8px na borda esquerda e 36px de recuo interno; titulo Bebas Neue 62px; corpo Inter 29px entrelinha 1.62. SEM foto.
+- [TIPO: ponte]: FUNDO CREME #F6F1E7; kicker "E A SUA EMPRESA?" em VERMELHO; titulo Bebas Neue 70px, entrelinha 0.98; corpo Inter 30px entrelinha 1.6. SEM foto.
+- FECHO (ultimo slide): kicker "A LIÇÃO" em VERMELHO; titulo Bebas Neue 66px; corpo Inter 30px; abaixo do texto, a assinatura: traco VERMELHO de 64x3px + "Pedro Rabelo" em Bebas Neue 32px, espacamento 0.06em, cor #3A3529.
+
+== CAIXAS DE FOTO REAL ([FOTO: ...]) ==
+NENHUMA imagem e gerada por IA. Cada marcador [FOTO: instrucao] vira uma CAIXA PLACEHOLDER no slide: borda 2px #C9C2B0, cantos 4px, fundo #F2EEE3, com "FOTO" em VERMELHO 22px MAIUSCULAS espacadas no centro e a instrucao logo abaixo em #55503F 24px (largura maxima 680px). O Pedro troca a caixa pela foto real depois (a foto final leva moldura preta #111111 de 3px, cantos 4px).
+
+== RODAPE (todos os slides, na faixa de 150px de baixo) ==
+Na esquerda, a numeracao "01/NN" em monoespacada 22px cinza #A39B86 (NN = total de slides); na direita, a seta de swipe "→" em VERMELHO #FF0000, 62px. No ULTIMO slide, troque a seta por "@pedrorabelo" em Inter 700 22px cinza #A39B86 espacado.
+
+== DESTAQUES ==
+Trechos entre **asteriscos duplos** ficam em VERMELHO #FF0000, na mesma fonte e tamanho do texto ao redor — e o sublinhado do Pedro. NAO renderize os asteriscos.
+
+== PROIBIDO ==
+Fundo escuro/preto; manchete fora da Bebas Neue; foto ou avatar do rosto do Pedro; emojis e icones de app; sombras, gradientes e texturas; gerar imagem por IA no lugar das caixas de foto; escrever a seta "→" dentro do texto dos slides.
+
+== CONTEUDO DOS SLIDES (use exatamente este texto; [TIPO: ...] escolhe o layout; [FOTO: ...] vira caixa placeholder; **trechos entre asteriscos** = vermelho) ==
+
+${slidesSection}`;
+}
+
 export function parseCarouselSlides(rawContent: string): ParsedCarousel {
   // 0) Credito da noticia (Atualidades) + identidade da empresa (case)
   const mFonte = rawContent.match(FONTE_LINE_RE);

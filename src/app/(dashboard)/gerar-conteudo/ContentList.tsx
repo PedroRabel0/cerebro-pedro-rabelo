@@ -15,11 +15,11 @@ import {
 import { contentTypeBadgeColor, contentTypeLabel } from "./FormatList";
 import { filesToImageFiles } from "@/lib/pdf-client";
 import SlideDesigner from "@/components/SlideDesigner";
-import CaseSlideDesigner from "@/components/CaseSlideDesigner";
 import {
   parseCarouselSlides,
   extractCaption,
   extractLegacyDesignPrompt,
+  buildCaseDesignPrompt,
 } from "./carousel";
 import { useConfirm } from "@/components/ConfirmProvider";
 import {
@@ -750,11 +750,14 @@ export default function ContentList({
           const imageUrls = parseImageUrls(freshImages[c.id] || c.image_url);
           const hasImage = imageUrls.length > 0;
           const isCopied = copiedId === c.id;
-          // Atualidades: o design e feito FORA da plataforma (Claude Design,
-          // via Ver Prompt) — sem botao Ver Design pra esses posts.
+          // Atualidades e Case de Empresa: o design e feito FORA da
+          // plataforma (Claude Design, via Ver Prompt) — sem botao Ver
+          // Design pra esses posts. O case segue isCarousel=true pra
+          // manter o upload de multiplas imagens.
           const isAtualidades = !!(
             c.generation_params as { atualidades?: boolean } | null
           )?.atualidades;
+          const isCase = c.content_type === "case_empresa";
           const isCarousel =
             !isAtualidades &&
             (c.content_type === "instagram_carousel" ||
@@ -764,10 +767,13 @@ export default function ContentList({
           // A area de legenda mostra SO a legenda — nunca slides nem o bloco
           // de design que registros antigos salvaram grudado no content_text.
           const caption = extractCaption(displayText);
+          // Case: fallback deterministico da os cases salvos ANTES do prompt
+          // de design ser gravado em image_prompt (remontado dos slides).
           const displayPrompt =
             refinedPrompts[c.id] ||
             c.image_prompt ||
-            extractLegacyDesignPrompt(c.content_text);
+            extractLegacyDesignPrompt(c.content_text) ||
+            (isCase ? buildCaseDesignPrompt(c.content_text) : null);
 
           return (
             <div
@@ -1030,7 +1036,7 @@ export default function ContentList({
                       {promptId === c.id ? "Fechar Prompt" : "Ver Prompt"}
                     </button>
                   )}
-                  {isCarousel && (
+                  {isCarousel && !isCase && (
                     <button
                       onClick={() =>
                         setDesignId(designId === c.id ? null : c.id)
@@ -1154,24 +1160,14 @@ export default function ContentList({
                     }}
                   />
                 )}
-                {designId === c.id && isCarousel && (
+                {designId === c.id && isCarousel && !isCase && (
                   <div className="rounded-xl border border-border bg-surface/30 p-4">
                     {c.content_text && /SLIDE\s*\d/i.test(c.content_text) ? (
                       (() => {
                         const parsed = parseCarouselSlides(c.content_text);
                         const designTitle =
                           c.free_text_input || c.playbook?.title || "Carousel";
-                        return c.content_type === "case_empresa" ? (
-                          <CaseSlideDesigner
-                            slides={parsed.slides}
-                            hook={parsed.hook}
-                            cta={parsed.cta}
-                            title={designTitle}
-                            photoHints={parsed.photoHints}
-                            slideRoles={parsed.slideRoles}
-                            companyBrand={parsed.companyBrand}
-                          />
-                        ) : (
+                        return (
                           <SlideDesigner
                             slides={parsed.slides}
                             hook={parsed.hook}
