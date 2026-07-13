@@ -284,7 +284,7 @@ TOPICS: [3-6 topicos separados por virgula]
 - Portugues simples e acessivel, gostoso de ler — como alguem inteligente explicando pra um amigo no bar. SEM jargao corporativo, SEM enrolacao.
 - Frases curtas. Paragrafos curtos. Analogias e exemplos reais pra fixar a ideia.
 - Tom do Pedro: direto, opiniao forte, pratico. Tem que dar PRAZER de ler ate o fim.
-- NUNCA use travessao (—) nem meia-risca (–) como pontuacao: reescreva com ponto, virgula ou dois-pontos.
+- NUNCA use travessao (—) nem meia-risca (–) como pontuacao, em NENHUM campo: vale pro SUBJECT, pro TITLE, pros TOPICS e pro corpo. Reescreva com ponto, virgula ou dois-pontos.
 - Tudo em PT-BR.
 
 ## CONFIDENCIALIDADE (relembre antes de escrever):
