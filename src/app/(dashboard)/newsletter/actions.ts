@@ -237,11 +237,20 @@ Parte do material vem de reuniões PRIVADAS de consultoria/mentoria e vai virar 
 - Criadores PÚBLICOS de conteúdo (posts de referência) podem ser citados pela IDEIA; na dúvida, generalize.
 - Antes de finalizar, RELEIA o texto caçando qualquer nome ou detalhe identificável que tenha escapado e remova.`;
 
+    // Reforco de tom no system (as regras completas vao no user prompt):
+    // a newsletter e cronica, nao relatorio — o formato de "Fenomeno 1/2/3"
+    // e os tiques de IA foram reprovados pelo Pedro.
+    const tomReforco = `
+
+## TOM DA NEWSLETTER (REFORCO)
+A newsletter e uma CRONICA/CARTA fluida em primeira pessoa, NAO um relatorio: sem secoes carimbadas tipo "Fenomeno 1" ou titulos fixos que se repetem toda semana, sem cliches e ditados populares, sem paralelismo triplo perfeitinho, no maximo UMA frase de efeito por edicao, e sem se auto-referenciar ("essa semana postei sobre..."). Os assuntos se conectam com transicoes naturais e a ideia e entregue direto, como reflexao do Pedro.`;
+
     const systemPrompt =
       (identity
         ? buildContentGenerationSystemPrompt(identity)
         : "REGRA: TODA SUA RESPOSTA EM PT-BR. Voce e o ghostwriter do Pedro Rabelo.") +
-      confidencialidade;
+      confidencialidade +
+      tomReforco;
 
     const userPrompt = `## Tarefa
 Escreva a NEWSLETTER SEMANAL do Pedro: um RECAP do periodo ${weekLabel}. Abaixo esta TUDO que passou pela semana dele: o conteudo que ele publicou, as ideias de outros criadores que ele acompanha, os playbooks e historias que entraram na base e as reunioes de consultoria (CONFIDENCIAIS).
@@ -272,23 +281,33 @@ TITLE: [titulo da newsletter]
 TOPICS: [3-6 topicos separados por virgula]
 
 ---BODY---
-[A newsletter completa em Markdown, nesta estrutura:]
+[A newsletter completa em Markdown: uma CRONICA da semana, fluida de ponta a ponta. Ao longo do texto, SEM blocos rotulados nem secoes fixas, ela precisa: abrir com o fio condutor da semana em 2-3 linhas; desenvolver os 2-4 temas que apareceram repetido cruzando as fontes, conectados por transicoes naturais; deixar licoes aplicaveis com exemplos reais (anonimizados quando vierem de reuniao); e fechar com uma provocacao ou direcao pra semana seguinte.]
 
-1. **Abertura** — o "clima" da semana em 2-3 linhas: qual foi o fio condutor.
-2. **Os fenomenos da semana** — 2 a 4 temas que apareceram REPETIDO cruzando as fontes (conteudo do Pedro + outros criadores + reunioes anonimizadas). Subtitulo proprio pra cada fenomeno.
-3. **Os playbooks e licoes que ficaram** — o que foi ensinado/aprendido, de forma APLICAVEL: o leitor termina sabendo o que fazer diferente.
-4. **Exemplos reais** — sempre anonimizados quando vierem de reuniao ("um dos mentorados...", "uma empresa que acompanho...").
-5. **Fechamento** — uma provocacao ou direcao pra semana seguinte.
+## COMO ESCREVER (regras de tom — obrigatórias)
+- Escreva como um humano inteligente CONVERSANDO, em primeira pessoa. O texto FLUI como uma crônica/carta: os assuntos se conectam com transições naturais, não em blocos isolados.
+- Parágrafos curtos. Linguagem simples e direta. Opinião de verdade, com convicção.
+- Exemplos concretos e reais (anonimizados quando vierem de reunião).
 
-## LINGUAGEM (REGRA DURA):
-- Portugues simples e acessivel, gostoso de ler — como alguem inteligente explicando pra um amigo no bar. SEM jargao corporativo, SEM enrolacao.
-- Frases curtas. Paragrafos curtos. Analogias e exemplos reais pra fixar a ideia.
-- Tom do Pedro: direto, opiniao forte, pratico. Tem que dar PRAZER de ler ate o fim.
-- NUNCA use travessao (—) nem meia-risca (–) como pontuacao, em NENHUM campo: vale pro SUBJECT, pro TITLE, pros TOPICS e pro corpo. Reescreva com ponto, virgula ou dois-pontos.
-- Tudo em PT-BR.
+## NUNCA FAÇA (o que deixou o texto ruim antes):
+- NUNCA use estrutura de fôrma: proibido "Fenômeno 1 / Fenômeno 2 / Fenômeno 3", proibido títulos fixos que se repetem toda semana ("Os playbooks que ficaram", "Pra semana que vem" como seções carimbadas). Se usar algum subtítulo, que seja específico daquela edição e diferente a cada semana — ou não use subtítulo nenhum.
+- NUNCA use clichês ou ditados populares. Proibido: "pulga atrás da orelha", "buraco é mais embaixo", "colocar a mão na massa", "ponta do iceberg", "no fim das contas", "jogar a toalha", "abrir o jogo" e afins. Fale com palavras próprias.
+- NUNCA repita a mesma muleta de abertura em cada seção (ex: "essa foi a afirmação que mais gerou reação", "esse foi o tema mais recorrente"). Varie.
+- NUNCA use paralelismo triplo perfeitinho ("olham pra X quando... olham pro Y quando... olham pro Z quando..."). Quebre o ritmo, escreva desigual como gente escreve.
+- NO MÁXIMO UMA frase de efeito por edição, e só se for genuína. Nada de empilhar punchlines de coach ("não é fraqueza, é matemática comportamental" + "fase boa não espera" etc.).
+- NUNCA se auto-referencie ("um post da semana sobre...", "essa semana postei sobre..."). Entregue a IDEIA direto, como reflexão sua — o leitor não precisa saber que veio de um post.
+- CONFIDENCIALIDADE: nunca cite nome de empresa/cliente/pessoa vindo de reunião de consultoria (nem apelidos como "Bagy"). Anonimize sempre ("um dos mentorados", "uma empresa de varejo"). Casos de empresas PÚBLICAS (ex: Havaianas, Localiza) podem ser citados.
 
-## CONFIDENCIALIDADE (relembre antes de escrever):
-- ZERO nome de empresa, cliente ou pessoa vindos de reuniao. Fenomeno e licao sim; caso identificavel, NUNCA.`;
+## EXEMPLO — ESCREVA ASSIM (fluido, humano, sem tique):
+"Uma coisa se repetiu a semana inteira e eu demorei pra sacar o padrão. Reunião aqui, conversa com founder ali — e no fundo era sempre o mesmo erro: gente brigando com o problema errado. O cara quer a ferramenta de IA, mas o buraco é o processo. O sócio quer aumentar o dividendo, mas o que está torto é como ele se paga.
+Começa pela IA. Não sou contra adotar — sou contra adotar em cima de bagunça. Automatizar um processo ruim não conserta o processo; só faz ele errar mais rápido. Se eu te perguntar quantos pedidos a tua operação aguenta por dia e você travar na resposta, esquece escalar canal novo."
+
+## EXEMPLO — NUNCA ASSIM (fôrma de relatório + tiques):
+"## Fenômeno 1: IA não escala nada, processo escala
+Essa foi a afirmação que mais gerou reação na semana. E faz sentido irritar, porque vai contra o que todo guru tem vendido. Estão olhando pra ferramenta quando o problema é o processo. Estão olhando pro dividendo quando o problema é a estrutura. Estão olhando pro conteúdo curto quando o problema é o tempo. Não é fraqueza, é matemática comportamental."
+
+## LINGUAGEM:
+- NUNCA use travessao (—) nem meia-risca (–) como pontuacao, em NENHUM campo: vale pro SUBJECT, pro TITLE, pros TOPICS e pro corpo. Reescreva com ponto, virgula ou dois-pontos. (Os exemplos acima usam travessao so pra ilustrar a FLUIDEZ; na sua resposta, nao use.)
+- Tudo em PT-BR.`;
 
     const anthropic = getClient();
     const response = await anthropic.messages.create({
