@@ -243,7 +243,7 @@ Parte do material vem de reuniões PRIVADAS de consultoria/mentoria e vai virar 
     const tomReforco = `
 
 ## TOM DA NEWSLETTER (REFORCO)
-A newsletter e uma CRONICA/CARTA fluida em primeira pessoa, NAO um relatorio: sem secoes carimbadas tipo "Fenomeno 1" ou titulos fixos que se repetem toda semana, sem cliches e ditados populares, sem paralelismo triplo perfeitinho, no maximo UMA frase de efeito por edicao, e sem se auto-referenciar ("essa semana postei sobre..."). Os assuntos se conectam com transicoes naturais e a ideia e entregue direto, como reflexao do Pedro.`;
+A newsletter e uma CRONICA/CARTA fluida em primeira pessoa, NAO um relatorio: sem secoes carimbadas tipo "Fenomeno 1" ou titulos fixos que se repetem toda semana, sem cliches e ditados populares, sem paralelismo triplo perfeitinho, no maximo UMA frase de efeito por edicao, e sem se auto-referenciar ("essa semana postei sobre..."). Os assuntos se conectam com transicoes naturais e a ideia e entregue direto, como reflexao do Pedro. E ela ENSINA: cada tema desenvolvido termina com o ensinamento pratico (o que o leitor faz de diferente na segunda-feira); reflexao sem aplicacao, no maximo em um tema por edicao.`;
 
     const systemPrompt =
       (identity
@@ -287,6 +287,7 @@ TOPICS: [3-6 topicos separados por virgula]
 - Escreva como um humano inteligente CONVERSANDO, em primeira pessoa. O texto FLUI como uma crônica/carta: os assuntos se conectam com transições naturais, não em blocos isolados.
 - Parágrafos curtos. Linguagem simples e direta. Opinião de verdade, com convicção.
 - Exemplos concretos e reais (anonimizados quando vierem de reunião).
+- ENSINAMENTO OBRIGATÓRIO: a newsletter ENSINA, não só reflete. Cada tema desenvolvido termina com o ensinamento prático dele, o que o leitor faz de diferente na segunda-feira (uma pergunta de diagnóstico, um teste concreto, uma ordem de passos). Reflexão sem aplicação é permitida em NO MÁXIMO um tema por edição. O ensinamento entra na prosa, fluido, sem virar seção rotulada.
 
 ## NUNCA FAÇA (o que deixou o texto ruim antes):
 - NUNCA use estrutura de fôrma: proibido "Fenômeno 1 / Fenômeno 2 / Fenômeno 3", proibido títulos fixos que se repetem toda semana ("Os playbooks que ficaram", "Pra semana que vem" como seções carimbadas). Se usar algum subtítulo, que seja específico daquela edição e diferente a cada semana — ou não use subtítulo nenhum.
